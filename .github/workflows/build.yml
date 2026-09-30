@@ -1,0 +1,451 @@
+# Ophanim CI — builds Ophanim.app, then tags and publishes a GitHub Release.
+#
+# Everything here exists to satisfy one hard constraint: Ophanim is Apple-Silicon only
+# (README "Building": Apple Silicon Mac, Xcode 26+, iOS platform installed). That means:
+#
+#   * an arm64 macOS runner  -> macos-26 (GA, macOS 26.6, arm64). `xcode-27` also works but is
+#                              a preview image with no SLA; `macos-latest` currently == macos-26.
+#   * Xcode 26+              -> macos-26 ships 26.0.1 … 26.6, default 26.6.
+#   * the iOS platform SDK   -> Galgal.framework and OphanimAgent.dylib are compiled for iOS
+#                              and only afterwards vtool-retagged to Mac Catalyst, and the app
+#                              target's "Carthage Bootstrap" pre-build phase compiles them with
+#                              -sdk iphoneos. The iOS SDK ships preinstalled on macos-26
+#                              (iphoneos26.0 … 26.5), so no `xcodebuild -downloadPlatform iOS`
+#                              step is needed here.
+#
+# Deliberately NOT set here: DEVELOPER_DIR. GitHub macOS runners select Xcode with a
+# system-wide `sudo xcode-select`, they do not export DEVELOPER_DIR. The "Carthage Bootstrap"
+# pre-build phase re-runs its script under `env -i PATH=… HOME="$HOME"`, so a workflow-level
+# DEVELOPER_DIR would be stripped anyway. We validate the runner default instead of overriding
+# it (see "Verify toolchain"), which keeps the CI toolchain identical to a maintainer's machine.
+name: Build
+
+on:
+  # The "Build" button: repo -> Actions -> Build -> Run workflow.
+  workflow_dispatch:
+    inputs:
+      configuration:
+        # The project defines exactly two configurations, Release and Nightly
+        # (project.pbxproj XCConfigurationList). `Debug` is named in Ophanim.xcscheme but
+        # does not exist, and xcodebuild would fail on it.
+        description: Build configuration
+        type: choice
+        options: [Release, Nightly]
+        default: Release
+      test_app:
+        description: Also build the OphanimTest.ipa capture harness
+        type: boolean
+        default: true
+      runner:
+        # A choice, not free text: a typo in a free-form `runs-on` value queues the job against
+        # a label with no runner until the timeout expires.
+        description: Runner image
+        type: choice
+        options: [macos-26, macos-15, xcode-27]
+        default: macos-26
+      publish:
+        description: Tag + release this build on success
+        type: boolean
+        default: true
+      channel:
+        description: Release channel (auto, nightly, release)
+        type: choice
+        options: [auto, nightly, release]
+        default: auto
+
+  push:
+    branches: [main]
+    # Path filters are not evaluated for tag pushes, so v* always builds.
+    tags: ["v*"]
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a tag run: it may be halfway through uploading an immutable release.
+  cancel-in-progress: ${{ github.ref_type == 'branch' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Ophanim.app
+    # `inputs` is populated for workflow_dispatch and empty for push/pull_request, so this
+    # resolves to macos-26 on CI and to the operator's choice on a manual run. `env` is NOT
+    # usable here (jobs.<id>.runs-on can't see the env context), hence the inline fallback.
+    runs-on: ${{ inputs.runner || 'macos-26' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    outputs:
+      # NB: `env` does NOT resolve in a job's `outputs` — the runner builds that context from
+      # GITHUB_ENV and `environment:` variables only, not from the workflow/job `env:` blocks,
+      # and it silently drops empty outputs. So both values come from step outputs.
+      configuration: ${{ steps.summary.outputs.configuration }}
+      version: ${{ steps.package.outputs.version }}
+      artifact: ophanim-app-${{ steps.summary.outputs.configuration }}-${{ github.run_number }}
+      channel: ${{ steps.summary.outputs.channel }}
+    env:
+      CONFIGURATION: ${{ inputs.configuration || 'Release' }}
+      # Manual runs follow the checkbox; push/PR/merge_group always build the harness too.
+      # (`inputs.test_app == true` alone would be false on a push, because GitHub coerces the
+      # absent input to null -> 0 before comparing against boolean true.)
+      BUILD_TEST_APP: ${{ github.event_name != 'workflow_dispatch' || inputs.test_app }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          # Nothing here runs `git push`; the release job authenticates with GH_TOKEN, so there
+          # is no reason to leave a credential in .git/config.
+          persist-credentials: false
+
+      - name: Cache SwiftPM
+        # Only the SwiftPM download/manifest caches, not DerivedData: the SPM git clones are
+        # the slow part of a cold build, while a restored DerivedData carries absolute paths
+        # and stale code signatures into a throwaway runner. Keyed on the project file because
+        # that is where the five SPM requirements (Yams, DownloadManager, DataCache, Injection,
+        # SwiftSoup) are pinned.
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/org.swift.swiftpm
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Ophanim.xcodeproj/project.pbxproj', 'Galgal/Galgal.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Verify toolchain
+        run: |
+          set -euo pipefail
+
+          # Do NOT pipe these into `head`. `xcodebuild -version | head -1` makes head close the
+          # pipe after the first line, xcodebuild then raises
+          # NSFileHandleOperationException "Broken pipe" and *aborts* (exit 134), which pipefail
+          # turns into a step failure. Take the whole output, then slice it in the shell.
+          xcode_all="$(xcodebuild -version)"
+          xcode="${xcode_all%%$'\n'*}"
+          swift_all="$(swift --version 2>&1)"
+          swift_line="${swift_all%%$'\n'*}"
+          echo "Xcode:   $xcode"
+          echo "Swift:   $swift_line"
+          echo "macOS:   $(sw_vers -productVersion) ($(uname -m))"
+
+          if ! ios_sdk="$(xcrun --sdk iphoneos --show-sdk-path 2>/dev/null)"; then
+            echo "::error::No iOS platform SDK. Install it with: sudo xcodebuild -downloadPlatform iOS"
+            exit 1
+          fi
+          echo "iOS SDK: $ios_sdk"
+
+          # Galgal.framework / OphanimAgent.dylib are iOS binaries, so a macOS-only toolchain
+          # cannot produce a working Ophanim.app at all.
+          if [ "$(xcode | sed -E 's/^Xcode ([0-9]+).*/\1/')" -lt 26 ]; then
+            echo "::error::Xcode 26+ is required (README > Building); runner default is $xcode. Re-run on a newer image via the 'runner' input."
+            exit 1
+          fi
+          if [ "$(uname -m)" != "arm64" ]; then
+            echo "::error::Ophanim is Apple-Silicon only; this runner is $(uname -m). Use an arm64 image (macos-15 / macos-26 / xcode-27)."
+            exit 1
+          fi
+
+          # cctools binaries are not enumerated in the runner image README but are required here.
+          for tool in vtool lipo actool; do
+            xcrun --find "$tool" >/dev/null || { echo "::error::xcrun cannot find $tool"; exit 1; }
+          done
+
+          {
+            echo "### Toolchain"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Xcode | $xcode |"
+            echo "| Swift | $swift_line |"
+            echo "| iOS SDK | \`$ios_sdk\` |"
+            echo "| Runner | ${{ inputs.runner || 'macos-26' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Inline-hook engine self-test
+        # Cheap (~2s) and it exercises the riskiest code in the repo — the arm64 relocator in
+        # OphanimCore/OPInline.c — before spending several minutes on xcodebuild.
+        working-directory: scripts
+        run: |
+          set -euo pipefail
+          clang -arch arm64 -isysroot "$(xcrun --sdk macosx --show-sdk-path)" \
+                -I ../OphanimCore -lobjc reloctest.c -o "$RUNNER_TEMP/reloctest"
+          "$RUNNER_TEMP/reloctest"
+
+      - name: Build Ophanim.app
+        # Reuses the project's own entry point, so CI builds exactly what a maintainer builds
+        # locally: xcodebuild (whose pre-build phase builds Galgal.framework + the plugin +
+        # OphanimAgent.dylib), then the deep ad-hoc re-sign and the install to
+        # ~/Applications (the path that satisfies the app's own AppIntegrity check).
+        run: ./build-ophanim.sh "$CONFIGURATION"
+
+      - name: Verify bundle
+        run: |
+          set -euo pipefail
+          app="$HOME/Applications/Ophanim.app"
+
+          codesign --verify --deep --strict --verbose=2 "$app"
+
+          # The injected pieces ship inside the app and are loaded by dyld from a Mac Catalyst
+          # host, so each must really be a Catalyst-tagged arm64 slice.
+          # NB: `vtool -show-build` prints the platform UPPERCASE (" platform MACCATALYST"),
+          # so this match has to be case-insensitive or it will never fire.
+          # `-print -quit` rather than `| head -1`: BSD find under `-P` reports the single
+          # regular file Versions/A/Galgal and then stops, so no writer is ever SIGPIPE'd.
+          galgal="$(find "$app/Contents/Frameworks/Galgal.framework" -type f -name Galgal -print -quit)"
+          for bin in "$galgal" "$app/Contents/Frameworks/OphanimAgent.dylib"; do
+            [ -n "$bin" ] && [ -f "$bin" ] || { echo "::error::missing $(basename "${bin:-?}") in the app bundle"; exit 1; }
+            echo "▸ $(basename "$bin") — $(lipo -archs "$bin")"
+            build_version="$(xcrun vtool -show-build "$bin")"
+            echo "$build_version" | sed 's/^/    /'
+            if ! printf '%s' "$build_version" | grep -qi maccatalyst; then
+              echo "::error title=Not Catalyst-tagged::$(basename "$bin") was not retagged to maccatalyst"
+              exit 1
+            fi
+          done
+
+          test -f "$app/Contents/Resources/Assets.car" || { echo "::error::missing Assets.car"; exit 1; }
+          echo "▸ $(du -sh "$app" | cut -f1) — bundle layout OK"
+
+      - name: Package Ophanim.app
+        id: package
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          rm -rf dist/Ophanim.app
+
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+                      "$HOME/Applications/Ophanim.app/Contents/Info.plist")"
+          version="$(printf '%s' "$version" | tr -c '0-9A-Za-z.+' '-')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          ditto "$HOME/Applications/Ophanim.app" dist/Ophanim.app
+          # Zip locally rather than handing the bundle to upload-artifact: the artifact backend
+          # documents that it does "not maintain file permissions" (everything becomes 644, so
+          # every Mach-O in Contents/MacOS would lose +x) and its symlink handling is
+          # undocumented and has regressed repeatedly — a versioned framework is mostly
+          # symlinks (Versions/Current, Galgal -> Versions/Current/Galgal). ditto -c -k keeps
+          # symlinks, mode bits and xattrs intact, and GitHub then only ever sees one opaque file.
+          ditto -c -k --keepParent dist/Ophanim.app "dist/Ophanim-${version}.zip"
+          ditto -c -k --keepParent dist/Ophanim.app "dist/Ophanim.app.zip"
+          rm -rf dist/Ophanim.app
+
+      - name: Build capture harness
+        if: env.BUILD_TEST_APP == 'true'
+        run: |
+          set -euo pipefail
+          ./TestApp/build-testapp.sh
+          mkdir -p dist
+          cp TestApp/build/OphanimTest.ipa dist/
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          ( cd dist && shasum -a 256 *.zip *.ipa > checksums.txt 2>/dev/null || shasum -a 256 *.* > checksums.txt )
+          cat dist/checksums.txt
+          ls -lh dist/
+
+      - name: Summary
+        id: summary
+        run: |
+          set -euo pipefail
+          app="$HOME/Applications/Ophanim.app"
+          plist="$app/Contents/Info.plist"
+          # Read back the *packaged* name so the summary can never disagree with the artifact.
+          version="${{ steps.package.outputs.version }}"
+          build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+          CHANNEL="${{ inputs.channel || 'auto' }}"
+          if [ "$CHANNEL" = "auto" ]; then
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              CHANNEL="release"
+            else
+              CHANNEL="nightly"
+            fi
+          fi
+          echo "configuration=$CONFIGURATION" >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Ophanim $version ($build) — $CONFIGURATION ($CHANNEL)"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo "| Channel | \`$CHANNEL\` |"
+            echo "| Size | $(du -sh "$app" | cut -f1) |"
+            echo "| Zip | $(ls -lh dist/Ophanim-${version}.zip | awk '{print $5}') |"
+            echo
+            echo "Unzip \`Ophanim.app.zip\` into \`/Applications\`. The build is **ad-hoc signed**, so clear the download quarantine once:"
+            echo
+            echo '```sh'
+            echo "unzip Ophanim.app.zip -d /Applications"
+            echo 'xattr -dr com.apple.quarantine /Applications/Ophanim.app'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Ophanim.app
+        uses: actions/upload-artifact@v7
+        with:
+          name: ophanim-app-${{ env.CONFIGURATION }}-${{ github.run_number }}
+          path: dist/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+      - name: Upload OphanimTest.ipa
+        if: env.BUILD_TEST_APP == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ophanim-testapp-${{ github.run_number }}
+          path: dist/OphanimTest.ipa
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  release:
+    name: Tag and publish release
+    needs: build
+    # The Build button is authoritative: unticking `publish` and hitting Run must NOT publish.
+    # Otherwise: a v* tag push, or any green build landing on main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && (inputs.publish == true || inputs.publish == 'true')) ||
+      (github.event_name != 'workflow_dispatch' &&
+       (github.ref_type == 'tag' || (github.event_name == 'push' && github.ref == 'refs/heads/main')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release-${{ needs.build.outputs.channel }}-${{ needs.build.outputs.version }}
+      cancel-in-progress: false
+    permissions:
+      contents: write   # create the tag + the release
+      id-token: write   # Sigstore OIDC, for the provenance attestation
+      attestations: write
+      artifact-metadata: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # No checkout in this job, so `gh` has no git remote to infer the repo from; without this
+      # every gh command dies with "failed to run git: not a git repository".
+      GH_REPO: ${{ github.repository }}
+      CHANNEL: ${{ needs.build.outputs.channel }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - name: Download build output
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: dist
+
+      - name: Plan the release
+        id: plan
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(dist/*.zip)
+          ipas=(dist/*.ipa)
+          assets=("${zips[@]}" "${ipas[@]}" dist/checksums.txt)
+          [ "${#zips[@]}" -gt 0 ] || { echo "::error::no zip in dist/ — refusing to publish a binary-less release"; exit 1; }
+          [ -f dist/checksums.txt ] || { echo "::error::missing dist/checksums.txt"; exit 1; }
+
+          echo "Target channel: $CHANNEL"
+          if [ "$CHANNEL" = "nightly" ]; then
+            TAG="nightly"
+            TITLE="Ophanim Nightly"
+            IS_PRERELEASE="true"
+          else
+            TAG="v${VERSION}"
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              TAG="$GITHUB_REF_NAME"
+            fi
+            TITLE="Ophanim $TAG"
+            IS_PRERELEASE="false"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        if: steps.plan.outputs.is_prerelease != 'true'
+        continue-on-error: true
+        uses: actions/attest@v4
+        with:
+          subject-path: dist/*.zip
+
+      - name: Create or update GitHub Release
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(dist/*.zip dist/*.ipa dist/checksums.txt)
+          TAG="${{ steps.plan.outputs.tag }}"
+          TITLE="${{ steps.plan.outputs.title }}"
+          IS_PRERELEASE="${{ steps.plan.outputs.is_prerelease }}"
+
+          if [ "$TAG" = "nightly" ]; then
+            # Delete existing nightly release to allow updating the rolling prerelease cleanly
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "Existing $TAG release found. Deleting old release and tag..."
+              gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+            fi
+
+            {
+              echo "### Ophanim Nightly Build"
+              echo
+              echo "Automated pre-release built directly from commit [\`${GITHUB_SHA:0:7}\`](https://github.com/${GH_REPO}/commit/${GITHUB_SHA}) on \`${GITHUB_REF_NAME}\`."
+              echo
+              echo "**Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+              echo "**Version:** \`${VERSION}\`"
+              echo
+              echo "#### Included Assets:"
+              echo "- \`Ophanim.app.zip\` — Complete application bundle."
+              echo "- \`Ophanim-${VERSION}.zip\` — Version-tagged archive."
+              echo "- \`OphanimTest.ipa\` — Instrumentation and capture test harness."
+              echo "- \`checksums.txt\` — SHA-256 integrity checksums."
+              echo
+              echo "#### Installation:"
+              echo "1. Download and extract \`Ophanim.app.zip\` into \`/Applications\`."
+              echo "2. Clear macOS quarantine (required for ad-hoc signed builds):"
+              echo '```sh'
+              echo "xattr -dr com.apple.quarantine /Applications/Ophanim.app"
+              echo '```'
+            } > dist/release-notes.md
+
+            # Create the fresh nightly pre-release
+            if ! gh release create "$TAG" "${assets[@]}" \
+              --title "$TITLE" \
+              --target "$GITHUB_SHA" \
+              --prerelease \
+              --notes-file dist/release-notes.md; then
+              echo "gh release create failed; attempting fallback upload with --clobber..."
+              gh release upload "$TAG" "${assets[@]}" --clobber
+              gh release edit "$TAG" --title "$TITLE" --prerelease --notes-file dist/release-notes.md || true
+            fi
+          else
+            # Official Tagged Release
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "::notice::release $TAG already exists — nothing to do (tags and assets are immutable once published). Bump MARKETING_VERSION in Ophanim.xcodeproj to cut the next release."
+              exit 0
+            fi
+
+            gh release create "$TAG" "${assets[@]}" \
+              --title "$TITLE" \
+              --target "$GITHUB_SHA" \
+              --generate-notes
+          fi
+
+          gh release view "$TAG" --json url,tagName,isDraft,isPrerelease \
+            --jq '"published \(.tagName) (draft=\(.isDraft) prerelease=\(.isPrerelease)) → \(.url)"' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Release ${{ steps.plan.outputs.tag || 'Summary' }}"
+            echo
+            echo "- assets: \`$(ls dist | tr '\n' ' ')\`"
+            echo "- commit: \`${GITHUB_SHA}\`"
+            echo "- channel: \`${CHANNEL}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
