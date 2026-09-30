@@ -140,14 +140,13 @@ struct AppLibraryView: View {
                 if let identifier = item.registeredTypeIdentifiers.first {
                     if identifier == "public.url" || identifier == "public.file-url" {
                         item.loadItem(forTypeIdentifier: identifier, options: nil) { (urlData, _) in
+                            guard let data = urlData as? Data else { return }
                             Task { @MainActor in
-                                if let urlData = urlData as? Data {
-                                    let url = NSURL(absoluteURLWithDataRepresentation: urlData, relativeTo: nil) as URL
-                                    if url.pathExtension == "ipa" {
-                                        installApp(url)
-                                    } else {
-                                        showWrongfileTypeAlert = true
-                                    }
+                                let url = NSURL(absoluteURLWithDataRepresentation: data, relativeTo: nil) as URL
+                                if url.pathExtension == "ipa" {
+                                    installApp(url)
+                                } else {
+                                    showWrongfileTypeAlert = true
                                 }
                             }
                         }

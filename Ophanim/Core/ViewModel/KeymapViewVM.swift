@@ -8,7 +8,7 @@
 import SwiftUI
 import DataCache
 
-@Observable class KeymapViewVM {
+@Observable class KeymapViewVM: @unchecked Sendable {
 
     public let app: HostedApp
     public let cache = DataCache.instance

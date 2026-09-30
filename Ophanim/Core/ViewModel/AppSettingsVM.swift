@@ -7,7 +7,7 @@
 
 import Foundation
 
-@Observable class AppSettingsVM {
+@Observable class AppSettingsVM: @unchecked Sendable {
     let app: HostedApp
     var settings: AppSettings
 

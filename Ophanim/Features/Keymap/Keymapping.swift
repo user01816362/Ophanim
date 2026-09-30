@@ -213,8 +213,8 @@ class Keymapping {
         openPanel.allowedContentTypes = [UTType(exportedAs: "be.ophanim.Ophanim-galgalmap")]
         openPanel.title = NSLocalizedString("hostedapp.importKm", comment: "")
 
-        openPanel.begin { result in
-            if result == .OK {
+        // runModal (synchronous, main thread): same UX as begin, no @Sendable closure.
+        if openPanel.runModal() == .OK {
                 do {
                     if let selectedPath = openPanel.url {
                         let data = try Data(contentsOf: selectedPath)
@@ -251,7 +251,6 @@ class Keymapping {
                     }
                 }
                 openPanel.close()
-            }
         }
     }
 
@@ -264,8 +263,7 @@ class Keymapping {
         savePanel.canCreateDirectories = true
         savePanel.isExtensionHidden = false
 
-        savePanel.begin { result in
-            if result == .OK {
+        if savePanel.runModal() == .OK {
                 do {
                     if let selectedPath = savePanel.url {
                         let data = try self.encoder.encode(self.getKeymap(name: name))
@@ -277,7 +275,6 @@ class Keymapping {
                     Log.shared.error(error)
                 }
                 savePanel.close()
-            }
         }
     }
 

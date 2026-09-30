@@ -5,7 +5,7 @@
 
 import Foundation
 
-@Observable class AppsVM {
+@Observable class AppsVM: @unchecked Sendable {
 
     public static let appDirectory = Galgal.ophanimContainer.appendingPathComponent("Applications")
 

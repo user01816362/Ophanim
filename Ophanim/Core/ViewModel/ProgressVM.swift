@@ -7,7 +7,7 @@
 
 import Foundation
 
-@Observable class ProgressVM<Steps: RawRepresentable & Equatable> where Steps.RawValue == String {
+@Observable class ProgressVM<Steps: RawRepresentable & Equatable & Sendable>: @unchecked Sendable where Steps.RawValue == String {
     var progress = 0.0
     var inProgress = false
     var status: Steps

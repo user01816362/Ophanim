@@ -6,15 +6,16 @@
 import Foundation
 import SwiftUI
 
-@Observable class Log {
+@Observable class Log: @unchecked Sendable {
 
     nonisolated(unsafe) static let shared = Log()
 
     func error(_ err: Error) {
+        let message = err.localizedDescription
         Task { @MainActor in
             self.dialog(
                 question: NSLocalizedString("alert.error", comment: ""),
-                text: err.localizedDescription,
+                text: message,
                 style: NSAlert.Style.critical)
         }
     }

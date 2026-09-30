@@ -99,7 +99,7 @@ struct AppSettingsData: Codable {
     }
 }
 
-@Observable class AppSettings {
+@Observable class AppSettings: @unchecked Sendable {
     static var appSettingsDir: URL {
         let settingsFolder =
             Galgal.ophanimContainer.appendingPathComponent("App Settings")

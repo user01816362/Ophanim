@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-@Observable class HostedAppVM {
+@Observable class HostedAppVM: @unchecked Sendable {
     var app: HostedApp
     var showSettings = false
     var showClearPreferencesAlert = false

@@ -42,7 +42,7 @@ enum OphanimMain {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     @AppStorage("ShowLowPowerModeAlert") var showLowPowerModeAlert = true
 
     func application(_ application: NSApplication, open urls: [URL]) {

@@ -6,7 +6,7 @@
 import CoreAudio
 import SwiftUI
 
-class SoundDeviceService {
+class SoundDeviceService: @unchecked Sendable {
 
     nonisolated(unsafe) static let shared = SoundDeviceService()
 

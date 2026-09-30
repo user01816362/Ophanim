@@ -7,7 +7,7 @@ import Cocoa
 import Foundation
 import IOKit.pwr_mgt
 
-class HostedApp: BaseApp {
+class HostedApp: BaseApp, @unchecked Sendable {
     // MARK: - Static
     public static let bundleIDCacheURL = Galgal.ophanimContainer.appendingPathComponent("CACHE")
 
