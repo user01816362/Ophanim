@@ -23,7 +23,7 @@ struct BypassesView: View {
          hasGalgal: Binding<Bool?>,
          task: Binding<BlockingTask>,
          app: HostedApp) {
-        self._settings = ObservedObject(wrappedValue: settings)
+        self._settings = Bindable(wrappedValue: settings)
         self._hasGalgal = hasGalgal
         self._task = task
         self.app = app

@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-@Observable class UninstallPreferences: NSObject {
+class UninstallPreferences: NSObject, ObservableObject {
     static var shared = UninstallPreferences()
 
     @objc @AppStorage("ClearAppDataUninstall") var clearAppData = false
@@ -22,7 +22,7 @@ import SwiftUI
 struct UninstallSettings: View {
     public static var shared = UninstallSettings()
 
-    @Bindable var uninstallPreferences = UninstallPreferences.shared
+    @ObservedObject var uninstallPreferences = UninstallPreferences.shared
 
     @State private var showPruneFileAlert = false
 

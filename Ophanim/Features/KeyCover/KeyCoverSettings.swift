@@ -13,7 +13,7 @@ enum KeyCoverStatus: String, Codable, Hashable {
     case userProvidedPassword
 }
 
-@Observable class KeyCoverPreferences: NSObject {
+class KeyCoverPreferences: NSObject, ObservableObject {
     static var shared = KeyCoverPreferences()
 
     @AppStorage("keyCoverEnabled") var keyCoverEnabled: KeyCoverStatus = KeyCoverStatus.disabled
@@ -27,7 +27,7 @@ struct KeyCoverSettings: View {
     @State private var keyCoverUpdatePasswordShown = false
     @State private var keyCoverRemovalViewShown = false
 
-    @Bindable var keyCoverPreferences = KeyCoverPreferences.shared
+    @ObservedObject var keyCoverPreferences = KeyCoverPreferences.shared
     @Bindable var keyCoverObserved = KeyCoverObservable.shared
 
     @Bindable var modifierKeyObserver = ModifierKeyObserver.shared

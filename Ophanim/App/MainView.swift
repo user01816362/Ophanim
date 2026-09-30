@@ -49,7 +49,10 @@ struct MainView: View {
                     .environment(InstallVM.shared)
             }
             .alert("alert.moveAppToApplications.title",
-                   isPresented: $integrity.integrityOff) {
+                   isPresented: Binding(
+                       get: { integrity.integrityOff },
+                       set: { integrity.integrityOff = $0 }
+                   )) {
                 Button("alert.moveAppToApplications.move", role: .cancel) {
                     integrity.moveToApps()
                 }
