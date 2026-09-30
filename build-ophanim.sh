@@ -19,8 +19,12 @@ APP="$(find "$HOME/Library/Developer/Xcode/DerivedData/Ophanim-"*/Build/Products
         -maxdepth 1 -name Ophanim.app 2>/dev/null | head -1)"
 [ -d "$APP" ] || { echo "built app not found"; exit 1; }
 
-echo "▸ Ad-hoc deep re-sign $APP"
-codesign --force --deep --sign - "$APP"
+echo "▸ Ad-hoc leaf-first re-sign $APP (TN2206: no --deep for signing)"
+for nested in "$APP"/Contents/Frameworks/* "$APP"/Contents/PlugIns/* "$APP"/Contents/Helpers/*; do
+    [ -e "$nested" ] || continue
+    codesign --force --sign - "$nested"
+done
+codesign --force --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 # Install to ~/Applications: a stable, sudo-free location whose path satisfies the AppIntegrity
@@ -30,6 +34,10 @@ DEST="$HOME/Applications/Ophanim.app"
 mkdir -p "$(dirname "$DEST")"
 rm -rf "$DEST"
 ditto "$APP" "$DEST"
-codesign --force --deep --sign - "$DEST"
+for nested in "$DEST"/Contents/Frameworks/* "$DEST"/Contents/PlugIns/* "$DEST"/Contents/Helpers/*; do
+    [ -e "$nested" ] || continue
+    codesign --force --sign - "$nested"
+done
+codesign --force --sign - "$DEST"
 codesign --verify --deep --strict "$DEST"
 echo "✓ Ophanim.app ready → $DEST"

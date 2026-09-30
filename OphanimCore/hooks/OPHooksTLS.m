@@ -25,10 +25,7 @@
 // Secure Transport (SSLRead/SSLWrite/SSLContextRef) is deprecated but still widely linked; silence.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-#define DYLD_INTERPOSE(_replacement, _replacee) \
-   __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
-   _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = \
-   { (const void *)(unsigned long)(void *)&_replacement, (const void *)(unsigned long)(void *)&_replacee };
+#import "../compat/OPInterpose.h"
 
 // --- boringssl (weak; in-cache, rarely interposable) ---
 extern int SSL_read(void *ssl, void *buf, int num) __attribute__((weak_import));
@@ -49,8 +46,8 @@ static int op_SSL_write(void *ssl, const void *buf, int num) {
     return SSL_write(ssl, buf, num);
 }
 
-DYLD_INTERPOSE(op_SSL_read, SSL_read)
-DYLD_INTERPOSE(op_SSL_write, SSL_write)
+OPHANIM_INTERPOSE(op_SSL_read, SSL_read)
+OPHANIM_INTERPOSE(op_SSL_write, SSL_write)
 
 // --- Apple Secure Transport (strong import; apps that link it ARE interposable) ---
 static OSStatus op_SSLRead(SSLContextRef ctx, void *data, size_t dataLength, size_t *processed) {
@@ -73,5 +70,5 @@ static OSStatus op_SSLWrite(SSLContextRef ctx, const void *data, size_t dataLeng
     return SSLWrite(ctx, data, dataLength, processed);
 }
 
-DYLD_INTERPOSE(op_SSLRead, SSLRead)
-DYLD_INTERPOSE(op_SSLWrite, SSLWrite)
+OPHANIM_INTERPOSE(op_SSLRead, SSLRead)
+OPHANIM_INTERPOSE(op_SSLWrite, SSLWrite)

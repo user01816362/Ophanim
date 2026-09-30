@@ -166,6 +166,24 @@ jobs:
             echo "| Runner | ${{ inputs.runner || 'macos-26' }} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: DRY enforcement gates
+        # R7 (single interpose macro): no local DYLD_INTERPOSE defines; every
+        # interpose site must import compat/OPInterpose.h.
+        # R10 (single plist helper): PropertyListSerialization.propertyList may
+        # only appear in PlistReader.swift + Entitlements.swift (Dictionary.read).
+        run: |
+          set -euo pipefail
+          if grep -rn 'define DYLD_INTERPOSE' OphanimCore Galgal/Galgal/; then
+            echo "::error::R7: local DYLD_INTERPOSE define found - use compat/OPInterpose.h"
+            exit 1
+          fi
+          if grep -rln 'PropertyListSerialization\.propertyList' Ophanim/ --include='*.swift' \
+              | grep -v -e 'Core/Support/PlistReader.swift' -e 'Core/Support/Entitlements.swift'; then
+            echo "::error::R10: plist decode outside PlistReader/Dictionary.read - use PlistReader.appInfoDict"
+            exit 1
+          fi
+          echo "DRY gates passed."
+
       - name: Inline-hook engine self-test
         # Cheap (~2s) and it exercises the riskiest code in the repo — the arm64 relocator in
         # OphanimCore/hooks/OPInline.c — before spending several minutes on xcodebuild.

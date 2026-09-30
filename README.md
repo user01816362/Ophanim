@@ -71,13 +71,14 @@ Ophanim has three parts:
 | Custom Swift hooks (native-Swift vtable patching) | ✅ | ✅ |
 | Inline hooks (arm64 machine-code patch by address/symbol/offset/signature; intercept/modify return/log; render `NSData`/`NSString` arg registers as bodies/fields) | ✅ | ✅ |
 | Rules engine + JavaScriptCore scripting + all sinks | ✅ | ✅ |
-| Filesystem | ✅ full (`open`/`stat`/`access`/`rename`/`unlink`) | ◑ partial - `NSFileManager` only |
+| Filesystem | ✅ full (`open`/`stat`/`access`/`rename`/`unlink`) | ✅ parity - raw C-level observe via `OPHooksFSRaw` (agent-only, chains through Galgal's dormant `gg_*`) + `NSFileManager` swizzle |
 | Keychain (`SecItem*`) | ✅ | ✗ (C API; no ObjC fallback) |
 | Jailbreak / root-detector bypass + logging | ✅ | bypass yes; logging Embedded-only |
 
 The engine deliberately only interposes C symbols the runtime doesn't already own, so the two never
-collide - that's why keychain and raw C-level filesystem stay Embedded-only and Sibling falls back to
-`NSFileManager`-level filesystem capture.
+collide - that's why keychain stays Embedded-only (Galgal-owned `gg_SecItem*` emulation, hard rule:
+the agent must NOT re-interpose it). Raw C-level filesystem is captured in both modes (embedded via
+Galgal's `gg_*`, sibling via `OPHooksFSRaw`); see `OPRing.h` SIBLING-MODE NOTE, normative for mechanism.
 
 ## Building
 

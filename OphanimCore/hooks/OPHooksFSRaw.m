@@ -34,10 +34,7 @@
 #import <stdarg.h>
 #import "../ring/OPRing.h"
 
-#define DYLD_INTERPOSE(_replacement, _replacee) \
-   __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
-   _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = \
-   { (const void *)(unsigned long)&_replacement, (const void *)(unsigned long)&_replacee };
+#import "../compat/OPInterpose.h"
 
 // open() is variadic: when O_CREAT (or O_TMPFILE, where defined) is set the caller passes a mode_t,
 // which must be forwarded or the new file gets a garbage mode. (Stricter than Galgal's gg_open, which
@@ -95,11 +92,11 @@ static int op_fs_unlink(const char *path) {
     return unlink(path);
 }
 
-DYLD_INTERPOSE(op_fs_open, open)
-DYLD_INTERPOSE(op_fs_stat, stat)
-DYLD_INTERPOSE(op_fs_lstat, lstat)
-DYLD_INTERPOSE(op_fs_access, access)
-DYLD_INTERPOSE(op_fs_rename, rename)
-DYLD_INTERPOSE(op_fs_unlink, unlink)
+OPHANIM_INTERPOSE(op_fs_open, open)
+OPHANIM_INTERPOSE(op_fs_stat, stat)
+OPHANIM_INTERPOSE(op_fs_lstat, lstat)
+OPHANIM_INTERPOSE(op_fs_access, access)
+OPHANIM_INTERPOSE(op_fs_rename, rename)
+OPHANIM_INTERPOSE(op_fs_unlink, unlink)
 
 #endif /* OPHANIM_SIBLING */

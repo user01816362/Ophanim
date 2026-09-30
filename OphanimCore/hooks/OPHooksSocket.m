@@ -15,10 +15,7 @@
 #import <netdb.h>
 #import "../ring/OPRing.h"
 
-#define DYLD_INTERPOSE(_replacement, _replacee) \
-   __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
-   _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = \
-   { (const void *)(unsigned long)&_replacement, (const void *)(unsigned long)&_replacee };
+#import "../compat/OPInterpose.h"
 
 static int op_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     if (op_ring_started() && addr) {   // dormant image (sibling Galgal): transparent thunk, no formatting
@@ -48,5 +45,5 @@ static int op_getaddrinfo(const char *node, const char *service,
     return getaddrinfo(node, service, hints, res);
 }
 
-DYLD_INTERPOSE(op_connect, connect)
-DYLD_INTERPOSE(op_getaddrinfo, getaddrinfo)
+OPHANIM_INTERPOSE(op_connect, connect)
+OPHANIM_INTERPOSE(op_getaddrinfo, getaddrinfo)

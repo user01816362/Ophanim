@@ -235,10 +235,6 @@ class Entitlements {
         """
 }
 
-public func == <K, L: Hashable, R: Hashable>(lhs: [K: L], rhs: [K: R]) -> Bool {
-    (lhs as NSDictionary).isEqual(to: rhs)
-}
-
 extension Dictionary {
     func store(_ toUrl: URL) throws {
         let data = try PropertyListSerialization.data(fromPropertyList: self, format: .xml, options: 0)

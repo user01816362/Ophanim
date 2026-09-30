@@ -12,6 +12,6 @@
   } _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = { \
     (const void *)(unsigned long)&_replacement, \
     (const void *)(unsigned long)&_replacee \
-  }
+  };
 
 #endif

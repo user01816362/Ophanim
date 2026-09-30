@@ -28,10 +28,7 @@
 // so we must interpose it too. Silence the deprecation diagnostic for this file.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-#define DYLD_INTERPOSE(_replacement, _replacee) \
-   __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
-   _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = \
-   { (const void *)(unsigned long)(void *)&_replacement, (const void *)(unsigned long)(void *)&_replacee };
+#import "../compat/OPInterpose.h"
 
 static atomic_bool g_bypass_pinning = false;
 
@@ -58,4 +55,4 @@ static Boolean op_SecTrustEvaluateWithError(SecTrustRef trust, CFErrorRef *error
     return original;
 }
 
-DYLD_INTERPOSE(op_SecTrustEvaluateWithError, SecTrustEvaluateWithError)
+OPHANIM_INTERPOSE(op_SecTrustEvaluateWithError, SecTrustEvaluateWithError)

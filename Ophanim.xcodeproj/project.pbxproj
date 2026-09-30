@@ -7,13 +7,44 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A5BCDD4FEE663813 /* Controls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0F81A91659E960A /* Controls.swift */; };
+		2BE108FE640E74C8 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEAC88529FFB5C85 /* AppTheme.swift */; };
+		1452BDC63A26A13B /* TerminalStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7B56747761298C /* TerminalStyles.swift */; };
+		8BE78DA4B7330A19 /* AmbientEffects.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7286C1F0C0912855 /* AmbientEffects.swift */; };
+		18B8F8545418D0B4 /* PlistReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C13AF73619B1C6 /* PlistReader.swift */; };
+		77EFD940A7878EA6 /* ResolutionMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9087A86A5DC671E8 /* ResolutionMath.swift */; };
+		B813561B9FBD2CF1 /* JBBypassCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0768B6168B08B627 /* JBBypassCatalog.swift */; };
+		8353AA2438D2A4B1 /* HostedApp+Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B2484B3BABE223 /* HostedApp+Environment.swift */; };
+		28AFA7C4935922F6 /* HostedApp+Power.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE182F7996141C5D /* HostedApp+Power.swift */; };
+		0F11B373B5D5CAB8 /* HostedApp+KeyCover.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16D93A5FD4D73CE /* HostedApp+KeyCover.swift */; };
+		E85A929E7C84BAAA /* HostedApp+Tools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C99F8F38CB1F9F5 /* HostedApp+Tools.swift */; };
+		B6181F6617F3D014 /* HostedApp+Files.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBD33DB5B867DF1 /* HostedApp+Files.swift */; };
+		08B8A1CF41394C72 /* ToolRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 900502EE8C0E1C7C /* ToolRouter.swift */; };
+		BC77E289CAFC42CD /* AppTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220847F9046C01C1 /* AppTools.swift */; };
+		5B7A3449F68B4385 /* EventTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3765949B44E0A21E /* EventTools.swift */; };
+		DADC6715A2A738F7 /* ReconTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DEEFFE3AD0AF6 /* ReconTools.swift */; };
+		63820A553F7822A2 /* HookTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC7C7D95F6CB3C2 /* HookTools.swift */; };
+		B7C5923B73019E46 /* RuleTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4348A085B12A9469 /* RuleTools.swift */; };
+		A9BCA17E026BF421 /* ConfigTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C5858FBCEEE0E6 /* ConfigTools.swift */; };
+		7527AAB09643E217 /* StdioTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AED5DF901EE05DC /* StdioTransport.swift */; };
+		D7C650AEF355211F /* HTTPTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E70BEBCBB434C08 /* HTTPTransport.swift */; };
+		C3A41E949D1E600D /* AppQueryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E79EE123C632373 /* AppQueryService.swift */; };
+		DDC60EB416ACAC10 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 550DAF5401731081 /* SettingsStore.swift */; };
+		9FF92C79D65B7FFD /* ReportBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4BCF3C93514DBED /* ReportBuilder.swift */; };
+		5854E1C8E8CB321E /* GraphicsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB948873F0F2EA5 /* GraphicsPane.swift */; };
+		8A84939569AC3C9B /* KeymappingPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0696BE3C138F13FF /* KeymappingPane.swift */; };
+		1E9F99F71F6A9E98 /* BypassesPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90BB9421D69FD643 /* BypassesPane.swift */; };
+		21B30B54EE6AE8C6 /* InfoPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = D324648A50A21929 /* InfoPane.swift */; };
+		9C9A714A49EDA1FC /* SettingsWindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C525977E937028 /* SettingsWindowManager.swift */; };
+		7A509E4CA6CD92E3 /* ObjCHooksEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36D4A6EAA09E20FC /* ObjCHooksEditor.swift */; };
+		6F535E1A465BC4C1 /* SwiftHooksEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 073D818FBD8FC133 /* SwiftHooksEditor.swift */; };
+		A761A8D25A040FB4 /* InlineHooksEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94A87C8F0FE614E7 /* InlineHooksEditor.swift */; };
 		FACE00000000000000000705 /* RulesEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000704 /* RulesEditorView.swift */; };
 		FACE00000000000000000703 /* LogViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000702 /* LogViewerView.swift */; };
 		FACE00000000000000000707 /* ReconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000706 /* ReconView.swift */; };
 		FACE00000000000000000701 /* InstrumentationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000700 /* InstrumentationSettings.swift */; };
 		FACE00000000000000000500 /* OPEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000400 /* OPEvent.swift */; };
 		FACE00000000000000000501 /* OPConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000401 /* OPConfig.swift */; };
-		FACE00000000000000000A01 /* MCPData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000A00 /* MCPData.swift */; };
 		FACE00000000000000000A03 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000A02 /* MCPServer.swift */; };
 		342787552E787EBB003A3C2F /* Keymapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342787542E787EB9003A3C2F /* Keymapping.swift */; };
 		3447B5E52E28B46800FAA22F /* KeymapViewVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */; };
@@ -89,13 +120,44 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C0F81A91659E960A /* Controls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Controls.swift; path = Ophanim/DesignSystem/Controls.swift; sourceTree = SOURCE_ROOT; };
+		EEAC88529FFB5C85 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppTheme.swift; path = Ophanim/DesignSystem/AppTheme.swift; sourceTree = SOURCE_ROOT; };
+		BF7B56747761298C /* TerminalStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TerminalStyles.swift; path = Ophanim/DesignSystem/TerminalStyles.swift; sourceTree = SOURCE_ROOT; };
+		7286C1F0C0912855 /* AmbientEffects.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AmbientEffects.swift; path = Ophanim/DesignSystem/AmbientEffects.swift; sourceTree = SOURCE_ROOT; };
+		24C13AF73619B1C6 /* PlistReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlistReader.swift; path = Ophanim/Core/Support/PlistReader.swift; sourceTree = SOURCE_ROOT; };
+		9087A86A5DC671E8 /* ResolutionMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ResolutionMath.swift; path = Ophanim/Core/Support/ResolutionMath.swift; sourceTree = SOURCE_ROOT; };
+		0768B6168B08B627 /* JBBypassCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = JBBypassCatalog.swift; path = Ophanim/Core/Model/JBBypassCatalog.swift; sourceTree = SOURCE_ROOT; };
+		50B2484B3BABE223 /* HostedApp+Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HostedApp+Environment.swift; path = Ophanim/Core/Model/HostedApp+Environment.swift; sourceTree = SOURCE_ROOT; };
+		BE182F7996141C5D /* HostedApp+Power.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HostedApp+Power.swift; path = Ophanim/Core/Model/HostedApp+Power.swift; sourceTree = SOURCE_ROOT; };
+		E16D93A5FD4D73CE /* HostedApp+KeyCover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HostedApp+KeyCover.swift; path = Ophanim/Core/Model/HostedApp+KeyCover.swift; sourceTree = SOURCE_ROOT; };
+		8C99F8F38CB1F9F5 /* HostedApp+Tools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HostedApp+Tools.swift; path = Ophanim/Core/Model/HostedApp+Tools.swift; sourceTree = SOURCE_ROOT; };
+		BCBD33DB5B867DF1 /* HostedApp+Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HostedApp+Files.swift; path = Ophanim/Core/Model/HostedApp+Files.swift; sourceTree = SOURCE_ROOT; };
+		900502EE8C0E1C7C /* ToolRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ToolRouter.swift; path = Ophanim/Core/MCP/ToolRouter.swift; sourceTree = SOURCE_ROOT; };
+		220847F9046C01C1 /* AppTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppTools.swift; path = Ophanim/Core/MCP/Tools/AppTools.swift; sourceTree = SOURCE_ROOT; };
+		3765949B44E0A21E /* EventTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventTools.swift; path = Ophanim/Core/MCP/Tools/EventTools.swift; sourceTree = SOURCE_ROOT; };
+		056DEEFFE3AD0AF6 /* ReconTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconTools.swift; path = Ophanim/Core/MCP/Tools/ReconTools.swift; sourceTree = SOURCE_ROOT; };
+		8AC7C7D95F6CB3C2 /* HookTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HookTools.swift; path = Ophanim/Core/MCP/Tools/HookTools.swift; sourceTree = SOURCE_ROOT; };
+		4348A085B12A9469 /* RuleTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RuleTools.swift; path = Ophanim/Core/MCP/Tools/RuleTools.swift; sourceTree = SOURCE_ROOT; };
+		86C5858FBCEEE0E6 /* ConfigTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConfigTools.swift; path = Ophanim/Core/MCP/Tools/ConfigTools.swift; sourceTree = SOURCE_ROOT; };
+		5AED5DF901EE05DC /* StdioTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StdioTransport.swift; path = Ophanim/Core/MCP/Transports/StdioTransport.swift; sourceTree = SOURCE_ROOT; };
+		9E70BEBCBB434C08 /* HTTPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HTTPTransport.swift; path = Ophanim/Core/MCP/Transports/HTTPTransport.swift; sourceTree = SOURCE_ROOT; };
+		1E79EE123C632373 /* AppQueryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppQueryService.swift; path = Ophanim/Core/MCP/Services/AppQueryService.swift; sourceTree = SOURCE_ROOT; };
+		550DAF5401731081 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsStore.swift; path = Ophanim/Core/MCP/Services/SettingsStore.swift; sourceTree = SOURCE_ROOT; };
+		F4BCF3C93514DBED /* ReportBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReportBuilder.swift; path = Ophanim/Core/MCP/Services/ReportBuilder.swift; sourceTree = SOURCE_ROOT; };
+		EAB948873F0F2EA5 /* GraphicsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GraphicsPane.swift; path = Ophanim/Features/AppSettings/GraphicsPane.swift; sourceTree = SOURCE_ROOT; };
+		0696BE3C138F13FF /* KeymappingPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeymappingPane.swift; path = Ophanim/Features/AppSettings/KeymappingPane.swift; sourceTree = SOURCE_ROOT; };
+		90BB9421D69FD643 /* BypassesPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BypassesPane.swift; path = Ophanim/Features/AppSettings/BypassesPane.swift; sourceTree = SOURCE_ROOT; };
+		D324648A50A21929 /* InfoPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InfoPane.swift; path = Ophanim/Features/AppSettings/InfoPane.swift; sourceTree = SOURCE_ROOT; };
+		88C525977E937028 /* SettingsWindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SettingsWindowManager.swift; path = Ophanim/Features/Rules/SettingsWindowManager.swift; sourceTree = SOURCE_ROOT; };
+		36D4A6EAA09E20FC /* ObjCHooksEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ObjCHooksEditor.swift; path = Ophanim/Features/Rules/ObjCHooksEditor.swift; sourceTree = SOURCE_ROOT; };
+		073D818FBD8FC133 /* SwiftHooksEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SwiftHooksEditor.swift; path = Ophanim/Features/Rules/SwiftHooksEditor.swift; sourceTree = SOURCE_ROOT; };
+		94A87C8F0FE614E7 /* InlineHooksEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InlineHooksEditor.swift; path = Ophanim/Features/Rules/InlineHooksEditor.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000704 /* RulesEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RulesEditorView.swift; path = Ophanim/Features/Rules/RulesEditorView.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000702 /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogViewerView.swift; path = Ophanim/Features/Recon/LogViewerView.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000706 /* ReconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconView.swift; path = Ophanim/Features/Recon/ReconView.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000700 /* InstrumentationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InstrumentationSettings.swift; path = Ophanim/Features/AppSettings/InstrumentationSettings.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000400 /* OPEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPEvent.swift; path = OphanimCore/policy/OPEvent.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000401 /* OPConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPConfig.swift; path = OphanimCore/policy/OPConfig.swift; sourceTree = SOURCE_ROOT; };
-		FACE00000000000000000A00 /* MCPData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPData.swift; path = Ophanim/Core/MCP/MCPData.swift; sourceTree = SOURCE_ROOT; };
 		FACE00000000000000000A02 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPServer.swift; path = Ophanim/Core/MCP/MCPServer.swift; sourceTree = SOURCE_ROOT; };
 		342787542E787EB9003A3C2F /* Keymapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Keymap/Keymapping.swift; sourceTree = SOURCE_ROOT; };
 		3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/KeymapViewVM.swift; sourceTree = SOURCE_ROOT; };
@@ -193,53 +255,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		FACE00000000000000000600 /* OphanimCore */ = {
-			isa = PBXGroup;
-			children = (
-				FACE00000000000000000704 /* RulesEditorView.swift */,
-				FACE00000000000000000702 /* LogViewerView.swift */,
-				FACE00000000000000000706 /* ReconView.swift */,
-				FACE00000000000000000700 /* InstrumentationSettings.swift */,
-				FACE00000000000000000400 /* OPEvent.swift */,
-				FACE00000000000000000401 /* OPConfig.swift */,
-				FACE00000000000000000A00 /* MCPData.swift */,
-				FACE00000000000000000A02 /* MCPServer.swift */,
-			);
-			name = OphanimCore;
-			sourceTree = "<group>";
-		};
-		36B26B95288C722500859EFD /* Settings */ = {
-			isa = PBXGroup;
-			children = (
-				3665EF8828832400007CF915 /* OphanimSettingsView.swift */,
-				B6603E1028E206A300DEFA3F /* UninstallSettings.swift */,
-				B6825C3428F3D23600E3015A /* InstallSettings.swift */,
-				ABDAD80929893EA300DC164F /* KeyCoverSettings.swift */,
-			);
-			path = Settings;
-			sourceTree = "<group>";
-		};
-		533F664B26C06A500051CB3E /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				B67BC7152C3951E500315011 /* KeymapView.swift */,
-				8783CFFA26B8C52D00171041 /* OphanimApp.swift */,
-				6E5C68B9289865C8008EC11B /* MainView.swift */,
-				FACE00000000000000000901 /* Theme.swift */,
-				ABED59822887A32F004D782B /* MenuBarView.swift */,
-				6E66B0D428A0039D0099B907 /* ToastView.swift */,
-				6ED6ACA328A949A30040D234 /* AppSettingsView.swift */,
-				6E250970297F5281004D754C /* SigningSetupView.swift */,
-				6E66B0CF289F562A0099B907 /* Sidebar */,
-				6E66B0CA289F55180099B907 /* AppLibrary */,
-				36B26B95288C722500859EFD /* Settings */,
-				B6603E1228E2257800DEFA3F /* Uninstaller.swift */,
-				ABDAD80529893CF900DC164F /* KeyCoverSetupViews.swift */,
-				ABDAD80B298A1E3E00DC164F /* KeyCoverViews.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		53841CC826D9D7920021D27C /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -253,111 +268,9 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		53F3802626EB6F5600D6B525 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				53F3802726EB6F6B00D6B525 /* NotifyService.swift */,
-				9280871A2824A8D20034C510 /* SoundDeviceService.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		53F4D29926C43A390020167C /* Model */ = {
-			isa = PBXGroup;
-			children = (
-				92EE06CF274EA433002C907B /* BaseApp.swift */,
-				92EE06D9274EB009002C907B /* HostedApp.swift */,
-				923421F6275F40300030CD7D /* AppContainer.swift */,
-				92ECD8AD274E787200DB7AC6 /* AppInfo.swift */,
-				9286D295273A7E4200958DD3 /* AppSettings.swift */,
-				AA71964A287A0EA800623C15 /* SandboxRules.swift */,
-				6E7CA16428B4D02900216CD8 /* ITunesResponse.swift */,
-				6E7CA16628B4EEAE00216CD8 /* KeymapData.swift */,
-				B6AB53C829232B4F00039B2E /* KeyCodeNames.swift */,
-			);
-			path = Model;
-			sourceTree = "<group>";
-		};
-		53F5E73B26C1C566005AED1D /* AppInstaller */ = {
-			isa = PBXGroup;
-			children = (
-				92ECD8A2274E75CD00DB7AC6 /* Installer.swift */,
-			);
-			path = AppInstaller;
-			sourceTree = "<group>";
-		};
-		53F5E73E26C1C654005AED1D /* ViewModel */ = {
-			isa = PBXGroup;
-			children = (
-				3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */,
-				B1084E1E28AA80F400E399FA /* AppSettingsVM.swift */,
-				9272F19C273B74C800DFBEF1 /* AppsVM.swift */,
-				6EF893D428F34CD1004AB6D9 /* NetworkVM.swift */,
-				928C01D8272E162C007EB2DF /* InstallVM.swift */,
-				6E66B0D828A135360099B907 /* ToastVM.swift */,
-				53F4D29F26C43C690020167C /* Log.swift */,
-				B6ABDA292971EEF700A46E80 /* ProgressVM.swift */,
-				A25930F32C49E2BC0006C91C /* HostedAppVM.swift */,
-			);
-			path = ViewModel;
-			sourceTree = "<group>";
-		};
-		53F5E74126C1D369005AED1D /* Utils */ = {
-			isa = PBXGroup;
-			children = (
-				6E25096D297F4E95004D754C /* Extensions */,
-				342787542E787EB9003A3C2F /* Keymapping.swift */,
-				92ECD8A4274E763700DB7AC6 /* IPA.swift */,
-				92EE06DD274EC09F002C907B /* Entitlements.swift */,
-				5314D1ED26C402EC00A0A727 /* Shell.swift */,
-				92B4D38E2737CF3D0001D7BB /* Galgal.swift */,
-				6E550A8A29BA507200EFC15C /* Macho.swift */,
-				68E48B9B295709BF00C39879 /* Cacher.swift */,
-				92A8AAC8275EFEA800D89B50 /* SystemConfig.swift */,
-				92F8500927675124005CE6BE /* AppIntegrity.swift */,
-				B17FD04628C7B0D900B1D4CA /* AssetsExtractor.swift */,
-				6EB4B57328C93E0600630890 /* LegacySettings.swift */,
-				B17FD03F28C70C7300B1D4CA /* CoreUI.h */,
-				AB00EB5129A7BF17006F3225 /* KeyCover.swift */,
-				AB6F21EA299B7FA20078ADEC /* URLHandler.swift */,
-				ABBC85B82B7C5CBA00DCF223 /* ModifierKeyObserver.swift */,
-				B67BC7112C39354500315011 /* UpdateScheme.swift */,
-			);
-			path = Utils;
-			sourceTree = "<group>";
-		};
-		6E25096D297F4E95004D754C /* Extensions */ = {
-			isa = PBXGroup;
-			children = (
-				AAE2F78E2F72562E001336C9 /* ViewExtensions.swift */,
-				8783D00A26B8C9E600171041 /* URLExtensions.swift */,
-				6ECB1D0D29798DFA00CD92AA /* DataExtensions.swift */,
-				6E25096E297F5032004D754C /* FileExtensions.swift */,
-				B68FD80C2ACB642100683778 /* HostedAppExtensions.swift */,
-			);
-			path = Extensions;
-			sourceTree = "<group>";
-		};
-		6E66B0CA289F55180099B907 /* AppLibrary */ = {
-			isa = PBXGroup;
-			children = (
-				92EE06D3274EA604002C907B /* HostedAppView.swift */,
-			);
-			path = AppLibrary;
-			sourceTree = "<group>";
-		};
-		6E66B0CF289F562A0099B907 /* Sidebar */ = {
-			isa = PBXGroup;
-			children = (
-				53F50C4826E3CA42007AD2D3 /* AppLibraryView.swift */,
-			);
-			path = Sidebar;
-			sourceTree = "<group>";
-		};
 		8783CFEE26B8C52D00171041 = {
 			isa = PBXGroup;
 			children = (
-				FACE00000000000000000600 /* OphanimCore */,
 				8783CFF926B8C52D00171041 /* Ophanim */,
 				8783CFF826B8C52D00171041 /* Products */,
 				53841CC826D9D7920021D27C /* Frameworks */,
@@ -378,12 +291,6 @@
 				AA719640287A085200623C15 /* Rules */,
 				AA970FD228793A310099A5D0 /* OphanimRelease.entitlements */,
 				53D9DAF226C1849D0071959E /* OphanimError.swift */,
-				53F3802626EB6F5600D6B525 /* Services */,
-				53F4D29926C43A390020167C /* Model */,
-				53F5E74126C1D369005AED1D /* Utils */,
-				53F5E73E26C1C654005AED1D /* ViewModel */,
-				53F5E73B26C1C566005AED1D /* AppInstaller */,
-				533F664B26C06A500051CB3E /* Views */,
 				8783CFFE26B8C52E00171041 /* Assets.xcassets */,
 				349915322F8866A3005565D1 /* AppIcon.icon */,
 				349915342F8866A8005565D1 /* AppIcon.dev.icon */,
@@ -392,6 +299,22 @@
 				8783D00026B8C52E00171041 /* Preview Content */,
 				532644E026E79E56002EA34D /* Localizable.strings */,
 				928C01D7272DF1A2007EB2DF /* Ophanim-Bridging-Header.h */,
+				EEB7200A8A32E367 /* App */,
+				9BDC8A3529F38E62 /* Core/Model */,
+				FADB37DBD069CAAE /* Core/Services */,
+				87F39D6E993627EE /* Core/Support */,
+				7FD966D5DBC50F1A /* Core/MCP */,
+				FF1D75359BABA31E /* Core/ViewModel */,
+				5599AFF0E1A78C8D /* DesignSystem */,
+				91815665E67D643A /* Features/AppLibrary */,
+				617D2CEF967DC23A /* Features/AppSettings */,
+				B104EA45D8372532 /* Features/Install */,
+				02F4EF014EA3BDB7 /* Features/KeyCover */,
+				CBD96BFF8A3E8228 /* Features/Keymap */,
+				EEF7C65EBDC8A3FA /* Features/Onboarding */,
+				9C80371D883F3E81 /* Features/Recon */,
+				4462778DA09FD414 /* Features/Rules */,
+				12F633876BDD7640 /* Engine */,
 			);
 			path = Ophanim;
 			sourceTree = "<group>";
@@ -412,7 +335,242 @@
 			path = Rules;
 			sourceTree = "<group>";
 		};
+		EEB7200A8A32E367 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				6E5C68B9289865C8008EC11B /* MainView.swift */,
+				ABED59822887A32F004D782B /* MenuBarView.swift */,
+				8783CFFA26B8C52D00171041 /* OphanimApp.swift */,
+			);
+			name = App;
+			sourceTree = "<group>";
+		};
+		9BDC8A3529F38E62 /* Core/Model */ = {
+			isa = PBXGroup;
+			children = (
+				0768B6168B08B627 /* JBBypassCatalog.swift */,
+				50B2484B3BABE223 /* HostedApp+Environment.swift */,
+				BE182F7996141C5D /* HostedApp+Power.swift */,
+				E16D93A5FD4D73CE /* HostedApp+KeyCover.swift */,
+				8C99F8F38CB1F9F5 /* HostedApp+Tools.swift */,
+				BCBD33DB5B867DF1 /* HostedApp+Files.swift */,
+				923421F6275F40300030CD7D /* AppContainer.swift */,
+				92ECD8AD274E787200DB7AC6 /* AppInfo.swift */,
+				9286D295273A7E4200958DD3 /* AppSettings.swift */,
+				92EE06CF274EA433002C907B /* BaseApp.swift */,
+				92EE06D9274EB009002C907B /* HostedApp.swift */,
+				6E7CA16428B4D02900216CD8 /* ITunesResponse.swift */,
+				B6AB53C829232B4F00039B2E /* KeyCodeNames.swift */,
+				6E7CA16628B4EEAE00216CD8 /* KeymapData.swift */,
+				AA71964A287A0EA800623C15 /* SandboxRules.swift */,
+			);
+			name = Model;
+			sourceTree = "<group>";
+		};
+		FADB37DBD069CAAE /* Core/Services */ = {
+			isa = PBXGroup;
+			children = (
+				68E48B9B295709BF00C39879 /* Cacher.swift */,
+				92B4D38E2737CF3D0001D7BB /* Galgal.swift */,
+				53F3802726EB6F6B00D6B525 /* NotifyService.swift */,
+				9280871A2824A8D20034C510 /* SoundDeviceService.swift */,
+			);
+			name = Services;
+			sourceTree = "<group>";
+		};
+		87F39D6E993627EE /* Core/Support */ = {
+			isa = PBXGroup;
+			children = (
+				24C13AF73619B1C6 /* PlistReader.swift */,
+				9087A86A5DC671E8 /* ResolutionMath.swift */,
+				92F8500927675124005CE6BE /* AppIntegrity.swift */,
+				B17FD04628C7B0D900B1D4CA /* AssetsExtractor.swift */,
+				B17FD03F28C70C7300B1D4CA /* CoreUI.h */,
+				92EE06DD274EC09F002C907B /* Entitlements.swift */,
+				6EB4B57328C93E0600630890 /* LegacySettings.swift */,
+				ABBC85B82B7C5CBA00DCF223 /* ModifierKeyObserver.swift */,
+				53D9DAF226C1849D0071959E /* OphanimError.swift */,
+				5314D1ED26C402EC00A0A727 /* Shell.swift */,
+				92A8AAC8275EFEA800D89B50 /* SystemConfig.swift */,
+				B67BC7112C39354500315011 /* UpdateScheme.swift */,
+				AB6F21EA299B7FA20078ADEC /* URLHandler.swift */,
+				6ECB1D0D29798DFA00CD92AA /* DataExtensions.swift */,
+				6E25096E297F5032004D754C /* FileExtensions.swift */,
+				B68FD80C2ACB642100683778 /* HostedAppExtensions.swift */,
+				8783D00A26B8C9E600171041 /* URLExtensions.swift */,
+				AAE2F78E2F72562E001336C9 /* ViewExtensions.swift */,
+			);
+			name = Support;
+			sourceTree = "<group>";
+		};
+		7FD966D5DBC50F1A /* Core/MCP */ = {
+			isa = PBXGroup;
+			children = (
+				F207D73F32CDDBF9 /* MCP/Tools */,
+				1892FDC0292E78C6 /* MCP/Transports */,
+				59E19E2FB313A34F /* MCP/Services */,
+				900502EE8C0E1C7C /* ToolRouter.swift */,
+				FACE00000000000000000A02 /* MCPServer.swift */,
+			);
+			name = MCP;
+			sourceTree = "<group>";
+		};
+		FF1D75359BABA31E /* Core/ViewModel */ = {
+			isa = PBXGroup;
+			children = (
+				B1084E1E28AA80F400E399FA /* AppSettingsVM.swift */,
+				9272F19C273B74C800DFBEF1 /* AppsVM.swift */,
+				A25930F32C49E2BC0006C91C /* HostedAppVM.swift */,
+				928C01D8272E162C007EB2DF /* InstallVM.swift */,
+				3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */,
+				53F4D29F26C43C690020167C /* Log.swift */,
+				6EF893D428F34CD1004AB6D9 /* NetworkVM.swift */,
+				B6ABDA292971EEF700A46E80 /* ProgressVM.swift */,
+				6E66B0D828A135360099B907 /* ToastVM.swift */,
+			);
+			name = ViewModel;
+			sourceTree = "<group>";
+		};
+		5599AFF0E1A78C8D /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				C0F81A91659E960A /* Controls.swift */,
+				EEAC88529FFB5C85 /* AppTheme.swift */,
+				BF7B56747761298C /* TerminalStyles.swift */,
+				7286C1F0C0912855 /* AmbientEffects.swift */,
+				FACE00000000000000000901 /* Theme.swift */,
+				6E66B0D428A0039D0099B907 /* ToastView.swift */,
+			);
+			name = DesignSystem;
+			sourceTree = "<group>";
+		};
+		91815665E67D643A /* Features/AppLibrary */ = {
+			isa = PBXGroup;
+			children = (
+				53F50C4826E3CA42007AD2D3 /* AppLibraryView.swift */,
+				92EE06D3274EA604002C907B /* HostedAppView.swift */,
+				B6603E1228E2257800DEFA3F /* Uninstaller.swift */,
+			);
+			name = AppLibrary;
+			sourceTree = "<group>";
+		};
+		617D2CEF967DC23A /* Features/AppSettings */ = {
+			isa = PBXGroup;
+			children = (
+				EAB948873F0F2EA5 /* GraphicsPane.swift */,
+				0696BE3C138F13FF /* KeymappingPane.swift */,
+				90BB9421D69FD643 /* BypassesPane.swift */,
+				D324648A50A21929 /* InfoPane.swift */,
+				6ED6ACA328A949A30040D234 /* AppSettingsView.swift */,
+				B6825C3428F3D23600E3015A /* InstallSettings.swift */,
+				FACE00000000000000000700 /* InstrumentationSettings.swift */,
+				3665EF8828832400007CF915 /* OphanimSettingsView.swift */,
+				B6603E1028E206A300DEFA3F /* UninstallSettings.swift */,
+			);
+			name = AppSettings;
+			sourceTree = "<group>";
+		};
+		B104EA45D8372532 /* Features/Install */ = {
+			isa = PBXGroup;
+			children = (
+				92ECD8A2274E75CD00DB7AC6 /* Installer.swift */,
+				92ECD8A4274E763700DB7AC6 /* IPA.swift */,
+				6E550A8A29BA507200EFC15C /* Macho.swift */,
+			);
+			name = Install;
+			sourceTree = "<group>";
+		};
+		02F4EF014EA3BDB7 /* Features/KeyCover */ = {
+			isa = PBXGroup;
+			children = (
+				AB00EB5129A7BF17006F3225 /* KeyCover.swift */,
+				ABDAD80929893EA300DC164F /* KeyCoverSettings.swift */,
+				ABDAD80529893CF900DC164F /* KeyCoverSetupViews.swift */,
+				ABDAD80B298A1E3E00DC164F /* KeyCoverViews.swift */,
+			);
+			name = KeyCover;
+			sourceTree = "<group>";
+		};
+		CBD96BFF8A3E8228 /* Features/Keymap */ = {
+			isa = PBXGroup;
+			children = (
+				B67BC7152C3951E500315011 /* KeymapView.swift */,
+				342787542E787EB9003A3C2F /* Keymapping.swift */,
+			);
+			name = Keymap;
+			sourceTree = "<group>";
+		};
+		EEF7C65EBDC8A3FA /* Features/Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				6E250970297F5281004D754C /* SigningSetupView.swift */,
+			);
+			name = Onboarding;
+			sourceTree = "<group>";
+		};
+		9C80371D883F3E81 /* Features/Recon */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000702 /* LogViewerView.swift */,
+				FACE00000000000000000706 /* ReconView.swift */,
+			);
+			name = Recon;
+			sourceTree = "<group>";
+		};
+		4462778DA09FD414 /* Features/Rules */ = {
+			isa = PBXGroup;
+			children = (
+				88C525977E937028 /* SettingsWindowManager.swift */,
+				36D4A6EAA09E20FC /* ObjCHooksEditor.swift */,
+				073D818FBD8FC133 /* SwiftHooksEditor.swift */,
+				94A87C8F0FE614E7 /* InlineHooksEditor.swift */,
+				FACE00000000000000000704 /* RulesEditorView.swift */,
+			);
+			name = Rules;
+			sourceTree = "<group>";
+		};
+		12F633876BDD7640 /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000400 /* OPEvent.swift */,
+				FACE00000000000000000401 /* OPConfig.swift */,
+			);
+			name = Engine;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
+		F207D73F32CDDBF9 /* MCP/Tools */ = {
+			isa = PBXGroup;
+			children = (
+				220847F9046C01C1 /* AppTools.swift */,
+				3765949B44E0A21E /* EventTools.swift */,
+				056DEEFFE3AD0AF6 /* ReconTools.swift */,
+				8AC7C7D95F6CB3C2 /* HookTools.swift */,
+				4348A085B12A9469 /* RuleTools.swift */,
+				86C5858FBCEEE0E6 /* ConfigTools.swift */,
+			);
+			name = Tools;
+			sourceTree = "<group>";
+		};
+		1892FDC0292E78C6 /* MCP/Transports */ = {
+			isa = PBXGroup;
+			children = (
+				5AED5DF901EE05DC /* StdioTransport.swift */,
+				9E70BEBCBB434C08 /* HTTPTransport.swift */,
+			);
+			name = Transports;
+			sourceTree = "<group>";
+		};
+		59E19E2FB313A34F /* MCP/Services */ = {
+			isa = PBXGroup;
+			children = (
+				1E79EE123C632373 /* AppQueryService.swift */,
+				550DAF5401731081 /* SettingsStore.swift */,
+				F4BCF3C93514DBED /* ReportBuilder.swift */,
+			);
+			name = Services;
+			sourceTree = "<group>";
+		};
 
 /* Begin PBXNativeTarget section */
 		8783CFF626B8C52D00171041 /* Ophanim */ = {
@@ -495,6 +653,38 @@
 				532644DE26E79E56002EA34D /* Localizable.strings in Resources */,
 				8783CFFF26B8C52E00171041 /* Assets.xcassets in Resources */,
 				349915332F8866A3005565D1 /* AppIcon.icon in Resources */,
+				A5BCDD4FEE663813 /* Controls.swift in Sources */,
+				2BE108FE640E74C8 /* AppTheme.swift in Sources */,
+				1452BDC63A26A13B /* TerminalStyles.swift in Sources */,
+				8BE78DA4B7330A19 /* AmbientEffects.swift in Sources */,
+				18B8F8545418D0B4 /* PlistReader.swift in Sources */,
+				77EFD940A7878EA6 /* ResolutionMath.swift in Sources */,
+				B813561B9FBD2CF1 /* JBBypassCatalog.swift in Sources */,
+				8353AA2438D2A4B1 /* HostedApp+Environment.swift in Sources */,
+				28AFA7C4935922F6 /* HostedApp+Power.swift in Sources */,
+				0F11B373B5D5CAB8 /* HostedApp+KeyCover.swift in Sources */,
+				E85A929E7C84BAAA /* HostedApp+Tools.swift in Sources */,
+				B6181F6617F3D014 /* HostedApp+Files.swift in Sources */,
+				08B8A1CF41394C72 /* ToolRouter.swift in Sources */,
+				BC77E289CAFC42CD /* AppTools.swift in Sources */,
+				5B7A3449F68B4385 /* EventTools.swift in Sources */,
+				DADC6715A2A738F7 /* ReconTools.swift in Sources */,
+				63820A553F7822A2 /* HookTools.swift in Sources */,
+				B7C5923B73019E46 /* RuleTools.swift in Sources */,
+				A9BCA17E026BF421 /* ConfigTools.swift in Sources */,
+				7527AAB09643E217 /* StdioTransport.swift in Sources */,
+				D7C650AEF355211F /* HTTPTransport.swift in Sources */,
+				C3A41E949D1E600D /* AppQueryService.swift in Sources */,
+				DDC60EB416ACAC10 /* SettingsStore.swift in Sources */,
+				9FF92C79D65B7FFD /* ReportBuilder.swift in Sources */,
+				5854E1C8E8CB321E /* GraphicsPane.swift in Sources */,
+				8A84939569AC3C9B /* KeymappingPane.swift in Sources */,
+				1E9F99F71F6A9E98 /* BypassesPane.swift in Sources */,
+				21B30B54EE6AE8C6 /* InfoPane.swift in Sources */,
+				9C9A714A49EDA1FC /* SettingsWindowManager.swift in Sources */,
+				7A509E4CA6CD92E3 /* ObjCHooksEditor.swift in Sources */,
+				6F535E1A465BC4C1 /* SwiftHooksEditor.swift in Sources */,
+				A761A8D25A040FB4 /* InlineHooksEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -557,7 +747,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nset -euo pipefail\n\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\";\necho Signing identity $IDENTITY;\n\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Galgal.framework/PlugIns/GalgalInterface.bundle;\ncodesign --verbose --force --deep --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Galgal.framework;\n";
+			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nset -euo pipefail\n\nIDENTITY=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\";\necho Signing identity $IDENTITY;\n\ncodesign --verbose --force --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Galgal.framework/PlugIns/GalgalInterface.bundle;\ncodesign --verbose --force --sign \"$IDENTITY\" ${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/Galgal.framework;\n";
 		};
 		AAE8809C287ACA4900FBB23C /* Carthage Bootstrap */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -591,7 +781,6 @@
 				FACE00000000000000000701 /* InstrumentationSettings.swift in Sources */,
 				FACE00000000000000000500 /* OPEvent.swift in Sources */,
 				FACE00000000000000000501 /* OPConfig.swift in Sources */,
-				FACE00000000000000000A01 /* MCPData.swift in Sources */,
 				FACE00000000000000000A03 /* MCPServer.swift in Sources */,
 				B67BC7162C3951E700315011 /* KeymapView.swift in Sources */,
 				6E66B0D528A0039D0099B907 /* ToastView.swift in Sources */,

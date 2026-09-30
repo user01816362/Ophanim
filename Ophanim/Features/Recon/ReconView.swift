@@ -18,33 +18,15 @@ import AppKit
 
 /// Opens the recon view as a standalone, resizable window (one per app bundle id), mirroring
 /// LogWindowManager so macOS 12 (no SwiftUI openWindow(for:)) is supported.
-final class ReconWindowManager: NSObject, NSWindowDelegate {
+final class ReconWindowManager: NSObject {
     static let shared = ReconWindowManager()
-    private var windows: [String: NSWindow] = [:]
 
     func show(executable: URL, bundleID: String, appName: String) {
-        if let existing = windows[bundleID] {
-            existing.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-        let hosting = NSHostingController(rootView: ReconView(executable: executable, appName: appName))
-        let window = NSWindow(contentViewController: hosting)
-        window.title = "Recon - \(appName)"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 980, height: 640))
-        window.contentMinSize = NSSize(width: 560, height: 360)
-        window.isReleasedWhenClosed = false
-        window.delegate = self
-        window.center()
-        windows[bundleID] = window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        guard let closing = notification.object as? NSWindow else { return }
-        windows = windows.filter { $0.value !== closing }
+        SettingsWindowManager.shared.show(key: bundleID, title: "Recon - \(appName)",
+                                          size: NSSize(width: 980, height: 640),
+                                          minSize: NSSize(width: 560, height: 360),
+                                          contentDrivenSize: true,
+                                          content: ReconView(executable: executable, appName: appName))
     }
 }
 

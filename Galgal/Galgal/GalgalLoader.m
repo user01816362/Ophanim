@@ -103,10 +103,10 @@ static int gg_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *
 }
 
 // Interpose the functions create the wrapper
-DYLD_INTERPOSE(gg_dyld_get_active_platform, dyld_get_active_platform)
-DYLD_INTERPOSE(gg_uname, uname)
-DYLD_INTERPOSE(gg_sysctlbyname, sysctlbyname)
-DYLD_INTERPOSE(gg_sysctl, sysctl)
+OPHANIM_INTERPOSE(gg_dyld_get_active_platform, dyld_get_active_platform)
+OPHANIM_INTERPOSE(gg_uname, uname)
+OPHANIM_INTERPOSE(gg_sysctlbyname, sysctlbyname)
+OPHANIM_INTERPOSE(gg_sysctl, sysctl)
 
 // Interpose Apple Keychain functions (SecItemCopyMatching, SecItemAdd, SecItemUpdate, SecItemDelete)
 // This allows us to intercept keychain requests and return our own data
@@ -228,12 +228,12 @@ static OSStatus gg_SecKeyGeneratePair(CFDictionaryRef parameters, SecKeyRef *pub
     return retval;
 }
 
-DYLD_INTERPOSE(gg_SecItemCopyMatching, SecItemCopyMatching)
-DYLD_INTERPOSE(gg_SecItemAdd, SecItemAdd)
-DYLD_INTERPOSE(gg_SecItemUpdate, SecItemUpdate)
-DYLD_INTERPOSE(gg_SecItemDelete, SecItemDelete)
-DYLD_INTERPOSE(gg_SecKeyCreateRandomKey, SecKeyCreateRandomKey)
-DYLD_INTERPOSE(gg_SecKeyGeneratePair, SecKeyGeneratePair)
+OPHANIM_INTERPOSE(gg_SecItemCopyMatching, SecItemCopyMatching)
+OPHANIM_INTERPOSE(gg_SecItemAdd, SecItemAdd)
+OPHANIM_INTERPOSE(gg_SecItemUpdate, SecItemUpdate)
+OPHANIM_INTERPOSE(gg_SecItemDelete, SecItemDelete)
+OPHANIM_INTERPOSE(gg_SecKeyCreateRandomKey, SecKeyCreateRandomKey)
+OPHANIM_INTERPOSE(gg_SecKeyGeneratePair, SecKeyGeneratePair)
 
 static uint8_t ue_status = 0;
 
@@ -349,12 +349,12 @@ static int gg_usleep(useconds_t time) {
 }
 
 
-DYLD_INTERPOSE(gg_open, open)
-DYLD_INTERPOSE(gg_stat, stat)
-DYLD_INTERPOSE(gg_access, access)
-DYLD_INTERPOSE(gg_rename, rename)
-DYLD_INTERPOSE(gg_unlink, unlink)
-DYLD_INTERPOSE(gg_usleep, usleep)
+OPHANIM_INTERPOSE(gg_open, open)
+OPHANIM_INTERPOSE(gg_stat, stat)
+OPHANIM_INTERPOSE(gg_access, access)
+OPHANIM_INTERPOSE(gg_rename, rename)
+OPHANIM_INTERPOSE(gg_unlink, unlink)
+OPHANIM_INTERPOSE(gg_usleep, usleep)
 
 @implementation GalgalLoader
 

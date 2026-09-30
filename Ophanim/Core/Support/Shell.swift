@@ -35,14 +35,19 @@ class Shell: ObservableObject {
         let password = argc
         let passwordWithNewline = password + "\n"
         let sudo = Process()
-        sudo.launchPath = "/usr/bin/sudo"
+        sudo.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
         sudo.arguments = args
         let sudoIn = Pipe()
         let sudoOut = Pipe()
         sudo.standardOutput = sudoOut
         sudo.standardError = sudoOut
         sudo.standardInput = sudoIn
-        sudo.launch()
+        do {
+            try sudo.run()
+        } catch {
+            Log.shared.log("sudo failed to launch: \(error.localizedDescription)", isError: true)
+            return false
+        }
 
         var result = true
 
@@ -77,13 +82,38 @@ class Shell: ObservableObject {
     }
 
     static func signAppWith(_ exec: URL, entitlements: URL) throws {
-        try run("/usr/bin/codesign", "-fs-", exec.deletingLastPathComponent().path,
-                "--deep", "--entitlements", entitlements.path)
+        let dir = exec.deletingLastPathComponent()
+        try signNestedCode(in: dir)
+        try run("/usr/bin/codesign", "-fs-", dir.path,
+                "--entitlements", entitlements.path)
     }
 
     static func signApp(_ exec: URL) throws {
-        try run("/usr/bin/codesign", "-fs-", exec.deletingLastPathComponent().path,
-                "--deep", "--preserve-metadata=entitlements")
+        let dir = exec.deletingLastPathComponent()
+        try signNestedCode(in: dir)
+        try run("/usr/bin/codesign", "-fs-", dir.path,
+                "--preserve-metadata=entitlements")
+    }
+
+    /// Sign nested code leaf-first (TN2206 discourages `--deep` for signing).
+    /// Signs bundled frameworks/bundles/dylibs plus PlugIns/Frameworks/Helpers
+    /// contents before the caller signs the top-level bundle.
+    private static func signNestedCode(in dir: URL) throws {
+        let fm = FileManager.default
+        let nestedExts = ["framework", "bundle", "dylib", "app", "appex"]
+        if let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
+            for item in items where nestedExts.contains(item.pathExtension) {
+                try run("/usr/bin/codesign", "-fs-", item.path)
+            }
+        }
+        for sub in ["PlugIns", "Frameworks", "Helpers"] {
+            let subdir = dir.appendingPathComponent(sub)
+            guard let nested = try? fm.contentsOfDirectory(
+                at: subdir, includingPropertiesForKeys: nil) else { continue }
+            for item in nested {
+                try run("/usr/bin/codesign", "-fs-", item.path)
+            }
+        }
     }
 
     static func setMetalHUD(_ bundleID: String, enabled: Bool) throws {

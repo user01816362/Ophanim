@@ -159,7 +159,6 @@
 		FACE00000000000000000105 /* OPBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPBootstrap.swift; path = ../OphanimCore/loader/OPBootstrap.swift; sourceTree = "<group>"; };
 		FACE00000000000000000106 /* OPHooksDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksDevice.swift; path = ../OphanimCore/hooks/OPHooksDevice.swift; sourceTree = "<group>"; };
 		2847AE47298EFC0F00B0F983 /* GalgalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalScreen.swift; sourceTree = "<group>"; };
-		6E76639628D0FA6200DE4AF9 /* GalgalInterface-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "GalgalInterface-Bridging-Header.h"; sourceTree = "<group>"; };
 		6E76639A28D0FAE700DE4AF9 /* Plugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugin.swift; sourceTree = "<group>"; };
 		6E7663A028D0FB5300DE4AF9 /* GalgalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalPlugin.swift; sourceTree = "<group>"; };
 		6E7663A428D0FEBE00DE4AF9 /* GalgalPluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalPluginLoader.swift; sourceTree = "<group>"; };
@@ -306,7 +305,6 @@
 			children = (
 				6E76639A28D0FAE700DE4AF9 /* Plugin.swift */,
 				6E7663A028D0FB5300DE4AF9 /* GalgalPlugin.swift */,
-				6E76639628D0FA6200DE4AF9 /* GalgalInterface-Bridging-Header.h */,
 			);
 			name = GalgalInterface;
 			sourceTree = "<group>";
@@ -930,7 +928,6 @@
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "GalgalInterface-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				WRAPPER_EXTENSION = bundle;
@@ -962,7 +959,6 @@
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OBJC_BRIDGING_HEADER = "GalgalInterface-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				WRAPPER_EXTENSION = bundle;
 			};

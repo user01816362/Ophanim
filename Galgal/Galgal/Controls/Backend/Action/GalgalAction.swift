@@ -28,7 +28,6 @@ class ButtonAction: Action {
         self.point = point
         let code = keyCode
         let codeName = KeyCodeNames.keyCodes[code] ?? "Btn"
-        // TODO: set both key names in draggable button, so as to depracate key code
         ActionDispatcher.register(key: code == KeyCodeNames.defaultCode ? keyName: codeName, handler: self.update)
     }
 

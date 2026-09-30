@@ -119,7 +119,7 @@ struct SignSetupView: View {
             HStack {
                 Button("button.Help") {
                     if let url = URL(string: "https://docs.ophanim.io/getting_started/troubleshoot_login") {
-                        NSWorkspace.shared.open(url)
+                        NSWorkspace.shared.open(url, configuration: NSWorkspace.OpenConfiguration()) { _, _ in }
                     }
                 }
                 Button("button.Dismiss", role: .cancel) {

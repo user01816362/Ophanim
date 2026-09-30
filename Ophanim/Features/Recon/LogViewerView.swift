@@ -15,33 +15,15 @@ import Combine
 /// sheet). One window per host app bundle id - re-opening brings the existing one to the front.
 /// macOS 12 can't use SwiftUI's openWindow/WindowGroup(for:), so we host the SwiftUI view in an
 /// AppKit window directly.
-final class LogWindowManager: NSObject, NSWindowDelegate {
+final class LogWindowManager: NSObject {
     static let shared = LogWindowManager()
-    private var windows: [String: NSWindow] = [:]
 
     func show(bundleID: String) {
-        if let existing = windows[bundleID] {
-            existing.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-        let hosting = NSHostingController(rootView: LogViewerView(bundleID: bundleID))
-        let window = NSWindow(contentViewController: hosting)
-        window.title = "Hacking Log - \(bundleID)"
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 1200, height: 640))
-        window.contentMinSize = NSSize(width: 560, height: 320)
-        window.isReleasedWhenClosed = false   // lifetime owned by `windows`
-        window.delegate = self
-        window.center()
-        windows[bundleID] = window
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func windowWillClose(_ notification: Notification) {
-        guard let closing = notification.object as? NSWindow else { return }
-        windows = windows.filter { $0.value !== closing }
+        SettingsWindowManager.shared.show(key: bundleID, title: "Hacking Log - \(bundleID)",
+                                          size: NSSize(width: 1200, height: 640),
+                                          minSize: NSSize(width: 560, height: 320),
+                                          contentDrivenSize: true,
+                                          content: LogViewerView(bundleID: bundleID))
     }
 }
 

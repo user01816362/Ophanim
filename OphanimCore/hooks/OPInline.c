@@ -14,6 +14,13 @@
 
 #if defined(__arm64__) || defined(__aarch64__)
 
+#ifdef __arm64e__
+// The engine synthesizes unsigned branches; arm64e targets carry PAC.
+// Refused at runtime too (OP_INLINE_ERR_ARM64E) - this fails the build early
+// instead of shipping a runtime-refused image.
+#error "Ophanim inline engine does not support arm64e (pointer authentication)"
+#endif
+
 #include "OPInline.h"
 #include <mach/mach.h>           // vm_protect, vm_region_64 (mach_vm.h is unsupported under iOS SDK)
 #include <sys/mman.h>

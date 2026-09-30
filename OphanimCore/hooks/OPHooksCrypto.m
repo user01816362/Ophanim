@@ -12,10 +12,7 @@
 #import <CommonCrypto/CommonCrypto.h>
 #import "../ring/OPRing.h"
 
-#define DYLD_INTERPOSE(_replacement, _replacee) \
-   __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
-   _interpose_##_replacee __attribute__((section("__DATA,__interpose"))) = \
-   { (const void *)(unsigned long)&_replacement, (const void *)(unsigned long)&_replacee };
+#import "../compat/OPInterpose.h"
 
 static CCCryptorStatus op_CCCrypt(CCOperation op, CCAlgorithm alg, CCOptions options,
                                   const void *key, size_t keyLength, const void *iv,
@@ -36,5 +33,5 @@ static void op_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLeng
     CCHmac(algorithm, key, keyLength, data, dataLength, macOut);
 }
 
-DYLD_INTERPOSE(op_CCCrypt, CCCrypt)
-DYLD_INTERPOSE(op_CCHmac, CCHmac)
+OPHANIM_INTERPOSE(op_CCCrypt, CCCrypt)
+OPHANIM_INTERPOSE(op_CCHmac, CCHmac)
