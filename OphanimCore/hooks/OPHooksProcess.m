@@ -17,7 +17,7 @@
 #import <dlfcn.h>
 #import <spawn.h>
 #import <unistd.h>
-#import "OPRing.h"
+#import "../ring/OPRing.h"
 
 #define DYLD_INTERPOSE(_replacement, _replacee) \
    __attribute__((used)) static struct { const void *replacement; const void *replacee; } \

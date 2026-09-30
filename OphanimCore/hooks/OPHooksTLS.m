@@ -20,7 +20,7 @@
 
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
-#import "OPRing.h"
+#import "../ring/OPRing.h"
 
 // Secure Transport (SSLRead/SSLWrite/SSLContextRef) is deprecated but still widely linked; silence.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"

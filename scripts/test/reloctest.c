@@ -12,7 +12,7 @@
 #include <string.h>
 
 void op_inline_shared_entry(void) {}   // satisfy the extern ref inside op_inline_install
-#include "../OphanimCore/OPInline.c"
+#include "../../OphanimCore/hooks/OPInline.c"
 
 typedef uint64_t (*fn_t)(uint64_t);
 

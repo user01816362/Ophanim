@@ -168,12 +168,12 @@ jobs:
 
       - name: Inline-hook engine self-test
         # Cheap (~2s) and it exercises the riskiest code in the repo — the arm64 relocator in
-        # OphanimCore/OPInline.c — before spending several minutes on xcodebuild.
-        working-directory: scripts
+        # OphanimCore/hooks/OPInline.c — before spending several minutes on xcodebuild.
+        working-directory: scripts/test
         run: |
           set -euo pipefail
           clang -arch arm64 -isysroot "$(xcrun --sdk macosx --show-sdk-path)" \
-                -I ../OphanimCore -lobjc reloctest.c -o "$RUNNER_TEMP/reloctest"
+                -I ../../OphanimCore -lobjc reloctest.c -o "$RUNNER_TEMP/reloctest"
           "$RUNNER_TEMP/reloctest"
 
       - name: Build Ophanim.app

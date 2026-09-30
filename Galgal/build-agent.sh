@@ -18,31 +18,31 @@ TARGET="arm64-apple-ios15.0"
 SDK="$(xcrun --sdk iphoneos --show-sdk-path)"
 
 echo "▸ Compiling OphanimCore (Swift, whole-module) for iOS…"
-SWIFT_SRCS=$(ls "$CORE"/*.swift)
+SWIFT_SRCS=$(find "$CORE" -name '*.swift' | sort)
 # -D OPHANIM_SIBLING renames the @objc entry class to OPAgentBootstrap so it doesn't collide with
 # the embedded Galgal runtime's OPBootstrap class when both are loaded in the same process.
 swiftc -sdk "$SDK" -target "$TARGET" -wmo -parse-as-library -D OPHANIM_SIBLING \
-  -import-objc-header "$CORE/OPRing.h" \
+  -import-objc-header "$CORE/ring/OPRing.h" \
   -module-name OphanimAgent -emit-object $SWIFT_SRCS -o "$TMP/ophanimcore.o"
 
 echo "▸ Compiling ObjC sources…"
 # -D OPHANIM_SIBLING activates agent-only interposes (e.g. OPHooksFSRaw.m's raw-POSIX filesystem
 # capture) that the embedded Galgal target must NOT compile. Mirrors the swiftc flag above.
 OBJC_OBJS=()
-for m in "$CORE"/*.m; do
+for m in $(find "$CORE" -name '*.m' | sort); do
   o="$TMP/$(basename "${m%.m}").o"
-  clang -c -fobjc-arc -D OPHANIM_SIBLING -isysroot "$SDK" -target "$TARGET" "$m" -o "$o"
+  clang -c -fobjc-arc -D OPHANIM_SIBLING -isysroot "$SDK" -target "$TARGET" -I "$CORE/ring" "$m" -o "$o"
   OBJC_OBJS+=("$o")
 done
 
 echo "▸ Compiling C / asm sources (inline-hook engine)…"
-for c in "$CORE"/*.c; do
+for c in $(find "$CORE" -name '*.c' | sort); do
   [ -e "$c" ] || continue
   o="$TMP/$(basename "${c%.c}").o"
   clang -c -D OPHANIM_SIBLING -isysroot "$SDK" -target "$TARGET" "$c" -o "$o"
   OBJC_OBJS+=("$o")
 done
-for s in "$CORE"/*.s; do
+for s in $(find "$CORE" -name '*.s' | sort); do
   [ -e "$s" ] || continue
   o="$TMP/$(basename "${s%.s}").o"
   clang -c -isysroot "$SDK" -target "$TARGET" "$s" -o "$o"

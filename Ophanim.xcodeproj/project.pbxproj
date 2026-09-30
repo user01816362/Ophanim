@@ -89,91 +89,91 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		FACE00000000000000000704 /* RulesEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RulesEditorView.swift; path = Ophanim/Views/Settings/RulesEditorView.swift; sourceTree = "<group>"; };
-		FACE00000000000000000702 /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogViewerView.swift; path = Ophanim/Views/Settings/LogViewerView.swift; sourceTree = "<group>"; };
-		FACE00000000000000000706 /* ReconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconView.swift; path = Ophanim/Views/Settings/ReconView.swift; sourceTree = "<group>"; };
-		FACE00000000000000000700 /* InstrumentationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InstrumentationSettings.swift; path = Ophanim/Views/Settings/InstrumentationSettings.swift; sourceTree = "<group>"; };
-		FACE00000000000000000400 /* OPEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPEvent.swift; path = OphanimCore/OPEvent.swift; sourceTree = "<group>"; };
-		FACE00000000000000000401 /* OPConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPConfig.swift; path = OphanimCore/OPConfig.swift; sourceTree = "<group>"; };
-		FACE00000000000000000A00 /* MCPData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPData.swift; path = Ophanim/MCP/MCPData.swift; sourceTree = "<group>"; };
-		FACE00000000000000000A02 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPServer.swift; path = Ophanim/MCP/MCPServer.swift; sourceTree = "<group>"; };
-		342787542E787EB9003A3C2F /* Keymapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keymapping.swift; sourceTree = "<group>"; };
-		3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeymapViewVM.swift; sourceTree = "<group>"; };
+		FACE00000000000000000704 /* RulesEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RulesEditorView.swift; path = Ophanim/Features/Rules/RulesEditorView.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000702 /* LogViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogViewerView.swift; path = Ophanim/Features/Recon/LogViewerView.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000706 /* ReconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconView.swift; path = Ophanim/Features/Recon/ReconView.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000700 /* InstrumentationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InstrumentationSettings.swift; path = Ophanim/Features/AppSettings/InstrumentationSettings.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000400 /* OPEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPEvent.swift; path = OphanimCore/policy/OPEvent.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000401 /* OPConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPConfig.swift; path = OphanimCore/policy/OPConfig.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000A00 /* MCPData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPData.swift; path = Ophanim/Core/MCP/MCPData.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000A02 /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPServer.swift; path = Ophanim/Core/MCP/MCPServer.swift; sourceTree = SOURCE_ROOT; };
+		342787542E787EB9003A3C2F /* Keymapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Keymap/Keymapping.swift; sourceTree = SOURCE_ROOT; };
+		3447B5E42E28B46800FAA22F /* KeymapViewVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/KeymapViewVM.swift; sourceTree = SOURCE_ROOT; };
 		349915322F8866A3005565D1 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 		349915342F8866A8005565D1 /* AppIcon.dev.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.dev.icon; sourceTree = "<group>"; };
-		3665EF8828832400007CF915 /* OphanimSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OphanimSettingsView.swift; sourceTree = "<group>"; usesTabs = 0; };
-		5314D1ED26C402EC00A0A727 /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shell.swift; sourceTree = "<group>"; };
+		3665EF8828832400007CF915 /* OphanimSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppSettings/OphanimSettingsView.swift; sourceTree = SOURCE_ROOT; usesTabs = 0; };
+		5314D1ED26C402EC00A0A727 /* Shell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Shell.swift; sourceTree = SOURCE_ROOT; };
 		532644E126E79E5C002EA34D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		53468A3E271236A800887A08 /* BaseBoard.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = BaseBoard.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/PrivateFrameworks/BaseBoard.framework/Versions/A/BaseBoard.tbd; sourceTree = DEVELOPER_DIR; };
 		53468A452712632800887A08 /* Security.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = Security.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Versions/A/Security.tbd; sourceTree = DEVELOPER_DIR; };
 		53468A4A2712917900887A08 /* libmis.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libmis.tbd; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libmis.tbd; sourceTree = DEVELOPER_DIR; };
 		53841CC926D9D7920021D27C /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/iPhoneOS.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
-		53D9DAF226C1849D0071959E /* OphanimError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OphanimError.swift; sourceTree = "<group>"; };
-		53F3802726EB6F6B00D6B525 /* NotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotifyService.swift; sourceTree = "<group>"; };
-		53F4D29F26C43C690020167C /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
-		53F50C4826E3CA42007AD2D3 /* AppLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLibraryView.swift; sourceTree = "<group>"; };
-		68E48B9B295709BF00C39879 /* Cacher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Cacher.swift; sourceTree = "<group>"; };
-		6E25096E297F5032004D754C /* FileExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileExtensions.swift; sourceTree = "<group>"; };
-		6E250970297F5281004D754C /* SigningSetupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SigningSetupView.swift; sourceTree = "<group>"; };
-		6E550A8A29BA507200EFC15C /* Macho.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Macho.swift; sourceTree = "<group>"; };
-		6E5C68B9289865C8008EC11B /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
-		FACE00000000000000000901 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		6E66B0D428A0039D0099B907 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastView.swift; sourceTree = "<group>"; };
-		6E66B0D828A135360099B907 /* ToastVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastVM.swift; sourceTree = "<group>"; };
-		6E7CA16428B4D02900216CD8 /* ITunesResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ITunesResponse.swift; sourceTree = "<group>"; };
-		6E7CA16628B4EEAE00216CD8 /* KeymapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeymapData.swift; sourceTree = "<group>"; };
-		6EB4B57328C93E0600630890 /* LegacySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacySettings.swift; sourceTree = "<group>"; };
-		6ECB1D0D29798DFA00CD92AA /* DataExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExtensions.swift; sourceTree = "<group>"; };
-		6ED6ACA328A949A30040D234 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
-		6EF893D428F34CD1004AB6D9 /* NetworkVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkVM.swift; sourceTree = "<group>"; };
+		53D9DAF226C1849D0071959E /* OphanimError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/OphanimError.swift; sourceTree = SOURCE_ROOT; };
+		53F3802726EB6F6B00D6B525 /* NotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Services/NotifyService.swift; sourceTree = SOURCE_ROOT; };
+		53F4D29F26C43C690020167C /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/Log.swift; sourceTree = SOURCE_ROOT; };
+		53F50C4826E3CA42007AD2D3 /* AppLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppLibrary/AppLibraryView.swift; sourceTree = SOURCE_ROOT; };
+		68E48B9B295709BF00C39879 /* Cacher.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Services/Cacher.swift; sourceTree = SOURCE_ROOT; };
+		6E25096E297F5032004D754C /* FileExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Extensions/FileExtensions.swift; sourceTree = SOURCE_ROOT; };
+		6E250970297F5281004D754C /* SigningSetupView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Onboarding/SigningSetupView.swift; sourceTree = SOURCE_ROOT; };
+		6E550A8A29BA507200EFC15C /* Macho.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Install/Macho.swift; sourceTree = SOURCE_ROOT; };
+		6E5C68B9289865C8008EC11B /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/App/MainView.swift; sourceTree = SOURCE_ROOT; };
+		FACE00000000000000000901 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/DesignSystem/Theme.swift; sourceTree = SOURCE_ROOT; };
+		6E66B0D428A0039D0099B907 /* ToastView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/DesignSystem/ToastView.swift; sourceTree = SOURCE_ROOT; };
+		6E66B0D828A135360099B907 /* ToastVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/ToastVM.swift; sourceTree = SOURCE_ROOT; };
+		6E7CA16428B4D02900216CD8 /* ITunesResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/ITunesResponse.swift; sourceTree = SOURCE_ROOT; };
+		6E7CA16628B4EEAE00216CD8 /* KeymapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/KeymapData.swift; sourceTree = SOURCE_ROOT; };
+		6EB4B57328C93E0600630890 /* LegacySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/LegacySettings.swift; sourceTree = SOURCE_ROOT; };
+		6ECB1D0D29798DFA00CD92AA /* DataExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Extensions/DataExtensions.swift; sourceTree = SOURCE_ROOT; };
+		6ED6ACA328A949A30040D234 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppSettings/AppSettingsView.swift; sourceTree = SOURCE_ROOT; };
+		6EF893D428F34CD1004AB6D9 /* NetworkVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/NetworkVM.swift; sourceTree = SOURCE_ROOT; };
 		8783CFF726B8C52D00171041 /* Ophanim.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ophanim.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		8783CFFA26B8C52D00171041 /* OphanimApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OphanimApp.swift; sourceTree = "<group>"; };
+		8783CFFA26B8C52D00171041 /* OphanimApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/App/OphanimApp.swift; sourceTree = SOURCE_ROOT; };
 		8783CFFE26B8C52E00171041 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8783D00126B8C52E00171041 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		8783D00326B8C52E00171041 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8783D00426B8C52E00171041 /* Ophanim.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Ophanim.entitlements; sourceTree = "<group>"; };
-		8783D00A26B8C9E600171041 /* URLExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLExtensions.swift; sourceTree = "<group>"; };
-		923421F6275F40300030CD7D /* AppContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
-		9272F19C273B74C800DFBEF1 /* AppsVM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppsVM.swift; sourceTree = "<group>"; };
-		9280871A2824A8D20034C510 /* SoundDeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundDeviceService.swift; sourceTree = "<group>"; };
-		9286D295273A7E4200958DD3 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
-		928C01D7272DF1A2007EB2DF /* Ophanim-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Ophanim-Bridging-Header.h"; sourceTree = "<group>"; };
-		928C01D8272E162C007EB2DF /* InstallVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallVM.swift; sourceTree = "<group>"; };
-		92A8AAC8275EFEA800D89B50 /* SystemConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemConfig.swift; sourceTree = "<group>"; };
-		92B4D38E2737CF3D0001D7BB /* Galgal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Galgal.swift; sourceTree = "<group>"; };
+		8783D00A26B8C9E600171041 /* URLExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Extensions/URLExtensions.swift; sourceTree = SOURCE_ROOT; };
+		923421F6275F40300030CD7D /* AppContainer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/AppContainer.swift; sourceTree = SOURCE_ROOT; };
+		9272F19C273B74C800DFBEF1 /* AppsVM.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/AppsVM.swift; sourceTree = SOURCE_ROOT; };
+		9280871A2824A8D20034C510 /* SoundDeviceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Services/SoundDeviceService.swift; sourceTree = SOURCE_ROOT; };
+		9286D295273A7E4200958DD3 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/AppSettings.swift; sourceTree = SOURCE_ROOT; };
+		928C01D7272DF1A2007EB2DF /* Ophanim-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Ophanim/Ophanim-Bridging-Header.h; sourceTree = SOURCE_ROOT; };
+		928C01D8272E162C007EB2DF /* InstallVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/InstallVM.swift; sourceTree = SOURCE_ROOT; };
+		92A8AAC8275EFEA800D89B50 /* SystemConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/SystemConfig.swift; sourceTree = SOURCE_ROOT; };
+		92B4D38E2737CF3D0001D7BB /* Galgal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Services/Galgal.swift; sourceTree = SOURCE_ROOT; };
 		92D79316273C065A001CC964 /* libsandbox.1.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsandbox.1.tbd; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/usr/lib/libsandbox.1.tbd; sourceTree = DEVELOPER_DIR; };
-		92ECD8A2274E75CD00DB7AC6 /* Installer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Installer.swift; sourceTree = "<group>"; };
-		92ECD8A4274E763700DB7AC6 /* IPA.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPA.swift; sourceTree = "<group>"; };
-		92ECD8AD274E787200DB7AC6 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
-		92EE06CF274EA433002C907B /* BaseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseApp.swift; sourceTree = "<group>"; };
-		92EE06D3274EA604002C907B /* HostedAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedAppView.swift; sourceTree = "<group>"; };
-		92EE06D9274EB009002C907B /* HostedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedApp.swift; sourceTree = "<group>"; };
-		92EE06DD274EC09F002C907B /* Entitlements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entitlements.swift; sourceTree = "<group>"; };
-		92F8500927675124005CE6BE /* AppIntegrity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntegrity.swift; sourceTree = "<group>"; };
-		A25930F32C49E2BC0006C91C /* HostedAppVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedAppVM.swift; sourceTree = "<group>"; };
+		92ECD8A2274E75CD00DB7AC6 /* Installer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Install/Installer.swift; sourceTree = SOURCE_ROOT; };
+		92ECD8A4274E763700DB7AC6 /* IPA.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Install/IPA.swift; sourceTree = SOURCE_ROOT; };
+		92ECD8AD274E787200DB7AC6 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/AppInfo.swift; sourceTree = SOURCE_ROOT; };
+		92EE06CF274EA433002C907B /* BaseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/BaseApp.swift; sourceTree = SOURCE_ROOT; };
+		92EE06D3274EA604002C907B /* HostedAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppLibrary/HostedAppView.swift; sourceTree = SOURCE_ROOT; };
+		92EE06D9274EB009002C907B /* HostedApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/HostedApp.swift; sourceTree = SOURCE_ROOT; };
+		92EE06DD274EC09F002C907B /* Entitlements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Entitlements.swift; sourceTree = SOURCE_ROOT; };
+		92F8500927675124005CE6BE /* AppIntegrity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/AppIntegrity.swift; sourceTree = SOURCE_ROOT; };
+		A25930F32C49E2BC0006C91C /* HostedAppVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/HostedAppVM.swift; sourceTree = SOURCE_ROOT; };
 		AA719647287A0E2500623C15 /* default.yaml */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.yaml; path = default.yaml; sourceTree = "<group>"; };
-		AA71964A287A0EA800623C15 /* SandboxRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SandboxRules.swift; sourceTree = "<group>"; };
+		AA71964A287A0EA800623C15 /* SandboxRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/SandboxRules.swift; sourceTree = SOURCE_ROOT; };
 		AA970FD228793A310099A5D0 /* OphanimRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = OphanimRelease.entitlements; sourceTree = "<group>"; };
-		AAE2F78E2F72562E001336C9 /* ViewExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewExtensions.swift; sourceTree = "<group>"; };
-		AB00EB5129A7BF17006F3225 /* KeyCover.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeyCover.swift; sourceTree = "<group>"; };
-		AB6F21EA299B7FA20078ADEC /* URLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLHandler.swift; sourceTree = "<group>"; };
-		ABBC85B82B7C5CBA00DCF223 /* ModifierKeyObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierKeyObserver.swift; sourceTree = "<group>"; };
-		ABDAD80529893CF900DC164F /* KeyCoverSetupViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCoverSetupViews.swift; sourceTree = "<group>"; };
-		ABDAD80929893EA300DC164F /* KeyCoverSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCoverSettings.swift; sourceTree = "<group>"; };
-		ABDAD80B298A1E3E00DC164F /* KeyCoverViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCoverViews.swift; sourceTree = "<group>"; };
-		ABED59822887A32F004D782B /* MenuBarView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
-		B1084E1E28AA80F400E399FA /* AppSettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsVM.swift; sourceTree = "<group>"; };
+		AAE2F78E2F72562E001336C9 /* ViewExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Extensions/ViewExtensions.swift; sourceTree = SOURCE_ROOT; };
+		AB00EB5129A7BF17006F3225 /* KeyCover.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/KeyCover/KeyCover.swift; sourceTree = SOURCE_ROOT; };
+		AB6F21EA299B7FA20078ADEC /* URLHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/URLHandler.swift; sourceTree = SOURCE_ROOT; };
+		ABBC85B82B7C5CBA00DCF223 /* ModifierKeyObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/ModifierKeyObserver.swift; sourceTree = SOURCE_ROOT; };
+		ABDAD80529893CF900DC164F /* KeyCoverSetupViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/KeyCover/KeyCoverSetupViews.swift; sourceTree = SOURCE_ROOT; };
+		ABDAD80929893EA300DC164F /* KeyCoverSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/KeyCover/KeyCoverSettings.swift; sourceTree = SOURCE_ROOT; };
+		ABDAD80B298A1E3E00DC164F /* KeyCoverViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/KeyCover/KeyCoverViews.swift; sourceTree = SOURCE_ROOT; };
+		ABED59822887A32F004D782B /* MenuBarView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Ophanim/App/MenuBarView.swift; sourceTree = SOURCE_ROOT; };
+		B1084E1E28AA80F400E399FA /* AppSettingsVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/AppSettingsVM.swift; sourceTree = SOURCE_ROOT; };
 		B17FD03828C70BAE00B1D4CA /* CoreUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreUI.framework; path = /System/Library/PrivateFrameworks/CoreUI.framework; sourceTree = "<group>"; };
-		B17FD03F28C70C7300B1D4CA /* CoreUI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CoreUI.h; sourceTree = "<group>"; };
-		B17FD04628C7B0D900B1D4CA /* AssetsExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetsExtractor.swift; sourceTree = "<group>"; };
-		B6603E1028E206A300DEFA3F /* UninstallSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UninstallSettings.swift; sourceTree = "<group>"; };
-		B6603E1228E2257800DEFA3F /* Uninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Uninstaller.swift; sourceTree = "<group>"; };
-		B67BC7112C39354500315011 /* UpdateScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateScheme.swift; sourceTree = "<group>"; };
-		B67BC7152C3951E500315011 /* KeymapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeymapView.swift; sourceTree = "<group>"; };
-		B6825C3428F3D23600E3015A /* InstallSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallSettings.swift; sourceTree = "<group>"; };
-		B68FD80C2ACB642100683778 /* HostedAppExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostedAppExtensions.swift; sourceTree = "<group>"; };
-		B6AB53C829232B4F00039B2E /* KeyCodeNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCodeNames.swift; sourceTree = "<group>"; };
-		B6ABDA292971EEF700A46E80 /* ProgressVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressVM.swift; sourceTree = "<group>"; };
+		B17FD03F28C70C7300B1D4CA /* CoreUI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Ophanim/Core/Support/CoreUI.h; sourceTree = SOURCE_ROOT; };
+		B17FD04628C7B0D900B1D4CA /* AssetsExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/AssetsExtractor.swift; sourceTree = SOURCE_ROOT; };
+		B6603E1028E206A300DEFA3F /* UninstallSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppSettings/UninstallSettings.swift; sourceTree = SOURCE_ROOT; };
+		B6603E1228E2257800DEFA3F /* Uninstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppLibrary/Uninstaller.swift; sourceTree = SOURCE_ROOT; };
+		B67BC7112C39354500315011 /* UpdateScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/UpdateScheme.swift; sourceTree = SOURCE_ROOT; };
+		B67BC7152C3951E500315011 /* KeymapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/Keymap/KeymapView.swift; sourceTree = SOURCE_ROOT; };
+		B6825C3428F3D23600E3015A /* InstallSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Features/AppSettings/InstallSettings.swift; sourceTree = SOURCE_ROOT; };
+		B68FD80C2ACB642100683778 /* HostedAppExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Support/Extensions/HostedAppExtensions.swift; sourceTree = SOURCE_ROOT; };
+		B6AB53C829232B4F00039B2E /* KeyCodeNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/Model/KeyCodeNames.swift; sourceTree = SOURCE_ROOT; };
+		B6ABDA292971EEF700A46E80 /* ProgressVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ophanim/Core/ViewModel/ProgressVM.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -230,8 +230,8 @@
 				6E66B0D428A0039D0099B907 /* ToastView.swift */,
 				6ED6ACA328A949A30040D234 /* AppSettingsView.swift */,
 				6E250970297F5281004D754C /* SigningSetupView.swift */,
-				6E66B0CF289F562A0099B907 /* Sidebar Views */,
-				6E66B0CA289F55180099B907 /* App Views */,
+				6E66B0CF289F562A0099B907 /* Sidebar */,
+				6E66B0CA289F55180099B907 /* AppLibrary */,
 				36B26B95288C722500859EFD /* Settings */,
 				B6603E1228E2257800DEFA3F /* Uninstaller.swift */,
 				ABDAD80529893CF900DC164F /* KeyCoverSetupViews.swift */,
@@ -338,20 +338,20 @@
 			path = Extensions;
 			sourceTree = "<group>";
 		};
-		6E66B0CA289F55180099B907 /* App Views */ = {
+		6E66B0CA289F55180099B907 /* AppLibrary */ = {
 			isa = PBXGroup;
 			children = (
 				92EE06D3274EA604002C907B /* HostedAppView.swift */,
 			);
-			path = "App Views";
+			path = AppLibrary;
 			sourceTree = "<group>";
 		};
-		6E66B0CF289F562A0099B907 /* Sidebar Views */ = {
+		6E66B0CF289F562A0099B907 /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
 				53F50C4826E3CA42007AD2D3 /* AppLibraryView.swift */,
 			);
-			path = "Sidebar Views";
+			path = Sidebar;
 			sourceTree = "<group>";
 		};
 		8783CFEE26B8C52D00171041 = {

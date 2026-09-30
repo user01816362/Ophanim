@@ -30,7 +30,7 @@
 
 // Re-export the Tier-3 inline-hook engine API through the shared bridging header so both the Galgal
 // framework (via Galgal.h) and the sibling agent (via -import-objc-header OPRing.h) see it in Swift.
-#include "OPInline.h"
+#include "../hooks/OPInline.h"
 
 /// Event kinds emitted by the C interpose wrappers. The Swift consumer (OPRingBridge) maps each to
 /// an (OPCategory, api) pair. `str` carries a path/host/symbol; `arg` a scalar (mode/len/port).

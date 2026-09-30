@@ -22,7 +22,7 @@
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <stdatomic.h>
-#import "OPRing.h"
+#import "../ring/OPRing.h"
 
 // SecTrustEvaluate is deprecated in favor of SecTrustEvaluateWithError, but apps still call it,
 // so we must interpose it too. Silence the deprecation diagnostic for this file.

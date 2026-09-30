@@ -20,7 +20,7 @@ FOUNDATION_EXPORT const unsigned char GalgalVersionString[];
 
 // OphanimCore capture ring - exposes op_ring_start()/op_ring_emit() to the framework's Swift (this
 // umbrella doubles as the Swift bridging header) and to the OphanimCore interpose wrappers.
-#import "../../OphanimCore/OPRing.h"
+#import "../../OphanimCore/ring/OPRing.h"
 
 // This is the function that CFRunLoop calls to serve main dispatch queue
 // Used by GalgalInput to manually drain the queue

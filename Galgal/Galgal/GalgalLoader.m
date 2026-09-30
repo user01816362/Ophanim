@@ -12,7 +12,7 @@
 #import <sys/utsname.h>
 #import "NSObject+Swizzle.h"
 #import <dlfcn.h>
-#import "../../OphanimCore/OPRing.h"   // op_ring_emit for filesystem capture
+#import "../../OphanimCore/ring/OPRing.h"   // op_ring_emit for filesystem capture
 
 @import MachO;
 

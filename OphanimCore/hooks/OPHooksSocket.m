@@ -13,7 +13,7 @@
 #import <netinet/in.h>
 #import <arpa/inet.h>
 #import <netdb.h>
-#import "OPRing.h"
+#import "../ring/OPRing.h"
 
 #define DYLD_INTERPOSE(_replacement, _replacee) \
    __attribute__((used)) static struct { const void *replacement; const void *replacee; } \
