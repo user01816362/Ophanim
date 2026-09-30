@@ -24,7 +24,7 @@ enum ToolRouter {
     }
 
     /// Name → handler. Only file that knows tool names besides the catalog.
-    static let handlers: [String: ([String: Any]) throws -> String] = [
+    nonisolated(unsafe) static let handlers: [String: ([String: Any]) throws -> String] = [
         "list_apps": AppTools.listApps,
         "launch_app": AppTools.launchApp,
         "install_app": AppTools.installApp,

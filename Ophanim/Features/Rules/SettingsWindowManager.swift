@@ -8,7 +8,7 @@ import AppKit
 /// hosted in AppKit windows directly. Callers keep their tiny manager shims
 /// (same `.shared.show(...)` signatures); this class owns all NSWindow work.
 final class SettingsWindowManager: NSObject, NSWindowDelegate {
-    static let shared = SettingsWindowManager()
+    nonisolated(unsafe) static let shared = SettingsWindowManager()
     private var windows: [String: NSWindow] = [:]
 
     func show<Content: View>(key: String, title: String,
@@ -49,7 +49,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
 /// Opens the rules editor. AppSettings is a reference type, so the editor mutates
 /// the shared instance in place (persisted via its didSet→encode).
 final class RulesWindowManager: NSObject {
-    static let shared = RulesWindowManager()
+    nonisolated(unsafe) static let shared = RulesWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Interception Rules - \(key)",
@@ -60,7 +60,7 @@ final class RulesWindowManager: NSObject {
 }
 
 final class ObjCHooksWindowManager: NSObject {
-    static let shared = ObjCHooksWindowManager()
+    nonisolated(unsafe) static let shared = ObjCHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "ObjC Boundary Hooks - \(key)",
@@ -71,7 +71,7 @@ final class ObjCHooksWindowManager: NSObject {
 }
 
 final class SwiftHooksWindowManager: NSObject {
-    static let shared = SwiftHooksWindowManager()
+    nonisolated(unsafe) static let shared = SwiftHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Swift Vtable Hooks - \(key)",
@@ -82,7 +82,7 @@ final class SwiftHooksWindowManager: NSObject {
 }
 
 final class InlineHooksWindowManager: NSObject {
-    static let shared = InlineHooksWindowManager()
+    nonisolated(unsafe) static let shared = InlineHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Inline Hooks - \(key)",

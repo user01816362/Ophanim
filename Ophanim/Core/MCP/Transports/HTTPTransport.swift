@@ -38,7 +38,7 @@ func mcpResolveBind(_ mode: String) -> in_addr_t {
 // MARK: - HTTP transport (loopback :20033, Streamable HTTP over a POSIX socket)
 
 final class MCPHTTPTransport {
-    static let shared = MCPHTTPTransport()
+    nonisolated(unsafe) static let shared = MCPHTTPTransport()
     private var listenFD: Int32 = -1
     private let queue = DispatchQueue(label: "be.ophanim.mcp.http", attributes: .concurrent)
     private(set) var isRunning = false

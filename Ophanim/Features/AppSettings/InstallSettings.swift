@@ -11,7 +11,7 @@ import SwiftUI
 /// the install dialog (and sensible defaults). The per-app "Application Type" now lives on each
 /// app's Application settings tab instead of a global default.
 class InstallPreferences: NSObject, ObservableObject {
-    static let shared = InstallPreferences()
+    nonisolated(unsafe) static let shared = InstallPreferences()
 
     @objc @AppStorage("AlwaysInstallGalgal") var alwaysInstallGalgal = true
 

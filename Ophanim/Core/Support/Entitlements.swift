@@ -8,7 +8,7 @@ import Yams
 
 class Entitlements {
     // These are so critical they MUST be gone no matter what.
-    static var critical = [
+    nonisolated(unsafe) static var critical = [
         "/bin/bash",
         "/usr/sbin/sshd",
         "/usr/libexec/ssh-keysign",

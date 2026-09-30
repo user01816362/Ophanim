@@ -8,7 +8,7 @@
 import Foundation
 
 @Observable class ToastVM {
-    static let shared = ToastVM()
+    nonisolated(unsafe) static let shared = ToastVM()
 
     var toasts: [ToastInfo] = []
     var isShown: Bool = true

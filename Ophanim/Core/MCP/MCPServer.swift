@@ -10,7 +10,7 @@
 import Foundation
 
 final class MCPServer {
-    static let shared = MCPServer()
+    nonisolated(unsafe) static let shared = MCPServer()
     private let serverName = "ophanim"
     private let serverVersion = "1.0.0"
 
@@ -74,7 +74,7 @@ final class MCPServer {
 
     // MARK: Tool catalog
 
-    static let toolDefinitions: [[String: Any]] = [
+    nonisolated(unsafe) static let toolDefinitions: [[String: Any]] = [
         [
             "name": "list_apps",
             "description": "List the iOS apps installed in Ophanim, with each app's bundle ID, name, "

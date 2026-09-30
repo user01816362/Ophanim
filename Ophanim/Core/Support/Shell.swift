@@ -6,6 +6,16 @@
 import Foundation
 
 @Observable class Shell {
+    /// Lock-guarded box for values mutated from concurrently-executing
+    /// callbacks (Swift 6: no mutating captured vars).
+    private final class LockBox<T>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: T
+        init(_ value: T) { self.value = value }
+        func set(_ v: T) { lock.lock(); defer { lock.unlock() }; value = v }
+        func get() -> T { lock.lock(); defer { lock.unlock() }; return value }
+    }
+
     @discardableResult
     static func run(print: Bool = true, _ binary: String, _ args: String...) throws -> String {
         let process = Process()
@@ -49,7 +59,7 @@ import Foundation
             return false
         }
 
-        var result = true
+        let result = LockBox(true)
 
         // Show the output as it is produced
         sudoOut.fileHandleForReading.readabilityHandler = { fileHandle in
@@ -59,7 +69,7 @@ import Foundation
             if let out = String(bytes: data, encoding: .utf8) {
                 Log.shared.log(out)
                 if out.contains("password") {
-                    result = false
+                    result.set(false)
                 }
             }
         }
@@ -74,7 +84,7 @@ import Foundation
 
         // Make sure we don't disappear while output is still being produced.
         sudo.waitUntilExit()
-        return result
+        return result.get()
     }
 
     static func signMacho(_ binary: URL) throws {

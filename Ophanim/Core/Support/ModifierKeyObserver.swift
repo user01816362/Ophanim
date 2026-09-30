@@ -8,7 +8,7 @@
 import Foundation
 
 @Observable class ModifierKeyObserver {
-    static let shared = ModifierKeyObserver()
+    nonisolated(unsafe) static let shared = ModifierKeyObserver()
 
     var isOptionKeyPressed = false
     var isCommandKeyPressed = false

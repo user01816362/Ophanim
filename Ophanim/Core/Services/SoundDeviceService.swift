@@ -8,7 +8,7 @@ import SwiftUI
 
 class SoundDeviceService {
 
-    static let shared = SoundDeviceService()
+    nonisolated(unsafe) static let shared = SoundDeviceService()
 
     private init() { }
 

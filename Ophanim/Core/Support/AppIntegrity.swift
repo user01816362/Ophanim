@@ -31,7 +31,7 @@ import Foundation
         Bundle.main.resourceURL?.deletingLastPathComponent().deletingLastPathComponent()
     }
 
-    private static var expectedUrl = URL(fileURLWithPath: "/Applications/Ophanim.app")
+    nonisolated(unsafe) private static var expectedUrl = URL(fileURLWithPath: "/Applications/Ophanim.app")
 
     private static var insideAppsFolder: Bool {
         if let url = appUrl {

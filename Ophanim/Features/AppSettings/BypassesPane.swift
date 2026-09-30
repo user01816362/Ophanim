@@ -71,9 +71,10 @@ struct BypassesView: View {
                         .onChange(of: appCategory) { _, _ in
                             signingCategory = true
                             app.info.applicationCategoryType = appCategory
+                            let executable = app.executable
                             Task.detached {
                                 do {
-                                    try await Shell.signApp(app.executable)
+                                    try await Shell.signApp(executable)
                                 } catch {
                                     Log.shared.error(error)
                                 }

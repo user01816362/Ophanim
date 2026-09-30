@@ -14,14 +14,14 @@ enum KeyCoverStatus: String, Codable, Hashable {
 }
 
 class KeyCoverPreferences: NSObject, ObservableObject {
-    static let shared = KeyCoverPreferences()
+    nonisolated(unsafe) static let shared = KeyCoverPreferences()
 
     @AppStorage("keyCoverEnabled") var keyCoverEnabled: KeyCoverStatus = KeyCoverStatus.disabled
     @AppStorage("promptForKeyCoverPasswordAtLaunch") var promptForKeyCoverPasswordAtLaunch = true
 }
 
 struct KeyCoverSettings: View {
-    static let shared = KeyCoverSettings()
+    nonisolated(unsafe) static let shared = KeyCoverSettings()
 
     @State private var keyCoverInitialSetupShown = false
     @State private var keyCoverUpdatePasswordShown = false

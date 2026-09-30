@@ -8,7 +8,7 @@ import SwiftUI
 
 @Observable class Log {
 
-    static let shared = Log()
+    nonisolated(unsafe) static let shared = Log()
 
     func error(_ err: Error) {
         Task { @MainActor in

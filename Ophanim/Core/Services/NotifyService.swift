@@ -9,7 +9,7 @@ import UserNotifications
 
 class NotifyService: NSObject, UNUserNotificationCenterDelegate {
 
-    static let shared = NotifyService()
+    nonisolated(unsafe) static let shared = NotifyService()
 
     func allowNotify() {
         UNUserNotificationCenter.current().delegate = self

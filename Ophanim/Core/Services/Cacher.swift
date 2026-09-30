@@ -10,7 +10,7 @@ import AppKit
 import DataCache
 
 class Cacher {
-    static let shared = Cacher()
+    nonisolated(unsafe) static let shared = Cacher()
     let cache = DataCache.instance
     /// We can create a custom cache like this (default values are as the same as below):
     /// `let cache = DataCache(name: "OphanimCache")`

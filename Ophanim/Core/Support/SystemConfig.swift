@@ -6,7 +6,7 @@
 import Foundation
 
 class SystemConfig {
-    static var isFirstTimePlaySign = false
+    nonisolated(unsafe) static var isFirstTimePlaySign = false
 
     static let isPlaySignActive: Bool = isSIPDisabled() && isRunningAMFIEnabled()
 

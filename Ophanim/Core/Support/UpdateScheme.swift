@@ -27,7 +27,7 @@ class UpdateScheme {
         let action: () throws -> Void
     }
 
-    private static let migrations: [Version: Migration] = [
+    nonisolated(unsafe) private static let migrations: [Version: Migration] = [
         Version("2"): Migration(
             fromVersion: "2",
             toVersion: "3",
