@@ -173,7 +173,7 @@ jobs:
         # only appear in PlistReader.swift + Entitlements.swift (Dictionary.read).
         run: |
           set -euo pipefail
-          if grep -rn 'define DYLD_INTERPOSE' OphanimCore Galgal/Galgal/; then
+          if grep -rn 'define DYLD_INTERPOSE' OphanimCore Galgal/Galgal/ --exclude-dir=compat; then
             echo "::error::R7: local DYLD_INTERPOSE define found - use compat/OPInterpose.h"
             exit 1
           fi
