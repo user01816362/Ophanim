@@ -14,7 +14,11 @@ enum KeyCoverStatus: String, Codable, Hashable {
 }
 
 class KeyCoverPreferences: NSObject, ObservableObject {
-    nonisolated(unsafe) static let shared = KeyCoverPreferences()
+    nonisolated(unsafe) static var shared: KeyCoverPreferences = {
+        // @AppStorage init is MainActor-isolated; first access may come from a
+        // background thread (MCP transport), so hop to main instead of assuming it.
+        if Thread.isMainThread { KeyCoverPreferences() } else { DispatchQueue.main.sync { KeyCoverPreferences() } }
+    }()
 
     @AppStorage("keyCoverEnabled") var keyCoverEnabled: KeyCoverStatus = KeyCoverStatus.disabled
     @AppStorage("promptForKeyCoverPasswordAtLaunch") var promptForKeyCoverPasswordAtLaunch = true

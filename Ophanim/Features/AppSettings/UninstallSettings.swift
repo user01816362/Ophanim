@@ -8,7 +8,11 @@
 import SwiftUI
 
 class UninstallPreferences: NSObject, ObservableObject {
-    nonisolated(unsafe) static let shared = UninstallPreferences()
+    nonisolated(unsafe) static var shared: UninstallPreferences = {
+        // @AppStorage init is MainActor-isolated; first access may come from a
+        // background thread (MCP transport), so hop to main instead of assuming it.
+        if Thread.isMainThread { UninstallPreferences() } else { DispatchQueue.main.sync { UninstallPreferences() } }
+    }()
 
     @objc @AppStorage("ClearAppDataUninstall") var clearAppData = false
     @objc @AppStorage("RemoveAppKeymapUninstall") var removeAppKeymap = false
