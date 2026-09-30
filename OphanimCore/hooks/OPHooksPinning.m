@@ -55,4 +55,4 @@ static Boolean op_SecTrustEvaluateWithError(SecTrustRef trust, CFErrorRef *error
     return original;
 }
 
-OPHANIM_INTERPOSE(op_SecTrustEvaluateWithError, SecTrustEvaluateWithError)
+DYLD_INTERPOSE(op_SecTrustEvaluateWithError, SecTrustEvaluateWithError)

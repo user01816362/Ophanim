@@ -45,6 +45,6 @@ static int op_posix_spawn(pid_t *pid, const char *path,
     return posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
-OPHANIM_INTERPOSE(op_dlopen, dlopen)
-OPHANIM_INTERPOSE(op_fork, fork)
-OPHANIM_INTERPOSE(op_posix_spawn, posix_spawn)
+DYLD_INTERPOSE(op_dlopen, dlopen)
+DYLD_INTERPOSE(op_fork, fork)
+DYLD_INTERPOSE(op_posix_spawn, posix_spawn)

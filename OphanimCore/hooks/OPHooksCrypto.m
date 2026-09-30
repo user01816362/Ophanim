@@ -33,5 +33,5 @@ static void op_CCHmac(CCHmacAlgorithm algorithm, const void *key, size_t keyLeng
     CCHmac(algorithm, key, keyLength, data, dataLength, macOut);
 }
 
-OPHANIM_INTERPOSE(op_CCCrypt, CCCrypt)
-OPHANIM_INTERPOSE(op_CCHmac, CCHmac)
+DYLD_INTERPOSE(op_CCCrypt, CCCrypt)
+DYLD_INTERPOSE(op_CCHmac, CCHmac)

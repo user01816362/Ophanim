@@ -38,9 +38,10 @@ enum RuleTools {
         switch name {
         case "block-trackers":
             let domains = ReportBuilder.trackerCatalog.keys.map { "\"\($0)\"" }.joined(separator: ",")
-            let js = "var t=[\(domains)];if(ctx.host){for(var i=0;i<t.length;i++)" +
-                     "{if(ctx.host.indexOf(t[i])>=0){ctx.block=true;break;}}}"
-            return [["id": "op-block-trackers", "enabled": true, "note": "Block known tracker/analytics/ad hosts",
+            // Lowercase once: Swift matching is case-insensitive, JS indexOf is not.
+            let js = "var t=[\(domains)];var h=(ctx.host||'').toLowerCase();for(var i=0;i<t.length;i++)" +
+                     "{if(h.indexOf(t[i])>=0){ctx.block=true;break;}}}"
+            return [["id": "op-block-trackers", "enabled": true, "note": "Block known tracker/analytics/ad hosts (breaks deep-link resolution + in-app ads while active)",
                      "match": ["categories": ["network"]],
                      "action": ["kind": "script", "script": js]]]
         case "fake-idfv":

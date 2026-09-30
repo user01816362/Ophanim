@@ -92,11 +92,11 @@ static int op_fs_unlink(const char *path) {
     return unlink(path);
 }
 
-OPHANIM_INTERPOSE(op_fs_open, open)
-OPHANIM_INTERPOSE(op_fs_stat, stat)
-OPHANIM_INTERPOSE(op_fs_lstat, lstat)
-OPHANIM_INTERPOSE(op_fs_access, access)
-OPHANIM_INTERPOSE(op_fs_rename, rename)
-OPHANIM_INTERPOSE(op_fs_unlink, unlink)
+DYLD_INTERPOSE(op_fs_open, open)
+DYLD_INTERPOSE(op_fs_stat, stat)
+DYLD_INTERPOSE(op_fs_lstat, lstat)
+DYLD_INTERPOSE(op_fs_access, access)
+DYLD_INTERPOSE(op_fs_rename, rename)
+DYLD_INTERPOSE(op_fs_unlink, unlink)
 
 #endif /* OPHANIM_SIBLING */

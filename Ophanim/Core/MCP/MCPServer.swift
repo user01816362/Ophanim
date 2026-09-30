@@ -124,7 +124,7 @@ final class MCPServer {
         ],
         [
             "name": "list_presets",
-            "description": "List ready-made rule presets (block-trackers, fake-idfv, fake-idfa) you can apply with apply_preset.",
+            "description": "List ready-made rule presets (block-trackers, fake-idfv, fake-idfa) you can apply with apply_preset. block-trackers breaks deep-link resolution + in-app ads while active.",
             "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
         ],
         [

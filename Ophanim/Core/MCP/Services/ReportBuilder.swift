@@ -37,31 +37,59 @@ enum ReportBuilder {
          OPPaths.legacyLogDirectory(forBundleID: bundleID)]
     }
 
-    private static let jbMarkers = ["/bin/bash", "/bin/sh", "/usr/sbin/sshd", "/etc/apt", "/private/var/lib/apt",
-        "/Applications/Cydia", "Cydia", "MobileSubstrate", "/usr/bin/ssh", "frida", "cycript",
-        "/private/var/stash", "/usr/libexec/sftp-server", "jailbreak", "/var/jb"]
+    /// Filesystem path probes matched against event paths (case-insensitive
+    /// substring). iOS-absolute markers (no macOS-host FP); the few generic names
+    /// at the end rely on the hosted-app context. See Research/10 for the 2026
+    /// landscape (rootless default, ElleKit, RootHide, Sileo/Zebra, Frida).
+    private static let jbMarkers = ["/var/jb", "/private/preboot", "/var/Liy", ".procursus_strapped",
+        "/Applications/Sileo.app", "/Applications/Zebra.app", "/Applications/Filza.app",
+        "/Applications/Dopamine.app", "/Applications/palera1nLoader.app", "/Applications/Cydia.app",
+        "com.opa334.Dopamine.plist", "/usr/bin/palera1n-helper", "/var/binpack", ".installed_unc0ver",
+        ".cydia_no_stash", "/jb/", "/private/var/stash", "/etc/apt", "/private/var/lib/apt",
+        "/Library/MobileSubstrate/DynamicLibraries", "MobileSubstrate", ".jbroot",
+        "libellekit.dylib", "libhooker.dylib", "libsubstitute.dylib", "TweakInject",
+        "/usr/sbin/frida-server", "/usr/lib/frida", "FridaGadget", "frida-agent",
+        "cycript", "libcycript", "CydiaSubstrate", "cydia.log",
+        "ABDYLD.dylib", "ABSubLoader.dylib",
+        "/etc/ssh/sshd_config", "/usr/libexec/ssh-keysign", "jailbreak"]
 
     /// Known tracker / analytics / ad / attribution / crash-reporting SDK host substrings.
+    /// 2026 set: Firebase still core (+logging/installation hosts), CleverTap + PostHog +
+    /// TelemetryDeck added, TikTok App Events, ironSource/LevelPlay (supersonicads),
+    /// AppLovin MAX subdomains, Sentry ingest, Airship/Customer.io, Criteo.
+    /// Removed: Flurry (sunset Mar 2024), MoPub (sunset Mar 2022). See Research/11.
     static let trackerCatalog: [String: String] = [
         "google-analytics.com": "Google Analytics (analytics)",
         "googletagmanager.com": "Google Tag Manager (analytics)",
         "app-measurement.com": "Firebase Analytics (analytics)",
+        "firebaselogging.googleapis.com": "Firebase Logging (analytics)",
+        "firebaseinstallations.googleapis.com": "Firebase Installations (analytics)",
         "firebase": "Firebase (analytics)", "crashlytics.com": "Crashlytics (crash)",
         "doubleclick.net": "Google Ads / DoubleClick (ads)", "googlesyndication.com": "Google AdSense (ads)",
         "googleadservices.com": "Google Ads (ads)", "admob": "Google AdMob (ads)",
         "graph.facebook.com": "Facebook SDK (analytics/ads)", "facebook.com/v": "Facebook Graph (analytics)",
-        "appsflyer.com": "AppsFlyer (attribution)", "adjust.com": "Adjust (attribution)", "adj.st": "Adjust (attribution)",
+        "appsflyer.com": "AppsFlyer (attribution)", "onelink.me": "AppsFlyer OneLink (attribution)",
+        "adjust.com": "Adjust (attribution)", "adj.st": "Adjust (attribution)",
         "branch.io": "Branch (attribution)", "singular.net": "Singular (attribution)", "kochava.com": "Kochava (attribution)",
         "amplitude.com": "Amplitude (analytics)", "mixpanel.com": "Mixpanel (analytics)",
+        "us.i.posthog.com": "PostHog (analytics)", "nom.telemetrydeck.com": "TelemetryDeck (analytics)",
         "segment.com": "Segment (analytics)", "segment.io": "Segment (analytics)",
-        "sentry.io": "Sentry (crash)", "bugsnag.com": "Bugsnag (crash)", "nr-data.net": "New Relic (analytics)",
-        "flurry.com": "Flurry (analytics)", "onesignal.com": "OneSignal (push/analytics)",
+        "sentry.io": "Sentry (crash)", "ingest.sentry.io": "Sentry ingest (crash)",
+        "bugsnag.com": "Bugsnag (crash)", "nr-data.net": "New Relic (analytics)",
+        "onesignal.com": "OneSignal (push/analytics)",
         "braze.com": "Braze (engagement)", "appboy.com": "Braze/Appboy (engagement)", "iterable.com": "Iterable (engagement)",
-        "applovin.com": "AppLovin (ads)", "chartboost.com": "Chartboost (ads)", "vungle.com": "Vungle (ads)",
+        "clevertap-prod.com": "CleverTap (engagement)", "wzrkt.com": "CleverTap legacy (engagement)",
+        "airship.com": "Airship (push)", "customer.io": "Customer.io (engagement)",
+        "moengage.com": "MoEngage (engagement)",
+        "business-api.tiktok.com": "TikTok App Events (ads)", "criteo.com": "Criteo (ads)",
+        "applovin.com": "AppLovin (ads)", "a.applovin.com": "AppLovin MAX (ads)",
+        "ms.applovin.com": "AppLovin MAX (ads)", "rt.applovin.com": "AppLovin MAX RTB (ads)",
+        "chartboost.com": "Chartboost (ads)", "vungle.com": "Vungle (ads)",
         "adcolony.com": "AdColony (ads)", "inmobi.com": "InMobi (ads)", "tapjoy.com": "TapJoy (ads)",
-        "mopub.com": "MoPub (ads)", "unity3d.com": "Unity Ads (ads)", "unityads": "Unity Ads (ads)",
+        "supersonicads.com": "ironSource/Unity LevelPlay (ads)", "ironsrc.com": "ironSource (ads)",
+        "unity3d.com": "Unity Ads (ads)", "unityads": "Unity Ads (ads)",
         "scorecardresearch.com": "comScore (analytics)", "demdex.net": "Adobe Audience (analytics)",
-        "omtrdc.net": "Adobe Analytics (analytics)", "moengage.com": "MoEngage (engagement)"
+        "omtrdc.net": "Adobe Analytics (analytics)"
     ]
 
     /// Summarize a run into a behavior/privacy picture: who it talked to, what it accessed, etc.

@@ -45,5 +45,5 @@ static int op_getaddrinfo(const char *node, const char *service,
     return getaddrinfo(node, service, hints, res);
 }
 
-OPHANIM_INTERPOSE(op_connect, connect)
-OPHANIM_INTERPOSE(op_getaddrinfo, getaddrinfo)
+DYLD_INTERPOSE(op_connect, connect)
+DYLD_INTERPOSE(op_getaddrinfo, getaddrinfo)
