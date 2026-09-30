@@ -11,7 +11,7 @@ import SwiftUI
 import Security
 
 struct KeyCover {
-    static var shared = KeyCover()
+    static let shared = KeyCover()
     static var chainGuardPath: URL {
         let chainGuardDir = Galgal.ophanimContainer.appendingPathComponent("ChainGuard")
 
@@ -93,7 +93,7 @@ struct KeyCover {
 }
 
 @Observable class KeyCoverObservable {
-    static var shared = KeyCoverObservable()
+    static let shared = KeyCoverObservable()
 
     var keyCoverEnabled = KeyCover.shared.isKeyCoverEnabled()
     var unlockedCount = KeyCover.shared.unlockedCount()

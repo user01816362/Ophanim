@@ -181,25 +181,23 @@ struct GraphicsView: View {
                     }
                 }
                 VStack(alignment: .leading) {
-                    if #available(macOS 13.2, *) {
-                        HStack {
-                            Toggle("settings.picker.windowFix", isOn: $settings.settings.inverseScreenValues)
-                                .help("settings.picker.windowFix.help")
-                                .onChange(of: settings.settings.inverseScreenValues) { _, _ in
-                                    settings.settings.windowFixMethod = 0
-                                }
-                            Spacer()
-                            // Dropdown to choose fix method
-                            Picker("", selection: $settings.settings.windowFixMethod) {
-                                Text("settings.picker.windowFixMethod.0").tag(0)
-                                Text("settings.picker.windowFixMethod.1").tag(1)
-                            }
-                            .frame(alignment: .leading)
-                            .help("settings.picker.windowFixMethod.help")
-                            .disabled(!settings.settings.inverseScreenValues)
-                        }
-                        Spacer()
-                    }
+HStack {
+    Toggle("settings.picker.windowFix", isOn: $settings.settings.inverseScreenValues)
+        .help("settings.picker.windowFix.help")
+        .onChange(of: settings.settings.inverseScreenValues) { _, _ in
+            settings.settings.windowFixMethod = 0
+        }
+    Spacer()
+    // Dropdown to choose fix method
+    Picker("", selection: $settings.settings.windowFixMethod) {
+        Text("settings.picker.windowFixMethod.0").tag(0)
+        Text("settings.picker.windowFixMethod.1").tag(1)
+    }
+    .frame(alignment: .leading)
+    .help("settings.picker.windowFixMethod.help")
+    .disabled(!settings.settings.inverseScreenValues)
+}
+Spacer()
                     HStack {
                         Text("settings.settings.displayRotation")
                         Spacer()
@@ -223,11 +221,9 @@ struct GraphicsView: View {
                     Toggle("settings.toggle.hideTitleBar", isOn: $settings.settings.hideTitleBar)
                         .help("settings.toggle.hideTitleBar.help")
                     Spacer()
-                    if #available(macOS 13.0, *) {
-                        Toggle("settings.toggle.hud", isOn: $settings.settings.metalHUD)
-                            .help("Show Apple's Metal performance HUD (FPS/GPU) overlay for this app.")
-                        Spacer()
-                    }
+Toggle("settings.toggle.hud", isOn: $settings.settings.metalHUD)
+    .help("Show Apple's Metal performance HUD (FPS/GPU) overlay for this app.")
+Spacer()
                 }
                 Spacer()
             }

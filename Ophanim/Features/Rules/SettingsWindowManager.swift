@@ -24,7 +24,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
         // Don't let the SwiftUI content drive the window size (its maxWidth/maxHeight .infinity makes
         // the preferred size ambiguous → opens at the wrong size). setContentSize is the source of truth.
         // Skipped for content-driven windows (Recon/Log), which relied on the default behavior.
-        if !contentDrivenSize, #available(macOS 13.0, *) { hosting.sizingOptions = [] }
+        if !contentDrivenSize { hosting.sizingOptions = [] }
         let window = NSWindow(contentViewController: hosting)
         window.title = title
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]

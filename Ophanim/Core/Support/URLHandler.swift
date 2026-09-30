@@ -25,11 +25,11 @@ enum URLAction: Int, Equatable {
     var type: URLTypes?
     var action: URLAction?
 
-    public static var shared = URLObservable()
+    public static let shared = URLObservable()
 }
 
 struct URLHandler {
-    public static var shared = URLHandler()
+    public static let shared = URLHandler()
 
     func processURL(url: URL) {
         guard let urlComponenents = NSURLComponents(url: url, resolvingAgainstBaseURL: false),

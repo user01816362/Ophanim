@@ -185,7 +185,6 @@ struct AppSettingsData: Codable {
 
 extension NSScreen {
     public static func hasNotch() -> Bool {
-        guard #available(macOS 12, *) else { return false }
         // check if any of the connected screens contains a notch
         return NSScreen.screens.contains { $0.safeAreaInsets.top != 0 }
     }

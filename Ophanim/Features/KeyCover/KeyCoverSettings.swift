@@ -14,7 +14,7 @@ enum KeyCoverStatus: String, Codable, Hashable {
 }
 
 class KeyCoverPreferences: NSObject, ObservableObject {
-    static var shared = KeyCoverPreferences()
+    static let shared = KeyCoverPreferences()
 
     @AppStorage("keyCoverEnabled") var keyCoverEnabled: KeyCoverStatus = KeyCoverStatus.disabled
     @AppStorage("promptForKeyCoverPasswordAtLaunch") var promptForKeyCoverPasswordAtLaunch = true

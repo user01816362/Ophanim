@@ -8,7 +8,7 @@
 import SwiftUI
 
 class UninstallPreferences: NSObject, ObservableObject {
-    static var shared = UninstallPreferences()
+    static let shared = UninstallPreferences()
 
     @objc @AppStorage("ClearAppDataUninstall") var clearAppData = false
     @objc @AppStorage("RemoveAppKeymapUninstall") var removeAppKeymap = false
@@ -20,7 +20,7 @@ class UninstallPreferences: NSObject, ObservableObject {
 }
 
 struct UninstallSettings: View {
-    public static var shared = UninstallSettings()
+    public static let shared = UninstallSettings()
 
     @ObservedObject var uninstallPreferences = UninstallPreferences.shared
 

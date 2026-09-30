@@ -48,11 +48,7 @@ struct OphanimThemeModifier: ViewModifier {
 
 private struct MonospaceEverywhere: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(macOS 13.0, *) {
-            content.fontDesign(.monospaced)
-        } else {
-            content.font(.system(.body, design: .monospaced))
-        }
+        content.fontDesign(.monospaced)
     }
 }
 
