@@ -11,7 +11,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
     nonisolated(unsafe) static let shared = SettingsWindowManager()
     private var windows: [String: NSWindow] = [:]
 
-    func show<Content: View>(key: String, title: String,
+    func show<Content: View & Sendable>(key: String, title: String,
                              size: NSSize, minSize: NSSize,
                              contentDrivenSize: Bool = false,
                              content: Content) {

@@ -44,6 +44,13 @@ class Installer {
         }
     }
 
+    /// Sendable box for the completion handler so the install Task can call it
+    /// without dragging a non-Sendable closure across isolation (same contract as before).
+    private final class CompletionBox: @unchecked Sendable {
+        let fn: (URL?) -> Void
+        init(_ fn: @escaping (URL?) -> Void) { self.fn = fn }
+    }
+
     // swiftlint:disable:next function_body_length
     static func install(ipaUrl: URL, export: Bool, injectGalgal: Bool? = nil,
                         returnCompletion: @escaping (URL?) -> Void) {
@@ -63,6 +70,7 @@ class Installer {
 
         InstallVM.shared.next(.begin, 0.0, 0.0)
 
+        let completionBox = CompletionBox(returnCompletion)
         Task(priority: .userInitiated) {
             let ipa = IPA(url: ipaUrl)
 
@@ -120,13 +128,13 @@ class Installer {
                 ipa.releaseTempDir()
                 try ipa.removeQuarantine(finalURL)
                 InstallVM.shared.next(.finish, 0.95, 1.0)
-                returnCompletion(finalURL)
+                completionBox.fn(finalURL)
             } catch {
                 Log.shared.error(returnErrorString(error: error))
                 ipa.releaseTempDir()
 
                 InstallVM.shared.next(.failed, 0.95, 1.0)
-                returnCompletion(nil)
+                completionBox.fn(nil)
             }
         }
     }
