@@ -24,7 +24,9 @@ class UninstallPreferences: NSObject, ObservableObject {
 }
 
 struct UninstallSettings: View {
-    public nonisolated(unsafe) static let shared = UninstallSettings()
+    public nonisolated(unsafe) static var shared: UninstallSettings = {
+        if Thread.isMainThread { UninstallSettings() } else { DispatchQueue.main.sync { UninstallSettings() } }
+    }()
 
     @ObservedObject var uninstallPreferences = UninstallPreferences.shared
 

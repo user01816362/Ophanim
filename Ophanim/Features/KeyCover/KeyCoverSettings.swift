@@ -25,7 +25,6 @@ class KeyCoverPreferences: NSObject, ObservableObject {
 }
 
 struct KeyCoverSettings: View {
-    nonisolated(unsafe) static let shared = KeyCoverSettings()
 
     @State private var keyCoverInitialSetupShown = false
     @State private var keyCoverUpdatePasswordShown = false
