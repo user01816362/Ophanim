@@ -29,7 +29,7 @@ struct KeyCoverInitialSetupView: View {
         }
         .pickerStyle(RadioGroupPickerStyle())
         .padding()
-        .onChange(of: keyOption) { _ in
+        .onChange(of: keyOption) { _, _ in
             switch keyOption {
             case .selfGeneratedPassword:
                 keyCoverPassword = KeyCoverPassword.shared.generateVerySecurePassword()
@@ -136,7 +136,7 @@ struct KeyCoverUpdatePasswordView: View {
             }
             .pickerStyle(RadioGroupPickerStyle())
             .padding()
-            .onChange(of: keyOption) { _ in
+            .onChange(of: keyOption) { _, _ in
                 switch keyOption {
                 case .selfGeneratedPassword:
                     keyCoverPassword = KeyCoverPassword.shared.generateVerySecurePassword()

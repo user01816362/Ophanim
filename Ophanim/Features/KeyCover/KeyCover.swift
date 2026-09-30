@@ -92,14 +92,14 @@ struct KeyCover {
     }
 }
 
-class KeyCoverObservable: ObservableObject {
+@Observable class KeyCoverObservable {
     static var shared = KeyCoverObservable()
 
-    @Published var keyCoverEnabled = KeyCover.shared.isKeyCoverEnabled()
-    @Published var unlockedCount = KeyCover.shared.unlockedCount()
-    @Published var keychains = KeyCover.shared.listKeychains()
+    var keyCoverEnabled = KeyCover.shared.isKeyCoverEnabled()
+    var unlockedCount = KeyCover.shared.unlockedCount()
+    var keychains = KeyCover.shared.listKeychains()
 
-    @Published var isKeyCoverUnlockingPromptShown = KeyCoverPreferences.shared.keyCoverEnabled == .selfGeneratedPassword
+    var isKeyCoverUnlockingPromptShown = KeyCoverPreferences.shared.keyCoverEnabled == .selfGeneratedPassword
     ? false : KeyCoverPreferences.shared.keyCoverEnabled == .disabled
     ? false : KeyCoverPreferences.shared.promptForKeyCoverPasswordAtLaunch
 

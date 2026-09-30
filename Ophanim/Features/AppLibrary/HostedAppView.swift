@@ -12,7 +12,7 @@ struct HostedAppView: View {
     @Binding var selected: HostedApp?
     @Binding var isList: Bool
 
-    @StateObject var viewModel: HostedAppVM
+    @Bindable var viewModel: HostedAppVM
 
     var body: some View {
         HostedAppConditionalView(selectedBackgroundColor: $selectedBackgroundColor,

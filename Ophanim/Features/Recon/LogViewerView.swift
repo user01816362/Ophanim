@@ -188,7 +188,7 @@ struct LogViewerView: View {
         .buttonStyle(TerminalButtonStyle())
         .textFieldStyle(TerminalTextFieldStyle())
         .onAppear(perform: load)
-        .onChange(of: selection) { _ in detailEvent = selectedEvent }
+        .onChange(of: selection) { _, _ in detailEvent = selectedEvent }
         .onReceive(refreshTimer) { _ in if autoRefresh { load() } }
     }
 

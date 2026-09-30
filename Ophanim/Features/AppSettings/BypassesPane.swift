@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct BypassesView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     @Binding var hasGalgal: Bool?
     @Binding var task: BlockingTask
     @AppStorage("settings.settings.chainGuard") private var chainGuard = false
@@ -68,7 +68,7 @@ struct BypassesView: View {
                         }
                         .frame(width: 250)
                         .help("settings.applicationCategoryType.help")
-                        .onChange(of: appCategory) { _ in
+                        .onChange(of: appCategory) { _, _ in
                             signingCategory = true
                             app.info.applicationCategoryType = appCategory
                             Task.detached {
@@ -169,14 +169,14 @@ struct BypassesView: View {
             .padding()
         }
         .onAppear { appCategory = app.info.applicationCategoryType }
-        .onChange(of: hasIntrospection) {_ in
+        .onChange(of: hasIntrospection) { _, _ in
             task = .introspection
             Task {
                 _ = await app.changeDyldLibraryPath(set: hasIntrospection, path: HostedApp.introspection)
                 task = .none
             }
         }
-        .onChange(of: hasIosFrameworks) {_ in
+        .onChange(of: hasIosFrameworks) { _, _ in
             task = .iosFrameworks
             Task {
                 _ = await app.changeDyldLibraryPath(set: hasIosFrameworks, path: HostedApp.iosFrameworks)

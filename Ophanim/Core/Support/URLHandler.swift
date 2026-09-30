@@ -20,10 +20,10 @@ enum URLAction: Int, Equatable {
     case open
 }
 
-class URLObservable: ObservableObject {
-    @Published var url: String?
-    @Published var type: URLTypes?
-    @Published var action: URLAction?
+@Observable class URLObservable {
+    var url: String?
+    var type: URLTypes?
+    var action: URLAction?
 
     public static var shared = URLObservable()
 }

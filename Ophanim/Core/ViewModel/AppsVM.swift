@@ -5,7 +5,7 @@
 
 import Foundation
 
-class AppsVM: ObservableObject {
+@Observable class AppsVM {
 
     public static let appDirectory = Galgal.ophanimContainer.appendingPathComponent("Applications")
 
@@ -27,10 +27,10 @@ class AppsVM: ObservableObject {
         )
     }
 
-    @Published var filteredApps: [HostedApp] = []
-    @Published var apps: [HostedApp] = []
-    @Published var searchText: String = ""
-    @Published var updatingApps = true
+    var filteredApps: [HostedApp] = []
+    var apps: [HostedApp] = []
+    var searchText: String = ""
+    var updatingApps = true
 
     func fetchApps() {
         Task { @MainActor in

@@ -5,7 +5,7 @@
 
 import Foundation
 
-class Shell: ObservableObject {
+@Observable class Shell {
     @discardableResult
     static func run(print: Bool = true, _ binary: String, _ args: String...) throws -> String {
         let process = Process()

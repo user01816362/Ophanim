@@ -7,9 +7,9 @@
 
 import Foundation
 
-class AppSettingsVM: ObservableObject {
+@Observable class AppSettingsVM {
     let app: HostedApp
-    @Published var settings: AppSettings
+    var settings: AppSettings
 
     init(app: HostedApp) {
         self.app = app

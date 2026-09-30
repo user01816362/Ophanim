@@ -6,8 +6,8 @@
 import SwiftUI
 
 struct AppLibraryView: View {
-    @EnvironmentObject var appsVM: AppsVM
-    @EnvironmentObject var installVM: InstallVM
+    @Environment(AppsVM.self) var appsVM
+    @Environment(InstallVM.self) var installVM
 
     @Binding var selectedBackgroundColor: Color
     @Binding var selectedTextColor: Color
@@ -108,17 +108,17 @@ struct AppLibraryView: View {
             }
         }
         .searchable(text: $searchString, placement: .toolbar)
-        .onChange(of: searchString, perform: { value in
+        .onChange(of: searchString) { _, value in
             appsVM.searchText = value
             appsVM.fetchApps()
-        })
+        }
         .onAppear {
             appsVM.searchText = ""
             appsVM.fetchApps()
         }
-        .onChange(of: isList, perform: { value in
+        .onChange(of: isList) { _, value in
             UserDefaults.standard.set(value, forKey: "AppLibraryView")
-        })
+        }
         .sheet(isPresented: $showSettings) {
             if let selected = selected {
                 AppSettingsView(viewModel: AppSettingsVM(app: selected), showKeymapSheet: $showKeymapSheet)

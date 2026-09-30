@@ -7,10 +7,10 @@
 
 import Foundation
 
-class ProgressVM<Steps: RawRepresentable & Equatable>: ObservableObject where Steps.RawValue == String {
-    @Published var progress = 0.0
-    @Published var inProgress = false
-    @Published var status: Steps
+@Observable class ProgressVM<Steps: RawRepresentable & Equatable> where Steps.RawValue == String {
+    var progress = 0.0
+    var inProgress = false
+    var status: Steps
 
     private let starting: Steps
     private let ends: [Steps]

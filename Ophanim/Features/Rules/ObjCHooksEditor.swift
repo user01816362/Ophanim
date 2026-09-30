@@ -9,7 +9,7 @@ import AppKit
 /// Visual editor for OPConfig.objcHooks. Rows are index-selected; selection is cleared before any
 /// removal so no detail binding is left pointing at a stale index.
 struct ObjCHooksEditorView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     @State private var selection: Int?
 
     private var hooks: [OPObjCHook] { settings.settings.ophanim.objcHooks }

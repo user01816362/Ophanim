@@ -10,7 +10,7 @@
 import SwiftUI
 
 struct InstrumentationView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     let app: HostedApp
     // Value-type mirror of the injection strategy. AppSettings is a class, so mutating it through
     // the binding writes the same object reference back and SwiftUI's @State sees "no change" - the

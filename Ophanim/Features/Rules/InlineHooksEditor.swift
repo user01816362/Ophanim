@@ -8,7 +8,7 @@ import AppKit
 
 /// Visual editor for OPConfig.inlineHooks. Index-keyed; selection cleared before removal.
 struct InlineHooksEditorView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     @State private var selection: Int?
 
     private var hooks: [OPInlineHook] { settings.settings.ophanim.inlineHooks }

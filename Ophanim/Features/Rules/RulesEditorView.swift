@@ -16,7 +16,7 @@ import SwiftUI
 import AppKit
 
 struct RulesEditorView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     @State private var selection: String?
 
     private var rules: [OPRule] { settings.settings.ophanim.rules }

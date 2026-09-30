@@ -99,7 +99,7 @@ struct AppSettingsData: Codable {
     }
 }
 
-class AppSettings: ObservableObject {
+@Observable class AppSettings {
     static var appSettingsDir: URL {
         let settingsFolder =
             Galgal.ophanimContainer.appendingPathComponent("App Settings")
@@ -119,11 +119,11 @@ class AppSettings: ObservableObject {
     let settingsUrl: URL
     var openWithLLDB: Bool = false
     var openLLDBWithTerminal: Bool = true
-    // @Published so SwiftUI re-renders on any mutation. AppSettings is a class, so views must
-    // observe it via @ObservedObject (not @Binding) - mutating it through a Binding<AppSettings>
-    // writes the same reference back and never fires objectWillChange, leaving dependent controls
+    // @Observable so SwiftUI re-renders on any mutation. AppSettings is a class, so views must
+    // observe it via @Bindable (not @Binding) - mutating it through a Binding<AppSettings>
+    // writes the same reference back without notifying observation, leaving dependent controls
     // (captions, enable/disable) stale.
-    @Published var settings: AppSettingsData {
+    var settings: AppSettingsData {
         didSet {
             encode()
         }

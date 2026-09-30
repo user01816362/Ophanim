@@ -5,9 +5,9 @@
 
 import Foundation
 
-class AppIntegrity: ObservableObject {
+@Observable class AppIntegrity {
 
-    @Published var integrityOff: Bool = !AppIntegrity.insideAppsFolder
+    var integrityOff: Bool = !AppIntegrity.insideAppsFolder
 
     func verifyAppIntegrity() {
         integrityOff = !AppIntegrity.insideAppsFolder

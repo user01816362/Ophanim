@@ -7,13 +7,13 @@
 
 import Foundation
 
-class ModifierKeyObserver: ObservableObject {
+@Observable class ModifierKeyObserver {
     static let shared = ModifierKeyObserver()
 
-    @Published var isOptionKeyPressed = false
-    @Published var isCommandKeyPressed = false
-    @Published var isControlKeyPressed = false
-    @Published var isShiftKeyPressed = false
+    var isOptionKeyPressed = false
+    var isCommandKeyPressed = false
+    var isControlKeyPressed = false
+    var isShiftKeyPressed = false
 
     private var eventMonitor: Any?
 
@@ -27,7 +27,6 @@ class ModifierKeyObserver: ObservableObject {
                 self.isCommandKeyPressed = event.modifierFlags.contains(.command)
                 self.isControlKeyPressed = event.modifierFlags.contains(.control)
                 self.isShiftKeyPressed = event.modifierFlags.contains(.shift)
-                self.objectWillChange.send()
             }
             return event
         }

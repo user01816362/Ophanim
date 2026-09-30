@@ -6,7 +6,7 @@
 import Foundation
 import SwiftUI
 
-class Log: ObservableObject {
+@Observable class Log {
 
     static let shared = Log()
 

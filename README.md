@@ -6,7 +6,7 @@ natively on macOS and observe - or actively rewrite - what it does.
 ## What it is
 
 Ophanim is a macOS **dynamic-analysis and security-testing** tool. It runs an iOS app natively on
-Apple Silicon (macOS 12.0+) by re-signing it and hosting it as a Mac Catalyst process, then injects a
+Apple Silicon (macOS 26.0+) by re-signing it and hosting it as a Mac Catalyst process, then injects a
 runtime into that process so you can **observe and intercept the app's behavior from the inside**:
 
 - **Network** - HTTP(S) requests and decrypted response bodies, raw socket/DNS, Secure-Transport

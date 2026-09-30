@@ -11,7 +11,7 @@ import DataCache
 struct AppSettingsView: View {
     @Environment(\.dismiss) var dismiss
 
-    @ObservedObject var viewModel: AppSettingsVM
+    @Bindable var viewModel: AppSettingsVM
 
     @Binding var showKeymapSheet: Bool
 
@@ -144,12 +144,12 @@ struct AppSettingsView: View {
             }
         }
         .disabled(currentTask != .none)
-        .onChange(of: resetSettingsCompletedAlert) { _ in
+        .onChange(of: resetSettingsCompletedAlert) { _, _ in
             ToastVM.shared.showToast(
                 toastType: .notice,
                 toastDetails: NSLocalizedString("settings.resetSettingsCompleted", comment: ""))
         }
-        .onChange(of: closeView) { _ in
+        .onChange(of: closeView) { _, _ in
             dismiss()
         }
         .task(priority: .background) {

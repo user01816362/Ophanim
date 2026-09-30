@@ -127,9 +127,9 @@ struct OphanimApp: App {
     var body: some Scene {
         WindowGroup {
             MainView(isSigningSetupShown: $isSigningSetupShown)
-                .environmentObject(InstallVM.shared)
-                .environmentObject(AppsVM.shared)
-                .environmentObject(AppIntegrity())
+                .environment(InstallVM.shared)
+                .environment(AppsVM.shared)
+                .environment(AppIntegrity())
                 .onAppear {
                     NSWindow.allowsAutomaticWindowTabbing = false
                     SoundDeviceService.shared.prepareSoundDevice()

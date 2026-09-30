@@ -70,7 +70,7 @@ struct MCPSettings: View {
             GroupBox("HTTP endpoint") {
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("Serve MCP over HTTP (loopback only)", isOn: $httpEnabled)
-                        .onChange(of: httpEnabled) { on in
+                        .onChange(of: httpEnabled) { _, on in
                             if on { MCPHTTPTransport.shared.start() } else { MCPHTTPTransport.shared.stop() }
                         }
                     HStack {
@@ -90,7 +90,7 @@ struct MCPSettings: View {
                             Text("Specific IP").tag("specific")
                         }
                         .frame(width: 240)
-                        .onChange(of: bindMode) { _ in restartIfRunning() }
+                        .onChange(of: bindMode) { _, _ in restartIfRunning() }
                         Spacer()
                     }
                     .disabled(!httpEnabled)

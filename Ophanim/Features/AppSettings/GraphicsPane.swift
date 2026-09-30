@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct GraphicsView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     var app: HostedApp
     @State var customWidth = 1920
     @State var customHeight = 1080
@@ -185,7 +185,7 @@ struct GraphicsView: View {
                         HStack {
                             Toggle("settings.picker.windowFix", isOn: $settings.settings.inverseScreenValues)
                                 .help("settings.picker.windowFix.help")
-                                .onChange(of: settings.settings.inverseScreenValues) { _ in
+                                .onChange(of: settings.settings.inverseScreenValues) { _, _ in
                                     settings.settings.windowFixMethod = 0
                                 }
                             Spacer()
@@ -237,22 +237,22 @@ struct GraphicsView: View {
                 customHeight = settings.settings.windowHeight
                 customScaler = settings.settings.customScaler
             }
-            .onChange(of: settings.settings.resolution) { _ in
+            .onChange(of: settings.settings.resolution) { _, _ in
                 setResolution()
             }
-            .onChange(of: settings.settings.aspectRatio) { _ in
+            .onChange(of: settings.settings.aspectRatio) { _, _ in
                 setResolution()
             }
-            .onChange(of: customWidth) { _ in
+            .onChange(of: customWidth) { _, _ in
                 setResolution()
             }
-            .onChange(of: customHeight) { _ in
+            .onChange(of: customHeight) { _, _ in
                 setResolution()
             }
-            .onChange(of: customScaler) { _ in
+            .onChange(of: customScaler) { _, _ in
                 setResolution()
             }
-            .onChange(of: settings.settings.resizableAspectRatioType) { _ in
+            .onChange(of: settings.settings.resizableAspectRatioType) { _, _ in
                 setAspectRatioForResizableWindow()
             }
         }

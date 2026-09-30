@@ -7,15 +7,15 @@
 
 import SwiftUI
 
-class HostedAppVM: ObservableObject {
-    @Published var app: HostedApp
-    @Published var showSettings = false
-    @Published var showClearPreferencesAlert = false
-    @Published var showClearChainGuardAlert = false
-    @Published var showStartingProgress = false
-    @Published var showImportSuccess = false
-    @Published var showImportFail = false
-    @Published var showKeymapSheet = false
+@Observable class HostedAppVM {
+    var app: HostedApp
+    var showSettings = false
+    var showClearPreferencesAlert = false
+    var showClearChainGuardAlert = false
+    var showStartingProgress = false
+    var showImportSuccess = false
+    var showImportFail = false
+    var showKeymapSheet = false
 
     init(app: HostedApp) {
         self.app = app

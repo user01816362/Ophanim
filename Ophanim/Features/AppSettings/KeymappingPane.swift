@@ -6,7 +6,7 @@
 import SwiftUI
 
 struct KeymappingView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings
     @AppStorage("settings.settings.keymapping") private var keymapping = false
     @AppStorage("settings.settings.noKMOnInput") private var noKMOnInput = false
     @AppStorage("settings.settings.enableScrollWheel") private var enableScrollWheel = false

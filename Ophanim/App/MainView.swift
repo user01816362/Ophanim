@@ -9,10 +9,10 @@ struct MainView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.controlActiveState) var controlActiveState
 
-    @EnvironmentObject var apps: AppsVM
-    @EnvironmentObject var integrity: AppIntegrity
+    @Environment(AppsVM.self) var apps
+    @Environment(AppIntegrity.self) var integrity
 
-    @ObservedObject var keyCoverObserved = KeyCoverObservable.shared
+    @Bindable var keyCoverObserved = KeyCoverObservable.shared
 
     @Binding public var isSigningSetupShown: Bool
 
@@ -24,10 +24,10 @@ struct MainView: View {
         // navigate to, so the sidebar is gone and the library renders directly.
         AppLibraryView(selectedBackgroundColor: $selectedBackgroundColor,
                        selectedTextColor: $selectedTextColor)
-            .onChange(of: colorScheme) { scheme in
+            .onChange(of: colorScheme) { _, scheme in
                 updateSelectionColors(scheme: scheme)
             }
-            .onChange(of: controlActiveState) { state in
+            .onChange(of: controlActiveState) { _, state in
                 if state == .inactive {
                     if colorScheme == .light {
                         selectedTextColor = .black
@@ -45,8 +45,8 @@ struct MainView: View {
             }
             .toastOverlay {
                 ToastView()
-                    .environmentObject(ToastVM.shared)
-                    .environmentObject(InstallVM.shared)
+                    .environment(ToastVM.shared)
+                    .environment(InstallVM.shared)
             }
             .alert("alert.moveAppToApplications.title",
                    isPresented: $integrity.integrityOff) {
@@ -82,8 +82,8 @@ struct MainView_Previews: PreviewProvider {
 
     static var previews: some View {
         MainView(isSigningSetupShown: $isSigningSetupShown)
-            .environmentObject(InstallVM.shared)
-            .environmentObject(AppsVM.shared)
-            .environmentObject(AppIntegrity())
+            .environment(InstallVM.shared)
+            .environment(AppsVM.shared)
+            .environment(AppIntegrity())
     }
 }
