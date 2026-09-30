@@ -25,7 +25,10 @@ class UninstallPreferences: NSObject, ObservableObject {
 
 struct UninstallSettings: View {
     public nonisolated(unsafe) static var shared: UninstallSettings = {
-        if Thread.isMainThread { UninstallSettings() } else { DispatchQueue.main.sync { UninstallSettings() } }
+        // View init is MainActor-isolated. assumeIsolated is statically permitted;
+        // the thread check + sync hop make the assumption hold at runtime.
+        if Thread.isMainThread { MainActor.assumeIsolated { UninstallSettings() } }
+        else { DispatchQueue.main.sync { MainActor.assumeIsolated { UninstallSettings() } } }
     }()
 
     @ObservedObject var uninstallPreferences = UninstallPreferences.shared
