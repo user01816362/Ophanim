@@ -283,4 +283,71 @@ class Macho {
             return versionCommand.platform == PLATFORM_MACCATALYST
         }
     }
+
+    // MARK: - Inspect
+    static func inspect(_ url: URL) throws -> [String: Any] {
+        var report: [String: Any] = ["path": url.path]
+
+        guard let data = try? Data(contentsOf: url) else {
+            report["loadable"] = false
+            report["reason"] = "not a readable file"
+            return report
+        }
+
+        // A framework is loadable if its binary is; report the binary's own verdict either way.
+        let isFramework = url.pathExtension == "framework"
+        let binaryURL: URL
+        if isFramework {
+            let bundle = Bundle(url: url)
+            guard let exe = bundle?.executableURL, FileManager.default.fileExists(atPath: exe.path) else {
+                report["loadable"] = false
+                report["reason"] = "framework has no readable executable"
+                return report
+            }
+            binaryURL = exe
+        } else {
+            binaryURL = url
+        }
+        report["isFramework"] = isFramework
+        if isFramework { report["binary"] = binaryURL.path }
+
+        guard let magic = data.first else {
+            report["loadable"] = false
+            report["reason"] = "empty file"
+            return report
+        }
+        // 0xFEEDFACF (MH_MAGIC_64, little endian) or its swapped form.
+        let magicLE = UInt32(magic) | (UInt32(data.count > 1 ? data[1] : 0) << 8)
+        let is64 = magicLE == 0xFEEDFACF || magicLE == 0xFEEDFACE
+        report["isMachO"] = is64
+        guard is64 else {
+            report["loadable"] = false
+            report["reason"] = "not a Mach-O file (a script or data file was given)"
+            return report
+        }
+
+        if let encrypted = try? isMachoEncrypted(atURL: binaryURL) {
+            report["encrypted"] = encrypted
+        }
+        if let valid = try? isMachoValidArch(binaryURL) {
+            report["validArchitecture"] = valid
+        }
+
+        // The load commands are walked with the engine's own iterator, so a change to what the
+        // loader looks for cannot leave this reporting something different.
+        var dependencies: [String] = []
+        _ = try? iterateLoadCommands(binary: data) { _, isDylib in
+            dependencies.append(isDylib ? "dylib" : "command")
+            return true
+        }
+        report["loadCommandCount"] = dependencies.count
+
+        // The decision the caller actually needs.
+        var blockers: [String] = []
+        if (report["encrypted"] as? Bool) == true { blockers.append("encrypted (FairPlay)") }
+        if (report["validArchitecture"] as? Bool) == false { blockers.append("not a loadable arm64 slice") }
+        report["loadable"] = blockers.isEmpty
+        report["reason"] = blockers.isEmpty ? "ok" : blockers.joined(separator: ", ")
+        return report
+    }
 }

@@ -396,6 +396,258 @@ final class MCPServer {
                 ],
                 "required": ["bundleID"]
             ]
-        ]
+        ],
+        [
+            "name": "list_tweaks",
+            "description": "List an app's tweak store entries (dylib/framework/folder, enabled state).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "recursive": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_tweak",
+            "description": "Report loadability + Mach-O facts for a tweak file.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "path": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "add_tweak",
+            "description": "Copy a tweak into the store after a loadability check.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "path": ["type": "string"],
+                    "replace": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "move_tweak",
+            "description": "Rename a tweak inside the store.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "from": ["type": "string"],
+                    "to": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "remove_tweak",
+            "description": "Remove a tweak from the store.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "set_tweak_enabled",
+            "description": "Enable/disable a tweak (.disabled convention).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string"],
+                    "enabled": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "tweak_folder",
+            "description": "Create/rename/remove a tweak subfolder.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "action": ["type": "string"],
+                    "name": ["type": "string"],
+                    "newName": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "resync_tweaks",
+            "description": "Re-sync the store into the app.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "get_log_path",
+            "description": "Capture log dirs + ndjson files with sizes.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "clear_logs",
+            "description": "Delete capture logs, byte-counted.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "container_info",
+            "description": "Resolved container report.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "list_profiles",
+            "description": "Container profiles + active + live check.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "create_profile",
+            "description": "Snapshot live container into a profile.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "switch_profile",
+            "description": "Swap live container to a profile.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "remove_profile",
+            "description": "Delete a profile.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "clear_container",
+            "description": "Wipe caches, data container, or keychain state.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "scope": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "backup_container",
+            "description": "Zip the data container to a path.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "destPath": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "restore_container",
+            "description": "Restore a container backup.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "archivePath": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "list_classes",
+            "description": "Static class/selector inventory (live classes arrive with Inspect).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "filter": ["type": "string"],
+                    "limit": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "set_injection_strategy",
+            "description": "Persist embedded/sibling strategy and settle load commands.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "strategy": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "get_keymap",
+            "description": "Read-only keymap JSON.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+
     ]
 }

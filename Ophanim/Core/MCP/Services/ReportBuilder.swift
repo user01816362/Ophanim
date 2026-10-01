@@ -32,7 +32,7 @@ enum ReportBuilder {
     /// Where capture NDJSON lives. The current path is Ophanim's shared container keyed by bundle id
     /// (`OPPaths.logDirectory`); the legacy path is the app's own data container, kept so logs written
     /// before the shared-dir fix stay readable. Both are scanned by `events`.
-    private static func logDirs(_ bundleID: String) -> [URL] {
+    static func logDirs(_ bundleID: String) -> [URL] {
         [OPPaths.logDirectory(forBundleID: bundleID),
          OPPaths.legacyLogDirectory(forBundleID: bundleID)]
     }
@@ -172,5 +172,53 @@ enum ReportBuilder {
                 "processesSpawned": Array(spawns).sorted()
             ] as [String: Any]
         ]
+    }
+
+    // MARK: - Static inventory
+    static func staticClassInventory(_ bundleID: String, filter: String?, limit: Int) throws -> (executable: String, classes: [String], selectors: [String]) {
+        guard let exe = AppQueryService.appExecutable(bundleID) else {
+            throw ToolRouter.ToolError(message: "app not installed: \(bundleID)")
+        }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
+        p.arguments = ["-a", exe.path]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = Pipe()
+        guard (try? p.run()) != nil else {
+            throw ToolRouter.ToolError(message: "could not read \(exe.path)")
+        }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        let text = String(data: data, encoding: .utf8) ?? ""
+
+        let needle = filter?.lowercased()
+        func keep(_ s: String) -> Bool {
+            guard let needle, !needle.isEmpty else { return true }
+            return s.lowercased().contains(needle)
+        }
+        let plausible: (String) -> Bool = { s in
+            s.count > 2 && s.count < 120
+                && s.allSatisfy { $0.isLetter || $0.isNumber || "_$:".contains($0) }
+        }
+
+        // Swift-mangled names start with _$s (classes) or _TtC; selectors contain a colon.
+        // (ObjC classes are invisible here: no mangling, no colon - the caller states this,
+        // it does not silently claim completeness.)
+        var classes: [String] = []
+        var selectors: [String] = []
+        var seenClasses = Set<String>()
+        var seenSelectors = Set<String>()
+        for raw in text.split(separator: "\n") {
+            let s = String(raw)
+            guard plausible(s) else { continue }
+            if s.hasPrefix("_$s") || s.hasPrefix("_TtC") {
+                if seenClasses.insert(s).inserted, keep(s) { classes.append(s) }
+            } else if s.contains(":") {
+                if seenSelectors.insert(s).inserted, keep(s) { selectors.append(s) }
+            }
+            if classes.count >= limit && selectors.count >= limit { break }
+        }
+        return (exe.path, classes, selectors)
     }
 }

@@ -58,6 +58,11 @@ enum SettingsStore {
         try encoder.encode(settings).write(to: AppQueryService.settingsURL(bundleID))
     }
 
+    /// Mutate just the instrumentation (OphanimCore) sub-config and persist.
+    static func updateConfig(_ bundleID: String, _ mutate: (inout OPConfig) throws -> Void) throws {
+        try updateSettings(bundleID) { try mutate(&$0.ophanim) }
+    }
+
     /// Apply a set_config argument patch to settings. Unit-testable without JSON:
     /// pass a plain dictionary, assert on the mutated struct.
     static func applyPatch(_ args: [String: Any], to s: inout AppSettingsData) throws {

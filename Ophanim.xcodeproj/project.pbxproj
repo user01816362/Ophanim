@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9A3CE4B786BC519C /* TweakTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D73451F9FFF0D2B /* TweakTools.swift */; };
+		977616121F1C5D48 /* ContainerTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF53023CB47A543F /* ContainerTools.swift */; };
+		7958FF75D95EB547 /* TweakStoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4ADF9344E6F37E /* TweakStoreService.swift */; };
+		71CB35DB99B57660 /* ContainerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1709F3002601F328 /* ContainerService.swift */; };
 		DA67E8F641CB67E0 /* SourceInstalls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B04E7B3498E422 /* SourceInstalls.swift */; };
 		B37E60EABA3993F3 /* AppSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48C799E7018F704 /* AppSources.swift */; };
 		46B1D44BC3E3EA08 /* IPAValidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E51CC374D4283408 /* IPAValidate.swift */; };
@@ -126,6 +130,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2D73451F9FFF0D2B /* TweakTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakTools.swift; path = Ophanim/Core/MCP/Tools/TweakTools.swift; sourceTree = SOURCE_ROOT; };
+		DF53023CB47A543F /* ContainerTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerTools.swift; path = Ophanim/Core/MCP/Tools/ContainerTools.swift; sourceTree = SOURCE_ROOT; };
+		1E4ADF9344E6F37E /* TweakStoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakStoreService.swift; path = Ophanim/Core/MCP/Services/TweakStoreService.swift; sourceTree = SOURCE_ROOT; };
+		1709F3002601F328 /* ContainerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerService.swift; path = Ophanim/Core/MCP/Services/ContainerService.swift; sourceTree = SOURCE_ROOT; };
 		C8B04E7B3498E422 /* SourceInstalls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceInstalls.swift; path = Ophanim/Features/Sources/SourceInstalls.swift; sourceTree = SOURCE_ROOT; };
 		B48C799E7018F704 /* AppSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSources.swift; path = Ophanim/Features/Sources/AppSources.swift; sourceTree = SOURCE_ROOT; };
 		E51CC374D4283408 /* IPAValidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IPAValidate.swift; path = Ophanim/Features/Sources/IPAValidate.swift; sourceTree = SOURCE_ROOT; };
@@ -566,6 +574,8 @@
 		F207D73F32CDDBF9 /* MCP/Tools */ = {
 			isa = PBXGroup;
 			children = (
+				2D73451F9FFF0D2B /* TweakTools.swift */,
+				DF53023CB47A543F /* ContainerTools.swift */,
 				3DF59B7004FB0A44 /* SourceTools.swift */,
 				220847F9046C01C1 /* AppTools.swift */,
 				3765949B44E0A21E /* EventTools.swift */,
@@ -589,6 +599,8 @@
 		59E19E2FB313A34F /* MCP/Services */ = {
 			isa = PBXGroup;
 			children = (
+				1E4ADF9344E6F37E /* TweakStoreService.swift */,
+				1709F3002601F328 /* ContainerService.swift */,
 				1E79EE123C632373 /* AppQueryService.swift */,
 				550DAF5401731081 /* SettingsStore.swift */,
 				F4BCF3C93514DBED /* ReportBuilder.swift */,
@@ -872,6 +884,10 @@
 				46B1D44BC3E3EA08 /* IPAValidate.swift in Sources */,
 				D4CD7861BECC0BFA /* AppSourcesView.swift in Sources */,
 				79C75F0AFC660F32 /* SourceTools.swift in Sources */,
+				9A3CE4B786BC519C /* TweakTools.swift in Sources */,
+				977616121F1C5D48 /* ContainerTools.swift in Sources */,
+				7958FF75D95EB547 /* TweakStoreService.swift in Sources */,
+				71CB35DB99B57660 /* ContainerService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

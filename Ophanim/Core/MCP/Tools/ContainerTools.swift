@@ -1,0 +1,149 @@
+import Foundation
+
+/// Container/log/profile/data tools. Finder reveal has no headless meaning and
+/// stays GUI-only. Snapshot/bookmark coupling arrives with the Inspect batch.
+enum ContainerTools {
+    static func getLogPath(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let dirs = ReportBuilder.logDirs(bid)
+        let primary = OPPaths.logDirectory(forBundleID: bid)
+        var files: [[String: Any]] = []
+        for dir in dirs {
+            guard let entries = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
+            for f in entries where f.pathExtension == "ndjson" {
+                let size = (try? f.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                files.append(["path": f.path, "bytes": size ?? 0])
+            }
+        }
+        return try ToolRouter.json(["bundleID": bid, "path": primary.path, "alsoScanned": dirs.map(\.path),
+                             "files": files, "count": files.count])
+    }
+
+    static func clearLogs(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        var candidates: [URL] = []
+        for dir in ReportBuilder.logDirs(bid) {
+            guard let entries = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil) else { continue }
+            candidates.append(contentsOf: entries.filter { $0.pathExtension == "ndjson" })
+        }
+        let bytes = candidates.reduce(0) { total, url in
+            total + ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 ?? 0)
+        }
+        var removed: [String] = []
+        for url in candidates {
+            if (try? FileManager.default.removeItem(at: url)) != nil { removed.append(url.path) }
+        }
+        return try ToolRouter.json(["bundleID": bid, "removed": removed, "count": removed.count, "bytes": bytes])
+    }
+
+    static func containerInfo(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        return try ToolRouter.json(ContainerService.containerReport(bid))
+    }
+
+    static func listProfiles(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        return try ToolRouter.json([
+            "bundleID": bid,
+            "active": ContainerProfiles.activeName(bundleID: bid),
+            "profiles": ContainerProfiles.profiles(bundleID: bid),
+            "liveExists": FileManager.default.fileExists(
+                atPath: ContainerProfiles.liveURL(bundleID: bid).path)
+        ])
+    }
+
+    static func createProfile(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
+        let liveExists = FileManager.default.fileExists(
+            atPath: ContainerProfiles.liveURL(bundleID: bid).path)
+        try ContainerProfiles.create(bundleID: bid, name: name)
+        return try ToolRouter.json(["bundleID": bid, "created": name, "copiedLive": liveExists])
+    }
+
+    static func switchProfile(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
+        try ContainerProfiles.switchTo(bundleID: bid, name: name)
+        return try ToolRouter.json(["bundleID": bid, "active": name])
+    }
+
+    static func removeProfile(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
+        try ContainerProfiles.remove(bundleID: bid, name: name)
+        return try ToolRouter.json(["bundleID": bid, "removed": name])
+    }
+
+    static func clearContainer(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let scope = args["scope"] as? String,
+              ["caches", "data", "keychain"].contains(scope) else {
+            throw ToolRouter.bail("scope is required: caches, data, or keychain")
+        }
+        let targets: [URL]
+        switch scope {
+        case "caches":
+            let caches = ContainerProfiles.liveURL(bundleID: bid)
+                .appendingPathComponent("Data")
+                .appendingPathComponent("Library")
+                .appendingPathComponent("Caches")
+            targets = FileManager.default.fileExists(atPath: caches.path) ? [caches] : []
+        case "data":
+            guard let real = Uninstaller.containerURL(for: bid) else {
+                throw ToolRouter.bail("no data container could be resolved for \(bid); it may never have launched")
+            }
+            targets = [real]
+        default:
+            targets = KeyCoverKey(appBundleID: bid).allFiles.filter {
+                FileManager.default.fileExists(atPath: $0.path)
+            }
+        }
+        let bytes = targets.compactMap { ContainerService.directorySize($0) }.reduce(0, +)
+        var removed: [String] = []
+        for target in targets {
+            if (try? FileManager.default.removeItem(at: target)) != nil {
+                removed.append(target.path)
+            }
+        }
+        return try ToolRouter.json(["bundleID": bid, "scope": scope, "removed": removed,
+                             "bytes": bytes])
+    }
+
+    static func backupContainer(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let dest = args["destPath"] as? String, !dest.isEmpty else { throw ToolRouter.bail("destPath is required") }
+        guard let real = Uninstaller.containerURL(for: bid) else {
+            throw ToolRouter.bail("no data container could be resolved for \(bid); it may never have launched")
+        }
+        let destURL = URL(fileURLWithPath: (dest as NSString).expandingTildeInPath)
+        let bytes = ContainerService.directorySize(real) ?? 0
+        try FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        try Shell.run(print: false, "/usr/bin/ditto", "-c", "-k", "--sequesterRsrc",
+                      real.path, destURL.path)
+        return try ToolRouter.json(["bundleID": bid, "source": real.path,
+                             "destination": destURL.path, "bytes": bytes])
+    }
+
+    static func restoreContainer(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let archive = args["archivePath"] as? String, !archive.isEmpty else { throw ToolRouter.bail("archivePath is required") }
+        let archiveURL = URL(fileURLWithPath: (archive as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
+            throw ToolRouter.bail("no such archive: \(archiveURL.path)")
+        }
+        if ContainerProfiles.isRunning(bundleID: bid) {
+            throw OphanimError.containerRunning
+        }
+        let live = ContainerProfiles.liveURL(bundleID: bid)
+        if FileManager.default.fileExists(atPath: live.path) {
+            try FileManager.default.removeItem(at: live)
+        }
+        try FileManager.default.createDirectory(at: live, withIntermediateDirectories: true)
+        try Shell.run(print: false, "/usr/bin/ditto", "-x", "-k", archiveURL.path, live.path)
+        return try ToolRouter.json(["bundleID": bid, "archive": archiveURL.path, "destination": live.path])
+    }
+}

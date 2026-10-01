@@ -24,4 +24,16 @@ enum ReconTools {
         }
         return try ToolRouter.json(AppQueryService.findSymbols(bid, kw))
     }
+
+    static func listClasses(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let filter = args["filter"] as? String
+        let limit = min((args["limit"] as? Int) ?? 200, 2000)
+        let (exe, classes, selectors) = try ReportBuilder.staticClassInventory(bid, filter: filter, limit: limit)
+        // Static strings only: ObjC classes are invisible without mangling, and live
+        // runtime classes arrive with the Inspect batch. Stated, not silent.
+        return try ToolRouter.json(["bundleID": bid, "executable": exe, "source": "static",
+                             "classes": classes, "selectors": selectors,
+                             "count": classes.count + selectors.count])
+    }
 }
