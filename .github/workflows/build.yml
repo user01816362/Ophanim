@@ -184,6 +184,14 @@ jobs:
             echo "::error::R10: plist decode outside sanctioned owners - use PlistReader.appInfoDict"
             exit 1
           fi
+          # R11 (single alert owner): NSAlert() may only appear in Log.swift (modal
+          # runModal owner) + Uninstaller.swift (window-bound beginSheetModal sheets).
+          # Everywhere else must route via Log.modal/confirm/notify.
+          if grep -rn 'NSAlert()' Ophanim/ --include='*.swift' \
+              | grep -v -e 'Core/ViewModel/Log.swift' -e 'Features/AppLibrary/Uninstaller.swift'; then
+            echo "::error::R11: NSAlert outside Log/Uninstaller - route via Log.modal/confirm/notify"
+            exit 1
+          fi
           echo "DRY gates passed."
 
       - name: Inline-hook engine self-test
