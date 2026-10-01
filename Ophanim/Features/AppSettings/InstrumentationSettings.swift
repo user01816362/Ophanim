@@ -21,6 +21,18 @@ struct InstrumentationView: View {
 
     private var enabled: Bool { settings.settings.ophanim.enabled }
 
+    /// Attribution rides on captured requests: the toggle is dead weight while off.
+    private var networkActive: Bool { settings.settings.ophanim.categories.contains(.network) }
+
+    /// What Clear-on-launch will actually sweep (live directory read, same inventory
+    /// the launch sweep uses). The previous run's crash summary survives regardless.
+    private var sweepPreview: String {
+        let runs = LogStore.runFiles(bundleID: settings.info.bundleIdentifier)
+        if runs.isEmpty { return "No previous runs — launch starts clean either way." }
+        let n = runs.count
+        return "\(n) previous run file\(n == 1 ? "" : "s") will be swept on launch."
+    }
+
     private var strategyBinding: Binding<OPInjectionStrategy> {
         Binding(get: { strategy },
                 set: { newValue in
@@ -58,10 +70,11 @@ struct InstrumentationView: View {
                               + "process launches) so you can see which code made each call. Adds overhead.")
                     Toggle("Attribute network callers", isOn: bind(\.captureNetworkCallers))
                         .toggleStyle(.switch)
-                        .disabled(!enabled)
+                        .disabled(!enabled || !networkActive)
                         .help("Record which thread and classes sent each HTTP request (symbolicated in-app; "
                               + "Swift frames stay mangled). Default off: requests are the hottest category "
-                              + "and stack capture costs per request.")
+                              + "and stack capture costs per request. Needs the Network category below — "
+                              + "attribution rides on captured requests, so it does nothing while Network is off.")
                     Toggle("Open log window on launch", isOn: bind(\.autoOpenLog))
                         .toggleStyle(.switch)
                         .disabled(!enabled)
@@ -138,6 +151,9 @@ struct InstrumentationView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Toggle("Clear on launch", isOn: $settings.settings.clearLogsOnLaunch)
                         .help("Delete previous runs when a new launch begins, so the log always shows exactly the current run. Off keeps history across launches.")
+                    Text(sweepPreview)
+                        .font(.caption).foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .disabled(!enabled)
 
