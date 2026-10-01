@@ -10,4 +10,12 @@ enum MCPTimeouts {
     static let installSettle: TimeInterval = 15
     /// Rate-limit rolling window.
     static let rateWindow: TimeInterval = 60
+    /// Inspect transaction bound.
+    static let inspect: TimeInterval = 60
+    /// Inspect orphan sweep age.
+    static let orphanSweep: TimeInterval = 600
+    /// Pump heartbeat freshness.
+    static let heartbeatGrace: TimeInterval = 150
+    /// Capture-log freshness for liveness.
+    static let logFresh: TimeInterval = 120
 }

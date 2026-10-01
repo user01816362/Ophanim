@@ -12,6 +12,11 @@
 		FACE00000000000000000212 /* OPReentry.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000112 /* OPReentry.swift */; };
 		FACE00000000000000000211 /* OPHooksSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000111 /* OPHooksSocket.m */; };
 		FACE00000000000000000210 /* OPSocketBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000110 /* OPSocketBridge.swift */; };
+		DBACCA3914616148 /* InspectCommandPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5FC2F9CF213185 /* InspectCommandPump.swift */; };
+		C951FA8D3CDF822F /* Inspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F2A9106BCBEECDE /* Inspector.swift */; };
+		9E23978B39FCBF6E /* InspectorActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2945BE028B2FF8F /* InspectorActivator.swift */; };
+		64A52AEE60015E57 /* InspectorScreenshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7D6647A4A3E21E /* InspectorScreenshot.swift */; };
+		05B86EA75C9FA7F6 /* InspectRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DB5A284BE2A866A /* InspectRequest.swift */; };
 		FACE0000000000000000020F /* OPHooksCrypto.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE0000000000000000010F /* OPHooksCrypto.m */; };
 		FACE0000000000000000020E /* OPCryptoBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE0000000000000000010E /* OPCryptoBridge.swift */; };
 		FACE0000000000000000020D /* OPFSBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE0000000000000000010D /* OPFSBridge.swift */; };
@@ -166,6 +171,11 @@
 		6E76639A28D0FAE700DE4AF9 /* Plugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugin.swift; sourceTree = "<group>"; };
 		6E7663A028D0FB5300DE4AF9 /* GalgalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalPlugin.swift; sourceTree = "<group>"; };
 		6E7663A428D0FEBE00DE4AF9 /* GalgalPluginLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalPluginLoader.swift; sourceTree = "<group>"; };
+		BB5FC2F9CF213185 /* InspectCommandPump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectCommandPump.swift; path = Inspect/InspectCommandPump.swift; sourceTree = "<group>"; };
+		2F2A9106BCBEECDE /* Inspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Inspector.swift; path = Inspect/Inspector.swift; sourceTree = "<group>"; };
+		A2945BE028B2FF8F /* InspectorActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectorActivator.swift; path = Inspect/InspectorActivator.swift; sourceTree = "<group>"; };
+		BF7D6647A4A3E21E /* InspectorScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectorScreenshot.swift; path = Inspect/InspectorScreenshot.swift; sourceTree = "<group>"; };
+		5DB5A284BE2A866A /* InspectRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectRequest.swift; path = Inspect/InspectRequest.swift; sourceTree = "<group>"; };
 		6E84A14C28D0F96D00BF7495 /* GalgalInterface.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GalgalInterface.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 		951D8276299D097C00D35B20 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Galgal.strings; sourceTree = "<group>"; };
 		951D8278299D098000D35B20 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Galgal.strings"; sourceTree = "<group>"; };
@@ -543,6 +553,7 @@
 				AA719702287A44D200623C15 /* GalgalLoader.m */,
 				AA719708287A44D200623C15 /* Galgal.h */,
 				2847AE47298EFC0F00B0F983 /* GalgalScreen.swift */,
+				9F10C1A603F3D7CF /* Inspect */,
 			);
 			path = Galgal;
 			sourceTree = "<group>";
@@ -640,6 +651,19 @@
 				AB7DA47629B8A78B0034ACB2 /* GalgalShadow.h */,
 			);
 			path = MysticRunes;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+		9F10C1A603F3D7CF /* Inspect */ = {
+			isa = PBXGroup;
+			children = (
+				BB5FC2F9CF213185 /* InspectCommandPump.swift */,
+				2F2A9106BCBEECDE /* Inspector.swift */,
+				A2945BE028B2FF8F /* InspectorActivator.swift */,
+				BF7D6647A4A3E21E /* InspectorScreenshot.swift */,
+				5DB5A284BE2A866A /* InspectRequest.swift */,
+			);
+			name = Inspect;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -891,6 +915,11 @@
 				9562D1662AB5049B002C329D /* KeyboardEventAdapter.swift in Sources */,
 				070778A0DD71FD19 /* OPObserve.swift in Sources */,
 				8930A9AD1E2836AE /* OPCallerAttribution.swift in Sources */,
+				DBACCA3914616148 /* InspectCommandPump.swift in Sources */,
+				C951FA8D3CDF822F /* Inspector.swift in Sources */,
+				9E23978B39FCBF6E /* InspectorActivator.swift in Sources */,
+				64A52AEE60015E57 /* InspectorScreenshot.swift in Sources */,
+				05B86EA75C9FA7F6 /* InspectRequest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

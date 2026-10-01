@@ -366,6 +366,15 @@ static void __attribute__((constructor)) initialize(void) {
     // and the embedded core stays dormant here.
     [OPBootstrap startEmbedded];
 
+    // Inspect (Agent Mode): boot on the main queue - the pump's timer must attach to a
+    // spinning runloop, and constructors are not guaranteed main-thread. Starts its command
+    // pump only when the app opted in - otherwise one config read and out. Deliberately the
+    // only addition here: no engine, no hooks, no loader behavior change for apps that never
+    // enable it.
+    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+        [InspectBoot maybeStart];
+    }];
+
     if (ue_status == 0) {
         if (GalgalInfo.isUnrealEngine) {
             ue_status = 2;
