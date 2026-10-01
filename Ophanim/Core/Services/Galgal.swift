@@ -6,7 +6,7 @@
 import Foundation
 import injection
 
-public struct TweakItem: Hashable, Identifiable {
+public struct TweakItem: Hashable, Identifiable, Sendable {
     public var id: URL { fileUrl }
     public let fileUrl: URL
     public let isFolder: Bool

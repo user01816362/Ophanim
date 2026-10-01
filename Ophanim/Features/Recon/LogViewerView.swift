@@ -325,7 +325,7 @@ struct EventDetailView: View {
         if let data = data, !data.isEmpty {
             section("\(title) (\(data.count) bytes)")
             ScrollView(.horizontal) {
-                Text(Self.pretty(data, contentType: contentType)).font(.caption.monospaced()).textSelection(.enabled)
+                Text(LogViewerView.pretty(data, contentType: contentType)).font(.caption.monospaced()).textSelection(.enabled)
             }
         }
     }

@@ -12,6 +12,8 @@ enum OphanimError: Error {
     case failedToStripBinary
     case invalidUserDylib
     case invalidFolderName
+    case containerRunning
+    case containerActive
 }
 
 extension OphanimError: LocalizedError {
@@ -35,6 +37,10 @@ extension OphanimError: LocalizedError {
             return NSLocalizedString("error.invalidUserDylib", comment: "")
         case .invalidFolderName:
             return NSLocalizedString("error.invalidFolderName", comment: "")
+        case .containerRunning:
+            return NSLocalizedString("error.containerRunning", value: "Quit the app before changing its container.", comment: "")
+        case .containerActive:
+            return NSLocalizedString("error.containerActive", value: "This is the active container. Switch to another one first.", comment: "")
         }
     }
 }

@@ -38,126 +38,13 @@ struct ContainerView: View {
             $0.bundleIdentifier == app.info.bundleIdentifier
         }
     }
-
     var body: some View {
         List {
-            Section("settings.container.overview") {
-                HStack {
-                    Text("settings.container.path")
-                    Spacer()
-                    Text("\(container.containerUrl.path)")
-                        .textSelection(.enabled)
-                        .multilineTextAlignment(.trailing)
-                }
-                HStack {
-                    Text("settings.container.size")
-                    Spacer()
-                    Text(containerExists ? containerSizeText : NSLocalizedString("settings.container.missing", comment: ""))
-                    Button("settings.container.refresh") {
-                        Task { await refreshContainer() }
-                    }
-                    .buttonStyle(.link)
-                    .disabled(busy || !containerExists)
-                }
-                HStack {
-                    Text("settings.container.preferences")
-                    Spacer()
-                    Text("\(container.userPrefsUrl.path)")
-                        .textSelection(.enabled)
-                        .multilineTextAlignment(.trailing)
-                }
-                HStack {
-                    Text("settings.container.activeProfile")
-                    Spacer()
-                    Text(activeProfile)
-                }
-            }
-            Section("settings.container.profiles") {
-                Text("settings.container.profilesDesc")
-                    .foregroundStyle(.secondary)
-                ForEach(profiles, id: \.self) { name in
-                    HStack {
-                        Image(systemName: name == activeProfile ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(name == activeProfile ? Color.accentColor : .secondary)
-                        Text(name)
-                        Spacer()
-                        if name != activeProfile {
-                            Button("settings.container.switch") {
-                                switchProfile(to: name)
-                            }
-                            .buttonStyle(.link)
-                            .disabled(busy || isAppRunning)
-                            Button("settings.container.delete") {
-                                profileToDelete = name
-                            }
-                            .buttonStyle(.link)
-                            .foregroundStyle(.red)
-                            .disabled(busy)
-                        }
-                    }
-                }
-                HStack {
-                    TextField("settings.container.newProfile", text: $newProfileName)
-                    Spacer()
-                    Button("settings.container.create") {
-                        createProfile()
-                    }
-                    .disabled(busy || newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-            Section("settings.container.snapshot") {
-                HStack {
-                    Text("settings.container.snapshotDesc")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("settings.container.backup") {
-                        backupContainer()
-                    }
-                    .disabled(busy || !containerExists)
-                    Button("settings.container.restore") {
-                        pickRestoreArchive()
-                    }
-                    .disabled(busy)
-                }
-            }
-            Section("settings.container.danger") {
-                HStack {
-                    Text("settings.container.cachesDesc")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("settings.container.clearCaches") {
-                        clearCaches()
-                    }
-                    .disabled(busy || !containerExists)
-                }
-                HStack {
-                    Text("settings.container.dataDesc")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("settings.container.clear", role: .destructive) {
-                        showClearDataConfirm = true
-                    }
-                    .disabled(busy || !containerExists)
-                }
-                HStack {
-                    Text("settings.container.keychainDesc")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("settings.container.clearKeychain", role: .destructive) {
-                        showClearKeychainConfirm = true
-                    }
-                    .disabled(busy)
-                }
-            }
-            Section {
-                HStack {
-                    Spacer()
-                    Button("settings.container.reveal") {
-                        NSWorkspace.shared.activateFileViewerSelecting([container.containerUrl])
-                    }
-                    .disabled(!containerExists)
-                }
-            }
+            overviewSection
+            profilesSection
+            snapshotSection
+            dangerSection
+            revealSection
         }
         .listStyle(.bordered(alternatesRowBackgrounds: true))
         .padding()
@@ -219,15 +106,152 @@ struct ContainerView: View {
         }
     }
 
+    @ViewBuilder
+    private var overviewSection: some View {
+            Section("settings.container.overview") {
+                HStack {
+                    Text("settings.container.path")
+                    Spacer()
+                    Text("\(container.containerUrl.path)")
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.trailing)
+                }
+                HStack {
+                    Text("settings.container.size")
+                    Spacer()
+                    Text(containerExists ? containerSizeText : NSLocalizedString("settings.container.missing", comment: ""))
+                    Button("settings.container.refresh") {
+                        Task { await refreshContainer() }
+                    }
+                    .buttonStyle(.link)
+                    .disabled(busy || !containerExists)
+                }
+                HStack {
+                    Text("settings.container.preferences")
+                    Spacer()
+                    Text("\(container.userPrefsUrl.path)")
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.trailing)
+                }
+                HStack {
+                    Text("settings.container.activeProfile")
+                    Spacer()
+                    Text(activeProfile)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var profilesSection: some View {
+            Section("settings.container.profiles") {
+                Text("settings.container.profilesDesc")
+                    .foregroundStyle(.secondary)
+                ForEach(profiles, id: \.self) { name in
+                    HStack {
+                        Image(systemName: name == activeProfile ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(name == activeProfile ? Color.accentColor : .secondary)
+                        Text(name)
+                        Spacer()
+                        if name != activeProfile {
+                            Button("settings.container.switch") {
+                                switchProfile(to: name)
+                            }
+                            .buttonStyle(.link)
+                            .disabled(busy || isAppRunning)
+                            Button("settings.container.delete") {
+                                profileToDelete = name
+                            }
+                            .buttonStyle(.link)
+                            .foregroundStyle(.red)
+                            .disabled(busy)
+                        }
+                    }
+                }
+                HStack {
+                    TextField("settings.container.newProfile", text: $newProfileName)
+                    Spacer()
+                    Button("settings.container.create") {
+                        createProfile()
+                    }
+                    .disabled(busy || newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var snapshotSection: some View {
+            Section("settings.container.snapshot") {
+                HStack {
+                    Text("settings.container.snapshotDesc")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("settings.container.backup") {
+                        backupContainer()
+                    }
+                    .disabled(busy || !containerExists)
+                    Button("settings.container.restore") {
+                        pickRestoreArchive()
+                    }
+                    .disabled(busy)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var dangerSection: some View {
+            Section("settings.container.danger") {
+                HStack {
+                    Text("settings.container.cachesDesc")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("settings.container.clearCaches") {
+                        clearCaches()
+                    }
+                    .disabled(busy || !containerExists)
+                }
+                HStack {
+                    Text("settings.container.dataDesc")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("settings.container.clear", role: .destructive) {
+                        showClearDataConfirm = true
+                    }
+                    .disabled(busy || !containerExists)
+                }
+                HStack {
+                    Text("settings.container.keychainDesc")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("settings.container.clearKeychain", role: .destructive) {
+                        showClearKeychainConfirm = true
+                    }
+                    .disabled(busy)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var revealSection: some View {
+            Section {
+                HStack {
+                    Spacer()
+                    Button("settings.container.reveal") {
+                        NSWorkspace.shared.activateFileViewerSelecting([container.containerUrl])
+                    }
+                    .disabled(!containerExists)
+                }
+            }
+    }
+
     private func refreshContainer() async {
         let url = container.containerUrl
         let exists = FileManager.default.fileExists(atPath: url.path)
         let size: Int64 = await Task.detached(priority: .utility) {
             guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
+            guard let subpaths = try? FileManager.default.subpathsOfDirectory(atPath: url.path) else { return 0 }
             var total: Int64 = 0
-            guard let enumerator = FileManager.default.enumerator(
-                at: url, includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey]) else { return 0 }
-            for case let file as URL in enumerator {
+            for sub in subpaths {
+                let file = url.appendingPathComponent(sub)
                 guard let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey]),
                       values.isDirectory != true else { continue }
                 total += Int64(values.fileSize ?? 0)

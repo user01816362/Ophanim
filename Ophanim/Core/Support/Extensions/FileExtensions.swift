@@ -85,3 +85,27 @@ extension NSOpenPanel {
         }
     }
 }
+
+extension NSOpenPanel {
+    static func openZip() -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.zip]
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+}
+
+extension NSSavePanel {
+    /// Synchronous zip-save panel (runModal). Returns nil on cancel.
+    static func saveZip(suggestedName: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        panel.nameFieldStringValue = suggestedName
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK else { return nil }
+        return panel.url
+    }
+}
