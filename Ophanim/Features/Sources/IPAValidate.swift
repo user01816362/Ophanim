@@ -45,7 +45,7 @@ enum IPAValidate {
         }
         // Any-match (same rule as launch): converted binaries carry the iOS command
         // first and Catalyst second - first-match would refuse working apps.
-        guard (try? Macho.hasCatalystPlatform(exe)) == true else {
+        guard (try? Macho.isMachoValidArch(exe)) == true else {
             throw OphanimError.unsupportedPlatform(bid, "no Mac Catalyst slice")
         }
         return bid

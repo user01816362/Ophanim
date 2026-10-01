@@ -33,15 +33,18 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
     /// Human version string of the in-flight/paused transfer, for row display.
     private(set) var activeVersions: [String: String] = [:]
 
-    private lazy var session: URLSession = {
+    private var session: URLSession!
+    private var delegate: DownloadDelegate!
+
+    private func makeSession() {
+        let delegate = DownloadDelegate(owner: self)
+        self.delegate = delegate
         let config = URLSessionConfiguration.background(
             withIdentifier: "be.ophanim.Ophanim.sources")
         config.sessionSendsLaunchEvents = true
-        return URLSession(configuration: config, delegate: delegate,
-                          delegateQueue: nil)
-    }()
-
-    private lazy var delegate = DownloadDelegate(owner: self)
+        self.session = URLSession(configuration: config, delegate: delegate,
+                                  delegateQueue: nil)
+    }
 
     private var tasks: [String: URLSessionDownloadTask] = [:]
     /// Generation per bundle id: starting a new transfer retires the previous one's
@@ -69,6 +72,7 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
 
     override init() {
         super.init()
+        makeSession()
         restoreInterrupted()
         sweepStaging()
     }

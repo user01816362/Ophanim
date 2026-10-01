@@ -15,8 +15,8 @@ import AppKit
 /// Single-instance sources window. Mirrors LogWindowManager: the SwiftUI content must not
 /// drive the window size (its stretched list makes the preferred size ambiguous), so
 /// setContentSize is the source of truth and the content fills it.
-final class SourcesWindowManager: NSObject {
-    static let shared = SourcesWindowManager()
+final class SourcesWindowManager: NSObject, @unchecked Sendable {
+    nonisolated(unsafe) static let shared = SourcesWindowManager()
 
     func show() {
         SettingsWindowManager.shared.show(key: "sources",
@@ -24,9 +24,7 @@ final class SourcesWindowManager: NSObject {
                                           size: NSSize(width: 980, height: 680),
                                           minSize: NSSize(width: 640, height: 440),
                                           contentDrivenSize: true,
-                                          content: AppSourcesView()
-                                              .environment(InstallVM.shared)
-                                              .environment(AppsVM.shared))
+                                          content: AppSourcesView())
         // Every open re-fetches: feeds change upstream, and the cached last-good state
         // renders meanwhile, so the window is never empty while it refreshes.
         Task { @MainActor in await AppSourcesStore.shared.refreshAll() }
@@ -36,7 +34,6 @@ final class SourcesWindowManager: NSObject {
 struct AppSourcesView: View {
     @Bindable private var store = AppSourcesStore.shared
     @Bindable private var installs = SourceInstalls.shared
-    @EnvironmentObject var appsVM: AppsVM
 
     @State private var searchString = ""
     @State private var expandedSources: Set<URL> = []
