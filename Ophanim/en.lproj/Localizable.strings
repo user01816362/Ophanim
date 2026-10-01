@@ -264,6 +264,7 @@
 "sources.error.invalidURL" = "That is not a usable URL.";
 "sources.error.duplicate" = "This source is already added.";
 "sources.error.installFailed" = "Install failed - see the Ophanim log for details.";
+"settings.container.header" = "App Container";
 "keycover.error.blankPassword" = "Password cannot be blank";
 "keycover.error.notMatch" = "Passwords do not match";
 "keycover.error.incorrectPassword" = "Incorrect Password";

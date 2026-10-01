@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D5C29B3DCCDF8C25 /* AppSettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B551BAF6C559FDE3 /* AppSettingsWindow.swift */; };
 		30E0A315D2F88E16 /* InspectTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C632249BBFC8BD /* InspectTools.swift */; };
 		54EDEA089AA2191C /* OPAppLiveness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E17E960CFFEACBF /* OPAppLiveness.swift */; };
 		EF55B86C65609681 /* SnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152221A2059674F5 /* SnapshotStore.swift */; };
@@ -138,6 +139,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B551BAF6C559FDE3 /* AppSettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSettingsWindow.swift; path = Ophanim/Features/AppSettings/AppSettingsWindow.swift; sourceTree = SOURCE_ROOT; };
 		F9C632249BBFC8BD /* InspectTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectTools.swift; path = Ophanim/Core/MCP/Tools/InspectTools.swift; sourceTree = SOURCE_ROOT; };
 		4E17E960CFFEACBF /* OPAppLiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPAppLiveness.swift; path = Ophanim/Core/Services/OPAppLiveness.swift; sourceTree = SOURCE_ROOT; };
 		152221A2059674F5 /* SnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SnapshotStore.swift; path = Ophanim/Core/Services/SnapshotStore.swift; sourceTree = SOURCE_ROOT; };
@@ -496,6 +498,7 @@
 		617D2CEF967DC23A /* Features/AppSettings */ = {
 			isa = PBXGroup;
 			children = (
+				B551BAF6C559FDE3 /* AppSettingsWindow.swift */,
 				01F370A4547DBF7E /* ContainerPane.swift */,
 				AD096AB0B5DDCBB4 /* TweakLibraryPane.swift */,
 				EAB948873F0F2EA5 /* GraphicsPane.swift */,
@@ -920,6 +923,7 @@
 				D39108BAD98AAD74 /* InspectGate.swift in Sources */,
 				5F38BAF765A9EAEF /* InspectRequest.swift in Sources */,
 				30E0A315D2F88E16 /* InspectTools.swift in Sources */,
+				D5C29B3DCCDF8C25 /* AppSettingsWindow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

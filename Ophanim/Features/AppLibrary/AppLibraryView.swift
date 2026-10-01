@@ -16,7 +16,6 @@ struct AppLibraryView: View {
     @State private var searchString = ""
     @State private var isList = UserDefaults.standard.bool(forKey: "AppLibraryView")
     @State private var selected: HostedApp?
-    @State private var showSettings = false
     @State private var showLegacyConvertAlert = false
     @State private var showWrongfileTypeAlert = false
     @State var showKeymapSheet = false
@@ -89,7 +88,9 @@ struct AppLibraryView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    showSettings.toggle()
+                    if let selected {
+                        AppSettingsWindowManager.shared.show(app: selected)
+                    }
                 } label: {
                     Image(systemName: "gear")
                 }
@@ -117,11 +118,6 @@ struct AppLibraryView: View {
         }
         .onChange(of: isList) { _, value in
             UserDefaults.standard.set(value, forKey: "AppLibraryView")
-        }
-        .sheet(isPresented: $showSettings) {
-            if let selected = selected {
-                AppSettingsView(viewModel: AppSettingsVM(app: selected), showKeymapSheet: $showKeymapSheet)
-            }
         }
         .sheet(isPresented: $showKeymapSheet) {
             if let selected = selected {

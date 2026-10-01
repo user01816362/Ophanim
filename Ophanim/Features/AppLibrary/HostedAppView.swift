@@ -36,7 +36,7 @@ struct HostedAppView: View {
             })
             .contextMenu {
                 Button("hostedapp.settings", systemImage: "gear", action: {
-                    viewModel.showSettings.toggle()
+                    AppSettingsWindowManager.shared.show(app: viewModel.app)
                 })
                 Button("hostedapp.openCache", systemImage: "folder", action: {
                     viewModel.app.openAppCache()
@@ -82,10 +82,6 @@ struct HostedAppView: View {
                     viewModel.showClearChainGuardAlert.toggle()
                 }
                 Button("button.Cancel", role: .cancel) { }
-            }
-            .sheet(isPresented: $viewModel.showSettings) {
-                AppSettingsView(viewModel: AppSettingsVM(app: viewModel.app),
-                                showKeymapSheet: $viewModel.showKeymapSheet)
             }
             .sheet(isPresented: $viewModel.showKeymapSheet) {
                 KeymapView(showKeymapSheet: $viewModel.showKeymapSheet, viewModel: KeymapViewVM(app: viewModel.app))

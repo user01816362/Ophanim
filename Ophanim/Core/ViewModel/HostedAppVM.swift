@@ -9,7 +9,6 @@ import SwiftUI
 
 @Observable class HostedAppVM: @unchecked Sendable {
     var app: HostedApp
-    var showSettings = false
     var showClearPreferencesAlert = false
     var showClearChainGuardAlert = false
     var showStartingProgress = false

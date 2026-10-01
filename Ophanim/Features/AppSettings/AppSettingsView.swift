@@ -15,6 +15,12 @@ struct AppSettingsView: View {
 
     @Binding var showKeymapSheet: Bool
 
+    /// The visible pane. Owned by the settings window (toolbar selection), not local state.
+    @Binding var selectedTab: SettingsTab
+
+    /// Called when the view asks to close (OK / reset / keymap buttons). The window manager
+    /// supplies this; the sheet-era `dismiss()` below is kept as a no-op fallback.
+    var onClose: (() -> Void)? = nil
     @State var resetSettingsCompletedAlert = false
     @State var closeView = false
     @State var appIcon: NSImage?
@@ -70,39 +76,32 @@ struct AppSettingsView: View {
                 appIcon = cache.readImage(forKey: viewModel.app.info.bundleIdentifier)
             }
 
-            TabView {
-                GraphicsView(settings: viewModel.settings, app: viewModel.app)
-                    .tabItem {
-                        Text("settings.tab.graphics")
-                    }
-                    .disabled(!(hasGalgal ?? true))
-                BypassesView(settings: viewModel.settings,
-                             hasGalgal: $hasGalgal,
-                             task: $currentTask,
-                             app: viewModel.app)
-                    .tabItem {
-                        Text("settings.tab.bypasses")
-                    }
-                    .disabled(!(hasGalgal ?? true))
-                InstrumentationView(settings: viewModel.settings, app: viewModel.app)
-                    .tabItem {
-                        Text("Hacking")
-                    }
-                KeymappingView(settings: viewModel.settings)
-                    .tabItem {
-                        Text("settings.tab.km")
-                    }
-                    .disabled(!(hasGalgal ?? true))
-                ContainerView(app: viewModel.app)
-                    .tabItem {
-                        Text("settings.tab.container")
-                    }
-                InfoView(info: viewModel.app.info, hasGalgal: (hasGalgal ?? true))
-                    .tabItem {
-                        Text("settings.tab.info")
-                    }
+            // Panes switch from the window toolbar (HIG settings window). A TabView was
+            // tried here and reverted: inside a sheet macOS collapses it into a ~40px
+            // segmented control that truncates every label.
+            Group {
+                switch selectedTab {
+                case .graphics:
+                    GraphicsView(settings: viewModel.settings, app: viewModel.app)
+                        .disabledWhenNoGalgal(hasGalgal)
+                case .bypasses:
+                    BypassesView(settings: viewModel.settings,
+                                 hasGalgal: $hasGalgal,
+                                 task: $currentTask,
+                                 app: viewModel.app)
+                        .disabledWhenNoGalgal(hasGalgal)
+                case .hacking:
+                    InstrumentationView(settings: viewModel.settings, app: viewModel.app)
+                case .keymapping:
+                    KeymappingView(settings: viewModel.settings)
+                        .disabledWhenNoGalgal(hasGalgal)
+                case .info:
+                    InfoView(info: viewModel.app.info, hasGalgal: (hasGalgal ?? true))
+                case .container:
+                    ContainerView(app: viewModel.app)
+                }
             }
-            .frame(minWidth: 500, minHeight: 250)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack {
                 Button {
                     currentTask = .galgal
@@ -154,6 +153,7 @@ struct AppSettingsView: View {
                 toastDetails: NSLocalizedString("settings.resetSettingsCompleted", comment: ""))
         }
         .onChange(of: closeView) { _, _ in
+            onClose?()
             dismiss()
         }
         .task(priority: .background) {
@@ -161,7 +161,9 @@ struct AppSettingsView: View {
             hasAlias = viewModel.app.hasAlias()
         }
         .padding()
-        .frame(width: 720, height: 470)
+        // In the settings window the NSWindow owns the size (840x640 content); this floor only
+        // keeps panes usable if the view is ever hosted elsewhere.
+        .frame(minWidth: 780, minHeight: 560)
         
         .buttonStyle(.bordered)
     }
