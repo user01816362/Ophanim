@@ -32,6 +32,24 @@ final class MCPServer {
         return meta[metaProtocolVersion] as? String
     }
 
+    /// Tools that change no state. Everything else defaults to mutating.
+    static let readOnlyTools: Set<String> = [
+        "list_apps", "query_events", "tail_events", "analyze_app", "app_imports",
+        "find_symbols", "get_config", "list_jailbreak_detectors", "list_presets",
+        "list_sources", "get_log_path", "container_info", "list_profiles",
+        "list_classes", "get_keymap", "uitree_read", "screenshot",
+        "inspect_classes", "inspect_element", "inspect_class_detail",
+        "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
+    ]
+
+    /// Tools that delete or replace state (preview first where offered).
+    static let destructiveTools: Set<String> = [
+        "uninstall_app", "set_rules", "set_objc_hooks", "set_swift_hooks",
+        "set_inline_hooks", "remove_source", "remove_tweak", "clear_logs",
+        "remove_profile", "switch_profile", "clear_container", "restore_container",
+        "inspect_clear_snapshots", "bookmark_remove"
+    ]
+
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
     func handle(_ msg: [String: Any]) -> [String: Any]? {
         let id = msg["id"]
@@ -72,7 +90,14 @@ final class MCPServer {
         case "notifications/initialized", "notifications/cancelled":
             return nil   // notifications take no reply
         case "tools/list":
-            return Self.result(id, ["tools": Self.toolDefinitions, "ttlMs": 300000, "cacheScope": "process"])
+            return Self.result(id, ["tools": Self.toolDefinitions.map { def -> [String: Any] in
+                var d = def
+                if let name = d["name"] as? String {
+                    d["annotations"] = ["readOnlyHint": Self.readOnlyTools.contains(name),
+                                        "destructiveHint": Self.destructiveTools.contains(name)]
+                }
+                return d
+            }, "ttlMs": 300000, "cacheScope": "process"])
         case "tools/call":
             return callTool(id, name: params["name"] as? String ?? "",
                             arguments: params["arguments"] as? [String: Any] ?? [:])
@@ -418,6 +443,15 @@ final class MCPServer {
                     ],
                     "chainGuard": ["type": "boolean", "description": "Route keychain calls through ChainGuard (emulated keychain)."],
                     "chainGuardDebugging": ["type": "boolean", "description": "Log each ChainGuard keychain read/write."],
+                    "captureNetworkCallers": ["type": "boolean", "description": "Symbolicate network callers in-process (default off, hot-path cost)."],
+                    "logToSharedDir": ["type": "boolean", "description": "Write capture logs to ~/Library/Logs/Ophanim instead of the app container."],
+                    "bodyCapBytes": ["type": "integer", "description": "Max captured payload bytes per event (1024-8388608)."],
+                    "redactionKeys": ["type": "array", "items": ["type": "string"], "description": "Header/field keys whose values are masked."],
+                    "spoofedOSVersion": ["type": "string", "description": "iOS version the app reports (empty = off)."],
+                    "agentMode": ["type": "boolean", "description": "Arm Inspect agent-mode providers in the guest."],
+                    "inspectDisableRedaction": ["type": "boolean", "description": "Hand capture to AI raw (explicit consent)."],
+                    "clearLogsOnLaunch": ["type": "boolean", "description": "Fresh log each launch instead of history."],
+                    "customTweakFolder": ["type": "string", "description": "Custom tweak directory (empty resets to default; must exist)."],
                     "iosDeviceModel": ["type": "string", "description": "iOS hardware model the app reports (e.g. iPad13,8)."],
                     "disableDisplaySleep": ["type": "boolean", "description": "Hold a no-display-sleep assertion while the app runs (useful for long capture sessions)."],
                     "keymapping": ["type": "boolean", "description": "Enable keyboard-to-touch key mapping."],
