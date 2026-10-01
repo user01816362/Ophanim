@@ -51,6 +51,19 @@ typedef struct {
     uint32_t _pad;          // +0x14
 } OPHookRecord;
 
+// Layout locks against OPInlineAsm.s (.equ block): any struct change that moves these
+// offsets must move the asm constants in the same commit, or the thunk reads garbage.
+// The R8 CI grep bans raw # immediates in the .s so new offsets arrive named.
+_Static_assert(sizeof(OPCpuContext) == 0x190, "OPCpuContext size drifted from asm CTX_SIZE");
+_Static_assert(offsetof(OPCpuContext, x) == 0x00, "ctx x[] drifted from asm CTX_X0");
+_Static_assert(offsetof(OPCpuContext, sp) == 0xF8, "ctx sp drifted from asm CTX_SP");
+_Static_assert(offsetof(OPCpuContext, pc) == 0x100, "ctx pc drifted from asm CTX_PC");
+_Static_assert(offsetof(OPCpuContext, nzcv) == 0x108, "ctx nzcv drifted from asm CTX_NZCV");
+_Static_assert(offsetof(OPCpuContext, q) == 0x110, "ctx q[] drifted from asm CTX_Q0");
+_Static_assert(offsetof(OPHookRecord, call_orig) == 0x00, "record call_orig drifted from asm");
+_Static_assert(offsetof(OPHookRecord, target) == 0x08, "record target drifted from asm");
+_Static_assert(offsetof(OPHookRecord, hook_id) == 0x10, "record hook_id drifted from asm");
+
 typedef struct {
     bool      in_use;
     uintptr_t target;

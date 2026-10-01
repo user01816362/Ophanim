@@ -9,6 +9,8 @@ re-check the cited path before reopening.
 - MD-8/MD-9 fx + brand → deleted; no `Theme.*`/effect views in `Ophanim/`.
 - MD-10 transport → satisfied as opt-in: HTTP only with `--port`
   (`Ophanim/App/OphanimApp.swift`), never default-on; stdio is primary.
+  Bearer token added (ADR-0009): required for write tools on non-loopback
+  binds, minted + persisted + printed on first use.
 - MD-13 `server/discover` → shipped (`Ophanim/Core/MCP/MCPServer.swift`).
 - MD-14 acquisition surface → `Features/Sources/` + `SourceTools.swift`.
 - MD-11 versioning → `build.yml` tags + publishes on green main.

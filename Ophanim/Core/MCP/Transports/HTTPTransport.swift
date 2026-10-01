@@ -14,6 +14,37 @@ var mcpConfiguredPort: UInt16 {
 /// The configured bind address as a string: "loopback" (default, 127.0.0.1), "all" (0.0.0.0 - all
 /// interfaces), or a specific IPv4 address. UserDefaults `ophanim.mcp.bind` holds the mode; when it
 /// is "specific" the address is read from `ophanim.mcp.bindIP`.
+///
+/// The configured MCP HTTP token (UserDefaults `ophanim.mcp.token`). Empty = none
+/// configured. Required for write tools on non-loopback binds (see requiredToken);
+/// loopback stays open (same-machine trust boundary, current behavior).
+var mcpConfiguredToken: String {
+    UserDefaults.standard.string(forKey: "ophanim.mcp.token") ?? ""
+}
+
+/// Token required for this request, if any. Loopback never requires one; a
+/// non-loopback bind fails closed (mint-and-print on first use, persisted).
+/// Reads stay open everywhere; only tools/call names outside the read-only sets pay.
+func mcpRequiredToken(bindMode: String) -> String? {
+    if bindMode == "loopback" { return nil }
+    let existing = mcpConfiguredToken
+    if !existing.isEmpty { return existing }
+    let minted = UUID().uuidString
+    UserDefaults.standard.set(minted, forKey: "ophanim.mcp.token")
+    FileHandle.standardError.write(Data(
+        ("ophanim: non-loopback MCP HTTP bind - minted bearer token (UserDefaults ophanim.mcp.token):\n"
+         + "ophanim: clients must send 'Authorization: Bearer <token>'\n").utf8))
+    return minted
+}
+
+/// Read-only tool names (catalog annotations + read-only inspect readers): token-exempt.
+func mcpTokenExempt(tool name: String) -> Bool {
+    if MCPServer.readOnlyTools.contains(name) { return true }
+    return ["uitree_read", "screenshot", "inspect_classes", "inspect_element",
+            "inspect_class_detail", "inspect_timeline", "inspect_diff",
+            "bookmark_list"].contains(name)
+}
+
 var mcpConfiguredBind: String {
     let mode = UserDefaults.standard.string(forKey: "ophanim.mcp.bind") ?? "loopback"
     if mode == "specific" {
@@ -108,7 +139,9 @@ final class MCPHTTPTransport {
             (status, payload) = ("400 Bad Request",
                 (try? JSONSerialization.data(withJSONObject: err)) ?? Data())
         } else if let msg = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-            if let response = MCPServer.shared.handle(msg) {
+            if let refusal = tokenRefusal(msg, headers: headers) {
+                (status, payload) = refusal
+            } else if let response = MCPServer.shared.handle(msg) {
                 let data = (try? JSONSerialization.data(withJSONObject: response, options: [.withoutEscapingSlashes])) ?? Data()
                 (status, payload) = ("200 OK", data)
             } else {
@@ -145,6 +178,25 @@ final class MCPHTTPTransport {
 
     /// Read one HTTP request: headers until CRLFCRLF, then Content-Length bytes of body. Header names
     /// are returned lowercased.
+    /// Bearer-token gate (MD-10 remainder): on non-loopback binds, write tools need
+    /// `Authorization: Bearer <token>`. Returns the refusal tuple, or nil to proceed.
+    /// Handshake/methods and read-only tools never pay.
+    private func tokenRefusal(_ msg: [String: Any], headers: [String: String]) -> (String, Data)? {
+        guard let token = mcpRequiredToken(bindMode: boundHost) else { return nil }
+        guard (msg["method"] as? String) == "tools/call",
+              let params = msg["params"] as? [String: Any],
+              let name = params["name"] as? String,
+              !mcpTokenExempt(tool: name) else { return nil }
+        let presented = headers["authorization"] ?? ""
+        guard presented == "Bearer \(token)" else {
+            let err: [String: Any] = ["jsonrpc": "2.0", "id": msg["id"] ?? NSNull(),
+                "error": ["code": -32001, "message": "bearer token required for '\(name)' "
+                    + "on non-loopback HTTP (UserDefaults ophanim.mcp.token)"]]
+            return ("401 Unauthorized", (try? JSONSerialization.data(withJSONObject: err)) ?? Data())
+        }
+        return nil
+    }
+
     private func readRequest(_ fd: Int32) -> (method: String, headers: [String: String], body: Data)? {
         var buf = Data()
         var chunk = [UInt8](repeating: 0, count: 1 << 14)
