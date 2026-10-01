@@ -11,11 +11,6 @@ struct GraphicsView: View {
     @State var customWidth = 1920
     @State var customHeight = 1080
     @State var showResolutionWarning = false
-    @AppStorage("settings.settings.inverseScreenValues") private var inverseScreenValues = false
-    @AppStorage("settings.settings.disableTimeout") private var disableTimeout = false
-    @AppStorage("settings.toggle.hideTitleBar") private var hideTitleBar = false
-    @AppStorage("settings.toggle.floatingWindow") private var floatingWindow = false
-    @AppStorage("settings.settings.displayRotation") private var displayRotation = 0
     static var number: NumberFormatter {
         let formatter = NumberFormatter()
         formatter.numberStyle = .none
