@@ -118,6 +118,32 @@ struct InstrumentationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                GroupBox("Agent Mode") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Agent Mode", isOn: bind(\.agentMode))
+                            .toggleStyle(.switch)
+                            .disabled(!enabled)
+                            .help("Arm in-app inspection for AI operators: UI tree, screenshots, and "
+                                  + "taps served from inside the app. Off by default; MCP refuses when off. "
+                                  + "Turning it ON takes effect on relaunch; turning it OFF stops serving within one poll.")
+                        Text("Takes effect on relaunch when turning on.")
+                            .font(.caption).foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if settings.settings.ophanim.agentMode {
+                            Button("Launch app now") {
+                                Task(priority: .userInitiated) { await app.launch() }
+                            }
+                            .disabled(!enabled)
+                            .help("Launches the app through the existing launch path so the new "
+                                  + "setting takes effect. If the app is already running, quit it "
+                                  + "first - opening a running app only activates it, it does not "
+                                  + "re-boot the guest pump.")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 HStack {
                     Button("Recon…") {
                         ReconWindowManager.shared.show(executable: app.executable,
