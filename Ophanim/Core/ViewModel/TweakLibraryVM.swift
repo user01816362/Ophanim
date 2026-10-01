@@ -49,12 +49,18 @@ import SwiftUI
 
     /// Single shape for every mutating op: processing flag, background work, error
     /// toast, list refresh. Callers pass only the Galgal call.
+    private final class WorkBox: @unchecked Sendable {
+        let fn: () throws -> Void
+        init(_ fn: @escaping () throws -> Void) { self.fn = fn }
+    }
+
     func performTweakOp(_ work: @escaping () throws -> Void) {
         isProcessing = true
+        let box = WorkBox(work)
         Task(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             do {
-                try work()
+                try box.fn()
             } catch {
                 Log.shared.error(error)
                 Task { @MainActor in
