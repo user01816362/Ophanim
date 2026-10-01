@@ -16,6 +16,8 @@ enum MCPTimeouts {
     static let orphanSweep: TimeInterval = 600
     /// Pump heartbeat freshness.
     static let heartbeatGrace: TimeInterval = 150
+    /// Launch/exit mark freshness.
+    static let stateFresh: TimeInterval = 180
     /// Capture-log freshness for liveness.
     static let logFresh: TimeInterval = 120
 }

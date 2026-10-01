@@ -70,7 +70,7 @@ enum BookmarkStore {
     static let maxPins = 500
 
     /// Test seam: logic tests point the store at a temp dir without Galgal.
-    static var testRoot: URL? = nil
+    nonisolated(unsafe) static var testRoot: URL? = nil
 
     static func storeRoot() -> URL {
         let root = (testRoot ?? Galgal.ophanimContainer)
