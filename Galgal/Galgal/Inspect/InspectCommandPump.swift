@@ -53,7 +53,7 @@ final class InspectCommandPump: NSObject {
         // Common modes: the default-mode timer stalls during scrolling/tracking, delaying a
         // tap past the gesture it was meant to hit. Polls are idempotent reads, so firing
         // during tracking is correct here.
-        if let timer { RunLoop.main.add(timer, forMode: .common) }
+        if let timer = timer { RunLoop.main.add(timer, forMode: .common) }
     }
 
 
@@ -163,7 +163,7 @@ final class InspectCommandPump: NSObject {
                                                     redact: redacted,
                                                     mode: mode, filter: cmd.filter,
                                                     maxDepth: depthCap)
-                guard let node else {
+                guard let node = node else {
                     return .failure(id: cmd.id, "rootId '\(rootId)' matched nothing under the current filter")
                 }
                 return InspectResponse(id: cmd.id, ok: true, error: nil,
@@ -220,7 +220,7 @@ final class InspectCommandPump: NSObject {
             } else {
                 return .failure(id: cmd.id, "tap needs elementId or x/y")
             }
-            guard let point else {
+            guard let point = point else {
                 return .failure(id: cmd.id, "tap coordinates out of range")
             }
             let result = InspectorActivator.tap(at: point, in: key)
@@ -306,7 +306,7 @@ final class InspectCommandPump: NSObject {
             let (node, _, _, _) = Inspector.walk(hit.view, id: elementId, window: hit.window,
                                               depth: 0, budget: Inspector.maxNodes,
                                               redact: redacted, mode: .full, filter: nil)
-            guard let node else {
+            guard let node = node else {
                 return .failure(id: cmd.id, "element '\(elementId)' vanished mid-read")
             }
             return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: node,

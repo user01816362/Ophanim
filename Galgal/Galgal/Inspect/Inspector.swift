@@ -128,7 +128,7 @@ enum Inspector {
             truncated = truncated || dCut || nCut
             depthCut = depthCut || dCut
             nodeCut = nodeCut || nCut
-            if let node { nodes.append(node) }
+            if let node = node { nodes.append(node) }
         }
         var by: [String] = []
         if depthCut { by.append("depth") }
@@ -226,7 +226,7 @@ enum Inspector {
         let (node, _, _, _) = walk(window, id: "0", window: window,
                                  depth: 0, budget: maxNodes, redact: true,
                                  mode: .full, filter: nil)
-        guard let node else { return [] }
+        guard let node = node else { return [] }
         var out: [CGRect] = []
         collectSecureFrames(node, into: &out)
         return out
@@ -287,7 +287,7 @@ enum Inspector {
                 consumed += used
                 depthCut = depthCut || dCut
                 nodeCut = nodeCut || nCut
-                if let child { children.append(child) }
+                if let child = child { children.append(child) }
             }
         }
 
