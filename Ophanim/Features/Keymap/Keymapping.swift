@@ -133,7 +133,7 @@ class Keymapping {
 
         do {
             let data = try encoder.encode(map)
-            try data.write(to: keymapPath)
+            try data.write(to: keymapPath, options: .atomic)
 
             if !keymapConfig.keymapOrder.contains(keymapPath) {
                 keymapConfig.keymapOrder.append(keymapPath)
@@ -141,6 +141,66 @@ class Keymapping {
         } catch {
             print(error)
         }
+    }
+
+    /// Summary of a validated headless write (MCP set_keymap).
+    struct ValidatedKeymapWrite {
+        let url: URL?
+        let buttons: Int
+        let draggableButtons: Int
+        let joysticks: Int
+        let mouseAreas: Int
+        let bundleIdentifier: String
+        let wouldOverwrite: Bool
+        let backupURL: URL?
+    }
+
+    /// Validated write for headless callers. Order: name gate (plain filename, no
+    /// traversal) → bundle binding (enforced unless explicitly allowed) → backup →
+    /// atomic write through the shared setKeymap path. dryRun computes everything and
+    /// writes nothing. Throws with a description; never resets-and-blanks on failure.
+    func writeValidatedKeymap(name: String, map: Keymap,
+                              allowBundleMismatch: Bool, dryRun: Bool) throws -> ValidatedKeymapWrite {
+        guard !name.isEmpty, !name.contains("/"), !name.hasPrefix(".") else {
+            throw NSError(domain: "be.ophanim.Ophanim", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey:
+                                        "invalid keymap name '\(name)': plain filename, no slashes"])
+        }
+        guard allowBundleMismatch || map.bundleIdentifier == info.bundleIdentifier else {
+            throw NSError(domain: "be.ophanim.Ophanim", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey:
+                                        "keymap bundle '\(map.bundleIdentifier)' does not match app "
+                                        + "'\(info.bundleIdentifier)'; pass allowBundleMismatch:true to file it anyway"])
+        }
+        let target = constructKeymapPath(name: name)
+        let wouldOverwrite = FileManager.default.fileExists(atPath: target.path)
+        let summary = ValidatedKeymapWrite(url: dryRun ? nil : target,
+                                           buttons: map.buttonModels.count,
+                                           draggableButtons: map.draggableButtonModels.count,
+                                           joysticks: map.joystickModel.count,
+                                           mouseAreas: map.mouseAreaModel.count,
+                                           bundleIdentifier: map.bundleIdentifier,
+                                           wouldOverwrite: wouldOverwrite,
+                                           backupURL: nil)
+        if dryRun { return summary }
+        var backup: URL? = nil
+        if wouldOverwrite {
+            let f = DateFormatter()
+            f.dateFormat = "yyyyMMdd-HHmmss"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            backup = baseKeymapURL.appendingPathComponent("\(name)-\(f.string(from: Date())).bak.plist")
+            try FileManager.default.copyItem(at: target, to: backup!)
+        }
+        setKeymap(name: name, map: map)
+        guard FileManager.default.fileExists(atPath: target.path) else {
+            throw NSError(domain: "be.ophanim.Ophanim", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "keymap write failed for '\(name)'"])
+        }
+        return ValidatedKeymapWrite(url: target, buttons: summary.buttons,
+                                    draggableButtons: summary.draggableButtons,
+                                    joysticks: summary.joysticks, mouseAreas: summary.mouseAreas,
+                                    bundleIdentifier: summary.bundleIdentifier,
+                                    wouldOverwrite: wouldOverwrite, backupURL: backup)
     }
 
     public func renameKeymap(prevName: String, newName: String) -> Bool {

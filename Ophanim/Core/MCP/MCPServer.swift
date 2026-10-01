@@ -47,7 +47,7 @@ final class MCPServer {
         "uninstall_app", "set_rules", "set_objc_hooks", "set_swift_hooks",
         "set_inline_hooks", "remove_source", "remove_tweak", "clear_logs",
         "remove_profile", "switch_profile", "clear_container", "restore_container",
-        "inspect_clear_snapshots", "bookmark_remove"
+        "inspect_clear_snapshots", "bookmark_remove", "set_keymap"
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
@@ -255,7 +255,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "since": ["type": "number", "description": "Cursor (epoch milliseconds) from a prior call; omit/0 for the latest batch."],
-                    "limit": ["type": "integer", "description": "Max events to return (default 100, newest)."]
+                    "limit": ["type": "integer", "description": "Max events to return (default 100, newest)."],
+                    "waitMs": ["type": "integer", "description": "Long-poll: block up to N ms (max 30000) for new events instead of returning empty. Default 0."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -821,6 +822,21 @@ final class MCPServer {
                     "bundleID": ["type": "string"]
                 ],
                 "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "set_keymap",
+            "description": "Write a whole keymap by name (validated: name gate, enforced bundle binding, backup, atomic replace; dryRun previews by default).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string", "description": "Keymap name (plain filename)."],
+                    "keymap": ["type": "object", "description": "Full Keymap JSON (buttonModels, draggableButtonModels, joystickModel, mouseAreaModel, bundleIdentifier)."],
+                    "allowBundleMismatch": ["type": "boolean", "description": "File a keymap bound to another bundle (default false, rejected)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report decoded counts + overwrite/backup plan. Pass false to write."]
+                ],
+                "required": ["bundleID", "name", "keymap"]
             ]
         ],
         [

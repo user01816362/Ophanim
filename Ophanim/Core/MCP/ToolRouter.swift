@@ -126,5 +126,6 @@ enum ToolRouter {
         "list_classes": ReconTools.listClasses,
         "set_injection_strategy": ConfigTools.setInjectionStrategy,
         "get_keymap": ConfigTools.getKeymap,
+        "set_keymap": ConfigTools.setKeymap,
     ]
 }

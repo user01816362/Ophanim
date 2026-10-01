@@ -73,4 +73,51 @@ enum ConfigTools {
         }
         return text
     }
+
+    /// Headless keymap write (full-blob replace). The blob reuses the exact decode
+    /// path the GUI uses, then goes through the validated writer: name gate, enforced
+    /// bundle binding, backup-before-write, atomic replace. dryRun previews by default.
+    static func setKeymap(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let name = args["name"] as? String, !name.isEmpty else {
+            throw ToolRouter.bail("name is required")
+        }
+        guard let dict = args["keymap"] as? [String: Any] else {
+            throw ToolRouter.bail("keymap (object, full Keymap JSON) is required")
+        }
+        let map: Keymap
+        do {
+            let data = try JSONSerialization.data(withJSONObject: dict)
+            map = try JSONDecoder().decode(Keymap.self, from: data)
+        } catch {
+            throw ToolRouter.bail("keymap does not decode: \(error.localizedDescription) - nothing written")
+        }
+        guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
+        let app = HostedApp(appUrl: url)
+        let dryRun = ToolRouter.isDryRun(args)
+        let allowMismatch = (args["allowBundleMismatch"] as? Bool) ?? false
+        let report: Keymapping.ValidatedKeymapWrite
+        do {
+            report = try app.keymapping.writeValidatedKeymap(name: name, map: map,
+                                                             allowBundleMismatch: allowMismatch,
+                                                             dryRun: dryRun)
+        } catch let e as NSError {
+            throw ToolRouter.bail("\(e.localizedDescription) - nothing written")
+        }
+        var payload: [String: Any] = ["bundleID": bid, "name": name,
+                             "buttons": report.buttons,
+                             "draggableButtons": report.draggableButtons,
+                             "joysticks": report.joysticks,
+                             "mouseAreas": report.mouseAreas,
+                             "bundleIdentifier": report.bundleIdentifier,
+                             "wouldOverwrite": report.wouldOverwrite]
+        if dryRun {
+            payload["dryRun"] = true
+        } else {
+            payload["written"] = report.url?.path ?? ""
+            payload["replaced"] = report.wouldOverwrite
+            if let backup = report.backupURL?.path { payload["backup"] = backup }
+        }
+        return try ToolRouter.json(payload)
+    }
 }
