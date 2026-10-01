@@ -23,14 +23,17 @@ enum SourceTools {
 
     static func addSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty else { throw ToolRouter.bail("url is required") }
-        var addError: String?
+        final class ErrorBox: @unchecked Sendable {
+            var value: String?
+        }
+        let box = ErrorBox()
         let sema = DispatchSemaphore(value: 0)
         Task {
-            addError = await AppSourcesStore.shared.addSource(from: raw)
+            box.value = await AppSourcesStore.shared.addSource(from: raw)
             sema.signal()
         }
         sema.wait()
-        if let addError { throw ToolRouter.bail(addError) }
+        if let addError = box.value { throw ToolRouter.bail(addError) }
         return try ToolRouter.json(["subscribed": raw])
     }
 
