@@ -8,3 +8,4 @@
 | `URLSession` policy path untested in CI (hardened waits unverified) | maintainer | after CI wiring |
 | `Cartfile` floating `master` vs resolved `v3.1.0`; no carthage binary invoked | maintainer | on Galgal bump |
 | Catalyst window disagreement resolved to single `OPConstants.h` — scripts must adopt | maintainer | this cleanup |
+| Inspect command slot is per-process (`NSLock`): two concurrent `--mcp` children can collide; fix is a file lock on the slot | engine | with Agent-Mode batch |
