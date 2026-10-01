@@ -198,12 +198,37 @@ struct AppSourcesView: View {
 
     private func filteredApps(in source: AppSource) -> [SourceApp] {
         let query = searchString.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !query.isEmpty else { return source.apps }
-        return source.apps.filter {
+        let base = query.isEmpty ? source.apps : source.apps.filter {
             $0.name.lowercased().contains(query)
                 || $0.bundleIdentifier.lowercased().contains(query)
                 || ($0.developerName?.lowercased().contains(query) ?? false)
         }
+        // One row per app: feeds list the same bundle under several names (Twitter/X
+        // variants). Merge versions into the first entry; row state, news, and install
+        // actions all key off bundleIdentifier already, so nothing downstream changes.
+        var order: [String] = []
+        var merged: [String: SourceApp] = [:]
+        for app in base {
+            if let cur = merged[app.bundleIdentifier] {
+                var versions = cur.versions
+                for v in app.versions where !versions.contains(where: {
+                    $0.version == v.version && $0.buildVersion == v.buildVersion
+                }) {
+                    versions.append(v)
+                }
+                merged[app.bundleIdentifier] = SourceApp(
+                    name: cur.name, bundleIdentifier: cur.bundleIdentifier,
+                    developerName: cur.developerName, subtitle: cur.subtitle,
+                    description: cur.description ?? app.description,
+                    iconURL: cur.iconURL, versions: versions,
+                    latestVersion: cur.latestVersion ?? app.latestVersion,
+                    isBeta: cur.isBeta || app.isBeta)
+            } else {
+                order.append(app.bundleIdentifier)
+                merged[app.bundleIdentifier] = app
+            }
+        }
+        return order.compactMap { merged[$0] }
     }
 
     // MARK: - Install (owned by SourceInstalls; the view only starts/pauses it)
