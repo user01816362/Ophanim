@@ -129,8 +129,7 @@ struct SignSetupView: View {
             .fixedSize(horizontal: true, vertical: true)
         }
         .padding()
-        .ophanimTheme()
-        .buttonStyle(TerminalButtonStyle())
+        .buttonStyle(.bordered)
     }
 }
 

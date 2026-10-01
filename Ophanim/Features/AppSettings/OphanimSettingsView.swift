@@ -9,16 +9,11 @@ import SwiftUI
 
 struct OphanimSettingsView: View {
     private enum Tabs: Hashable {
-        case keyCover, install, uninstall, appearance, mcp
+        case keyCover, install, uninstall, mcp
     }
 
     var body: some View {
         TabView {
-            AppearanceSettings()
-                .tabItem {
-                    Label("Appearance", systemImage: "paintbrush")
-                }
-                .tag(Tabs.appearance)
             // KeyCover tab hidden - KeyCover (at-rest encryption of the emulated keychain) is
             // intentionally disabled in Ophanim, so its settings tab is not surfaced.
             // Install tab removed - Galgal is always installed by default, and the per-app
@@ -34,9 +29,8 @@ struct OphanimSettingsView: View {
                 }
                 .tag(Tabs.mcp)
         }
-        .ophanimTheme()
-        .groupBoxStyle(TerminalGroupBoxStyle())
-        .buttonStyle(TerminalButtonStyle())
+        
+        .buttonStyle(.bordered)
     }
 }
 
@@ -109,7 +103,7 @@ struct MCPSettings: View {
                         Text("⚠ This exposes the MCP server beyond this Mac. Anyone who can reach this "
                              + "address can read captured data and change capture settings. Use only on "
                              + "trusted networks.")
-                            .font(.caption).foregroundColor(Theme.danger)
+                            .font(.caption).foregroundColor(.red)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text("MCP clients connect at http://\(displayHost):\(String(port))/ - "
@@ -131,7 +125,7 @@ struct MCPSettings: View {
                         .textSelection(.enabled)
                         .padding(8)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.black.opacity(0.35))
+                        .background(.tertiary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
                     Button("Copy config") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(stdioConfig, forType: .string)
@@ -181,74 +175,5 @@ struct MCPSettings: View {
         guard httpEnabled else { return }
         MCPHTTPTransport.shared.stop()
         MCPHTTPTransport.shared.start()
-    }
-}
-
-/// Appearance / theme preferences (app-wide). The fx toggle gates the digital-rain, scanlines and
-/// glow used throughout the UI.
-struct AppearanceSettings: View {
-    @AppStorage("ophanim.fx.enabled") private var fxEnabled = true
-    @AppStorage("ophanim.rain.enabled") private var rainEnabled = false
-    @AppStorage("ophanim.fx.wind")   private var windEnabled = true
-    @AppStorage("ophanim.fx.glitch") private var glitchEnabled = true
-    @AppStorage("ophanim.fx.surge")  private var surgeEnabled = true
-    @AppStorage("ophanim.fx.sweep")  private var sweepEnabled = true
-    @AppStorage("ophanim.fx.eyes")   private var eyesEnabled = true
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            GroupBox("Theme") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("CRT scanlines + glow", isOn: $fxEnabled)
-                        .help("Faint scanline overlay and phosphor glow on accents. Turn off for a flat, faster UI.")
-                    Toggle("Digital rain", isOn: $rainEnabled)
-                        .help("Falling green/purple glyphs behind the UI (the library, editors, options and "
-                              + "log windows). Off by default.")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            GroupBox("Effects") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Wind", isOn: $windEnabled)
-                        .help("The digital rain leans and curves in a gusting wind that shifts direction over time.")
-                    Toggle("Glitches", isOn: $glitchEnabled)
-                        .help("Sparse white flashes on rain heads, plus an occasional horizontal tear line.")
-                    Toggle("Surges", isOn: $surgeEnabled)
-                        .help("Occasional bursts where a whole rain column briefly brightens.")
-                    Toggle("Screen sweep", isOn: $sweepEnabled)
-                        .help("A slow bright CRT refresh band that travels down the screen.")
-                    Toggle("Eyes", isOn: $eyesEnabled)
-                        .help("Eyeballs of varying sizes fade in at random spots in the background, open, "
-                              + "blink a few times, then fade away.")
-                    Text("Wind, surges and rain glitches apply when Digital rain is on; the sweep and tear "
-                         + "glitch apply when CRT scanlines is on; eyes follow the CRT scanlines master toggle.")
-                        .font(Theme.caption)
-                        .foregroundColor(Theme.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            GroupBox("Preview") {
-                ZStack {
-                    Color.black
-                    // Live preview: reflects the toggles above (rain/eyes show only when enabled; the
-                    // glow follows the scanlines+glow toggle).
-                    DigitalRainView()
-                    EyeballsView()
-                    Text("OPHANIM")
-                        .font(Theme.mono(22, .bold))
-                        .foregroundColor(Theme.accentBright)
-                        .phosphorGlow(Theme.purple, radius: 6)
-                }
-                .frame(height: 120)
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-        }
-        .padding()
-        .frame(width: 440)
-        .fixedSize(horizontal: false, vertical: true)
     }
 }

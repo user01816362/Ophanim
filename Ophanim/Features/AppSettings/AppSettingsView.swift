@@ -93,6 +93,10 @@ struct AppSettingsView: View {
                         Text("settings.tab.km")
                     }
                     .disabled(!(hasGalgal ?? true))
+                ContainerView(app: viewModel.app)
+                    .tabItem {
+                        Text("settings.tab.container")
+                    }
                 InfoView(info: viewModel.app.info, hasGalgal: (hasGalgal ?? true))
                     .tabItem {
                         Text("settings.tab.info")
@@ -158,8 +162,7 @@ struct AppSettingsView: View {
         }
         .padding()
         .frame(width: 720, height: 470)
-        .ophanimTheme()
-        .groupBoxStyle(TerminalGroupBoxStyle())
-        .buttonStyle(TerminalButtonStyle())
+        
+        .buttonStyle(.bordered)
     }
 }

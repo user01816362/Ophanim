@@ -154,7 +154,7 @@ struct HostedAppConditionalView: View {
                     .padding(.vertical, 5)
 
                     Text(app.name)
-                        .foregroundColor(isSelected ? Theme.accentBright : Theme.textPrimary)
+                        .foregroundColor(isSelected ? .accentColor : .primary)
                     if !(hasGalgal ?? true) {
                         Image(systemName: "exclamationmark.triangle")
                             .padding(.leading, 15)
@@ -173,9 +173,9 @@ struct HostedAppConditionalView: View {
                 .contentShape(Rectangle())
                 .background(
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(isSelected ? Theme.purple.opacity(0.22) : Color.clear)
+                        .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
                         .overlay(RoundedRectangle(cornerRadius: 4)
-                            .stroke(isSelected ? Theme.accent.opacity(0.8) : Color.clear, lineWidth: 1))
+                            .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1))
                     )
             } else {
                 LazyVStack {
@@ -198,9 +198,8 @@ struct HostedAppConditionalView: View {
                     .frame(width: 60, height: 60)
                     .overlay(
                         RoundedRectangle(cornerRadius: 15)
-                            .stroke(isSelected ? Theme.accent : Color.clear, lineWidth: 2)
+                            .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
                     )
-                    .phosphorGlow(isSelected ? Theme.accent : .clear, radius: isSelected ? 8 : 0)
 
                     let noGalgalWarning = Text(
                         (hasGalgal ?? true) ? "" : "\(Image(systemName: "exclamationmark.triangle"))  "
@@ -211,10 +210,10 @@ struct HostedAppConditionalView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
-                            .foregroundColor(isSelected ? Theme.accentBright : Theme.textPrimary)
+                            .foregroundColor(isSelected ? .accentColor : .primary)
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(isSelected ? Theme.purple.opacity(0.22) : Color.clear)
+                                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
                             )
                             .help(!(hasGalgal ?? true) ? "settings.noGalgal" : "")
                             .frame(height: 20)

@@ -25,7 +25,7 @@ struct InlineHooksEditorView: View {
             }
             if !armed {
                 Text("⚠ Inline hooks are OFF - turn on “Enable inline hooks” in Hacking to arm these.")
-                    .font(.caption).foregroundColor(Theme.danger)
+                    .font(.caption).foregroundColor(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(alignment: .top, spacing: 12) {
@@ -58,9 +58,8 @@ struct InlineHooksEditorView: View {
         .padding()
         .frame(minWidth: 620, idealWidth: 800, maxWidth: .infinity,
                minHeight: 400, idealHeight: 540, maxHeight: .infinity)
-        .ophanimTheme()
-        .buttonStyle(TerminalButtonStyle())
-        .textFieldStyle(TerminalTextFieldStyle())
+        .buttonStyle(.bordered)
+        .textFieldStyle(.roundedBorder)
     }
 
     private func targetSummary(_ h: OPInlineHook) -> String {

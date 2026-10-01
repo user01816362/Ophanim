@@ -52,11 +52,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Force the whole app - including the menu bar, context menus and Picker dropdowns, which
-        // SwiftUI's .preferredColorScheme doesn't reach - into dark appearance so native menus match
-        // the terminal theme. Green selection comes from the SwiftUI .tint(Theme.accent) at the roots.
-        NSApp.appearance = NSAppearance(named: .darkAqua)
-
         UpdateScheme.checkForUpdate()
 
         // Local MCP endpoint on 127.0.0.1:20033 so an AI client can drive Ophanim while it runs.

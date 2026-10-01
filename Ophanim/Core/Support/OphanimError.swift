@@ -10,6 +10,8 @@ enum OphanimError: Error {
     case appProhibited
     case appMaliciousProhibited
     case failedToStripBinary
+    case invalidUserDylib
+    case invalidFolderName
 }
 
 extension OphanimError: LocalizedError {
@@ -29,6 +31,10 @@ extension OphanimError: LocalizedError {
             return NSLocalizedString("error.appMaliciousProhibited", comment: "")
         case .failedToStripBinary:
             return NSLocalizedString("error.failedToStripBinary", comment: "")
+        case .invalidUserDylib:
+            return NSLocalizedString("error.invalidUserDylib", comment: "")
+        case .invalidFolderName:
+            return NSLocalizedString("error.invalidFolderName", comment: "")
         }
     }
 }

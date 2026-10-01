@@ -53,6 +53,9 @@ struct AppSettingsData: Codable {
     var resizableAspectRatioHeight = 0
     var blockSleepSpamming = false
 
+    /// Custom tweak folder path (nil = default per-app store). Set from the tweak library pane.
+    var customTweakFolder: String?
+
     /// Ophanim instrumentation config. Persisted under the "ophanim" key, read in-process by
     /// OphanimCore's OPConfigLoader at agent start.
     var ophanim = OPConfig()
@@ -95,6 +98,7 @@ struct AppSettingsData: Codable {
         resizableAspectRatioWidth = try container.decodeIfPresent(Int.self, forKey: .resizableAspectRatioWidth) ?? 0
         resizableAspectRatioHeight = try container.decodeIfPresent(Int.self, forKey: .resizableAspectRatioHeight) ?? 0
         blockSleepSpamming = try container.decodeIfPresent(Bool.self, forKey: .blockSleepSpamming) ?? false
+        customTweakFolder = try container.decodeIfPresent(String.self, forKey: .customTweakFolder)
         ophanim = try container.decodeIfPresent(OPConfig.self, forKey: .ophanim) ?? OPConfig()
     }
 }

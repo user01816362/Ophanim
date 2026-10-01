@@ -54,9 +54,8 @@ struct SwiftHooksEditorView: View {
         .padding()
         .frame(minWidth: 620, idealWidth: 800, maxWidth: .infinity,
                minHeight: 400, idealHeight: 540, maxHeight: .infinity)
-        .ophanimTheme()
-        .buttonStyle(TerminalButtonStyle())
-        .textFieldStyle(TerminalTextFieldStyle())
+        .buttonStyle(.bordered)
+        .textFieldStyle(.roundedBorder)
     }
 
     @ViewBuilder private func editor(_ i: Int) -> some View {

@@ -89,7 +89,7 @@ struct BypassesView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("Bypass each SDK's detector individually (\(settings.settings.jailbreakBypasses.count)/\(JBBypassCatalog.all.count))")
-                                .font(Theme.caption).foregroundColor(Theme.textSecondary)
+                                .font(.caption).foregroundColor(.secondary)
                             Spacer()
                             Button("Select All") {
                                 settings.settings.jailbreakBypasses = JBBypassCatalog.allIDs
@@ -132,7 +132,7 @@ struct BypassesView: View {
                         Text("Hooks SecTrustEvaluateWithError - covers SecTrust-based pinning (most apps), "
                              + "not in-process TLS stacks like Cronet. Pinning checks are logged under the "
                              + "Network capture category.")
-                            .font(Theme.caption).foregroundColor(Theme.textSecondary)
+                            .font(.caption).foregroundColor(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,6 +148,10 @@ struct BypassesView: View {
                             .toggleStyle(.async($task, role: .iosFrameworks))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                GroupBox("settings.customPlugins.title") {
+                    CustomDylibView(app: app, settings: settings, hasGalgal: $hasGalgal)
                 }
 
                 GroupBox("Compatibility") {

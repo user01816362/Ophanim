@@ -44,3 +44,44 @@ extension NSOpenPanel {
         }
     }
 }
+
+extension NSOpenPanel {
+    static func selectDylib(completion: @escaping (_ result: Result<URL, Error>) -> Void) {
+        selectTweakItem(completion: completion)
+    }
+
+    static func selectTweakItem(completion: @escaping (_ result: Result<URL, Error>) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "dylib") ?? .unixExecutable,
+            UTType.framework,
+            UTType.folder
+        ]
+        panel.begin { result in
+            if result == .OK {
+                if let url = panel.urls.first {
+                    completion(.success(url))
+                }
+            }
+        }
+    }
+
+    static func selectTweakFolder(completion: @escaping (_ result: Result<URL, Error>) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = NSLocalizedString("settings.customPlugins.selectFolder", comment: "")
+        panel.begin { result in
+            if result == .OK {
+                if let url = panel.urls.first {
+                    completion(.success(url))
+                }
+            }
+        }
+    }
+}

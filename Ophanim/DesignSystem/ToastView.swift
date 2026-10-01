@@ -29,13 +29,13 @@ struct ToastView: View {
                     HStack {
                         switch toast.toastType {
                         case .notice:
-                            Image(systemName: "info.circle").foregroundColor(Theme.accent)
+                            Image(systemName: "info.circle").foregroundColor(.accentColor)
                         case .error:
-                            Image(systemName: "exclamationmark.triangle").foregroundColor(Theme.danger)
+                            Image(systemName: "exclamationmark.triangle").foregroundColor(.red)
                         case .network:
-                            Image(systemName: "info.circle").foregroundColor(Theme.purple)
+                            Image(systemName: "info.circle").foregroundColor(.purple)
                         }
-                        Text(toast.toastDetails).foregroundColor(Theme.textPrimary)
+                        Text(toast.toastDetails).foregroundColor(.primary)
                     }
                     .toastBackground()
                     .onAppear {

@@ -91,6 +91,9 @@
 "error.appProhibited" = "Using this app through Ophanim will likely result in a ban!";
 "error.appMaliciousProhibited" = "This App behaves maliciously on Macs, and using it can leave your device in an unbootable state, therefore it is blocked from Ophanim. (Uninstalling...)";
 "error.failedToStripBinary" = "Could not find ARM64 arch in fat binary!";
+"error.invalidUserDylib" = "This file isn't a valid dylib Ophanim can convert for this app's architecture, so Galgal can't load it.";
+"error.invalidFolderName" = "The folder name contains invalid characters.";
+
 
 "settings.title" = "%@ Settings";
 "settings.tab.info" = "Info";
@@ -252,6 +255,11 @@
 "keycover.confirmMasterPassword" = "Confirm Master Password";
 "keycover.oldMasterPassword" = "Current Master Password";
 
+"settings.customPlugins.selectFolder" = "Select Tweak Folder";
+"settings.tab.container" = "Container";
+"settings.customPlugins.title" = "Custom Plugins";
+"settings.container.missing" = "No container (never launched)";
+"settings.container.restoreRunning" = "Quit the app before restoring its container.";
 "keycover.error.blankPassword" = "Password cannot be blank";
 "keycover.error.notMatch" = "Passwords do not match";
 "keycover.error.incorrectPassword" = "Incorrect Password";

@@ -6,6 +6,20 @@
 import Foundation
 import injection
 
+public struct TweakItem: Hashable, Identifiable {
+    public var id: URL { fileUrl }
+    public let fileUrl: URL
+    public let isFolder: Bool
+    public let isFramework: Bool
+    public let isTweak: Bool
+    public let isEnabled: Bool
+
+    public var displayName: String {
+        let name = fileUrl.lastPathComponent
+        return isEnabled ? name : String(name.dropLast(Galgal.disabledSuffix.count))
+    }
+}
+
 class Galgal {
     private static let frameworksURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library")
@@ -304,4 +318,264 @@ class Galgal {
             }
         }
 	}
+
+    // MARK: - User custom plugins & tweak folders
+
+    public static let disabledSuffix = ".disabled"
+
+    public static func defaultTweakStore(bundleIdentifier: String) -> URL {
+        tweakStoresRoot.appendingPathComponent(bundleIdentifier)
+    }
+
+    /// The directory that holds every app's tweak store, one subdirectory per bundle identifier.
+    /// Anything that enumerates or prunes per-app state must start here, so the layout is defined
+    /// in exactly one place.
+    public static var tweakStoresRoot: URL {
+        ophanimContainer
+            .appendingPathComponent("Galgal")
+            .appendingPathComponent("UserPlugins")
+    }
+
+    public static func effectiveTweakStore(bundleIdentifier: String, customPath: String?) -> URL {
+        if let customPath = customPath, !customPath.isEmpty {
+            let customURL = URL(fileURLWithPath: customPath)
+            var isDir: ObjCBool = false
+            if FileManager.default.fileExists(atPath: customURL.path, isDirectory: &isDir), isDir.boolValue {
+                return customURL
+            }
+        }
+        return defaultTweakStore(bundleIdentifier: bundleIdentifier)
+    }
+
+    public static func tweakItems(bundleIdentifier: String, customPath: String?) -> [TweakItem] {
+        let store = effectiveTweakStore(bundleIdentifier: bundleIdentifier, customPath: customPath)
+        guard let files = try? FileManager.default.contentsOfDirectory(at: store, includingPropertiesForKeys: nil) else {
+            return []
+        }
+        var items: [TweakItem] = []
+        for file in files {
+            let fileName = file.lastPathComponent
+            if fileName.hasPrefix(".") { continue }
+            var isDir: ObjCBool = false
+            FileManager.default.fileExists(atPath: file.path, isDirectory: &isDir)
+            let isEnabled = !fileName.hasSuffix(disabledSuffix)
+            let baseName = isEnabled ? fileName : String(fileName.dropLast(disabledSuffix.count))
+            let isFramework = isDir.boolValue && baseName.hasSuffix(".framework")
+            // Exactly what syncUserDylibs ships: `.dylib` files and `.framework` bundles. A bare
+            // Mach-O also matches UTType.unixExecutable, but sync skips it - listing it as a
+            // tweak would show something enabled that can never reach the app, so it stays a
+            // plain file row instead.
+            let isTweak = !isDir.boolValue && baseName.hasSuffix(".dylib")
+            let isFolder = isDir.boolValue && !isFramework
+
+            items.append(TweakItem(fileUrl: file,
+                                   isFolder: isFolder,
+                                   isFramework: isFramework,
+                                   isTweak: isTweak,
+                                   isEnabled: isEnabled))
+        }
+        return items.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    public static func setTweakEnabled(item: TweakItem,
+                                       enabled: Bool,
+                                       bundleIdentifier: String,
+                                       appExecutable: URL,
+                                       customPath: String?) throws {
+        let currentUrl = item.fileUrl
+        let currentName = currentUrl.lastPathComponent
+        if enabled && currentName.hasSuffix(disabledSuffix) {
+            let newName = String(currentName.dropLast(disabledSuffix.count))
+            let targetUrl = currentUrl.deletingLastPathComponent().appendingPathComponent(newName)
+            try FileManager.default.moveItem(at: currentUrl, to: targetUrl)
+        } else if !enabled && !currentName.hasSuffix(disabledSuffix) {
+            let newName = currentName + disabledSuffix
+            let targetUrl = currentUrl.deletingLastPathComponent().appendingPathComponent(newName)
+            try FileManager.default.moveItem(at: currentUrl, to: targetUrl)
+        }
+        try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
+    }
+
+    public static func addTweakItem(at sourceURL: URL,
+                                    bundleIdentifier: String,
+                                    appExecutable: URL,
+                                    customPath: String?) throws {
+        let store = effectiveTweakStore(bundleIdentifier: bundleIdentifier, customPath: customPath)
+        try FileManager.default.createDirectory(at: store, withIntermediateDirectories: true)
+
+        // Accept only what the pipeline handles: `.dylib` files (arch-checked below),
+        // `.framework` bundles, and directories (tweak folders scanned recursively). Anything
+        // else - a bare Mach-O, a text file, an alias - would sit in the store forever: listed
+        // but never synced, never loaded. Reject it at the door with the existing error.
+        var isSourceDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: sourceURL.path, isDirectory: &isSourceDir),
+              isSourceDir.boolValue
+                || sourceURL.pathExtension == "dylib"
+                || sourceURL.pathExtension == "framework" else {
+            throw OphanimError.invalidUserDylib
+        }
+
+        let target = store.appendingPathComponent(sourceURL.lastPathComponent)
+        if FileManager.default.fileExists(atPath: target.path) {
+            try FileManager.default.removeItem(at: target)
+        }
+        try FileManager.default.copyItem(at: sourceURL, to: target)
+
+        var isDir: ObjCBool = false
+        FileManager.default.fileExists(atPath: target.path, isDirectory: &isDir)
+        if !isDir.boolValue && target.pathExtension == "dylib" {
+            do {
+                if try !(try Macho.isMachoValidArch(target)) {
+                    try Macho.convertMacho(target)
+                }
+            } catch {
+                try? FileManager.default.removeItem(at: target)
+                throw OphanimError.invalidUserDylib
+            }
+        }
+
+        _ = try? Shell.run(print: false, "/usr/bin/xattr", "-cr", target.path)
+        try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
+    }
+
+    public static func createNewSubfolder(named name: String,
+                                          bundleIdentifier: String,
+                                          customPath: String?) throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              !trimmed.hasPrefix("."),
+              !trimmed.contains("/"),
+              !trimmed.contains("\\"),
+              !trimmed.contains(":"),
+              !trimmed.contains("..") else {
+            throw OphanimError.invalidFolderName
+        }
+        let store = effectiveTweakStore(bundleIdentifier: bundleIdentifier, customPath: customPath)
+        let subfolder = store.appendingPathComponent(trimmed)
+        try FileManager.default.createDirectory(at: subfolder, withIntermediateDirectories: false)
+    }
+
+    public static func removeTweakItem(item: TweakItem,
+                                       bundleIdentifier: String,
+                                       appExecutable: URL,
+                                       customPath: String?) throws {
+        if FileManager.default.fileExists(atPath: item.fileUrl.path) {
+            try FileManager.default.removeItem(at: item.fileUrl)
+        }
+        try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
+    }
+
+    // Resync user dylibs into the app's Frameworks/UserPlugins directory and sign them
+    public static func syncUserDylibs(bundleIdentifier: String,
+                                      into appExecutable: URL,
+                                      customPath: String? = nil) throws {
+        let targetDirectory = appExecutable.deletingLastPathComponent()
+            .appendingPathComponent("Frameworks")
+            .appendingPathComponent("UserPlugins")
+
+        if FileManager.default.fileExists(atPath: targetDirectory.path) {
+            try FileManager.default.removeItem(at: targetDirectory)
+        }
+
+        let store = effectiveTweakStore(bundleIdentifier: bundleIdentifier, customPath: customPath)
+        guard FileManager.default.fileExists(atPath: store.path) else { return }
+
+        var dylibsToSync: [URL] = []
+        var frameworksToSync: [URL] = []
+        var visitedCanonicalPaths = Set<String>()
+
+        func scanDirectory(_ dir: URL, depth: Int = 0) {
+            guard depth <= 8 else { return }
+            let canonical = dir.resolvingSymlinksInPath().path
+            guard visitedCanonicalPaths.insert(canonical).inserted else { return }
+
+            guard let contents = try? FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+            ) else { return }
+
+            for file in contents {
+                let name = file.lastPathComponent
+                if name.hasPrefix(".") || name.hasSuffix(disabledSuffix) { continue }
+
+                let values = try? file.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                let isDir = values?.isDirectory == true
+
+                if isDir {
+                    if name.hasSuffix(".framework") {
+                        frameworksToSync.append(file)
+                    } else {
+                        if values?.isSymbolicLink == true {
+                            let resolved = file.resolvingSymlinksInPath()
+                            if visitedCanonicalPaths.contains(resolved.path) { continue }
+                        }
+                        scanDirectory(file, depth: depth + 1)
+                    }
+                } else if name.hasSuffix(".dylib") {
+                    // Only what the loader will actually load. This previously also accepted
+                    // anything conforming to UTType.unixExecutable, but GalgalLoader.m dlopens
+                    // only `.dylib` and `.framework` - so a bare Mach-O was copied, re-signed
+                    // and shipped into the app, appeared in the store as present, and was never
+                    // loaded. Rejecting it here is honest; silently accepting it was not.
+                    dylibsToSync.append(file)
+                }
+            }
+        }
+
+        scanDirectory(store, depth: 0)
+
+        if dylibsToSync.isEmpty && frameworksToSync.isEmpty { return }
+
+        try FileManager.default.createDirectory(at: targetDirectory, withIntermediateDirectories: true)
+
+        let storePrefix = store.standardizedFileURL.path + "/"
+
+        for source in dylibsToSync {
+            let sourcePath = source.standardizedFileURL.path
+            let relativePath: String
+            if sourcePath.hasPrefix(storePrefix) {
+                relativePath = String(sourcePath.dropFirst(storePrefix.count))
+            } else {
+                relativePath = source.lastPathComponent
+            }
+            let target = targetDirectory.appendingPathComponent(relativePath)
+            do {
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: target.path) {
+                    try FileManager.default.removeItem(at: target)
+                }
+                try FileManager.default.copyItem(at: source, to: target)
+                _ = try? Shell.run(print: false, "/usr/bin/xattr", "-cr", target.path)
+                try target.fixExecutable()
+                try Shell.signMacho(target)
+            } catch {
+                Log.shared.error("Failed to sync dylib \(source.lastPathComponent): \(error)")
+                try? FileManager.default.removeItem(at: target)
+            }
+        }
+
+        for source in frameworksToSync {
+            let sourcePath = source.standardizedFileURL.path
+            let relativePath: String
+            if sourcePath.hasPrefix(storePrefix) {
+                relativePath = String(sourcePath.dropFirst(storePrefix.count))
+            } else {
+                relativePath = source.lastPathComponent
+            }
+            let target = targetDirectory.appendingPathComponent(relativePath)
+            do {
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: target.path) {
+                    try FileManager.default.removeItem(at: target)
+                }
+                try FileManager.default.copyItem(at: source, to: target)
+                _ = try? Shell.run(print: false, "/usr/bin/xattr", "-cr", target.path)
+                try target.fixExecutable()
+                try Shell.signMacho(target)
+            } catch {
+                Log.shared.error("Failed to sync framework \(source.lastPathComponent): \(error)")
+                try? FileManager.default.removeItem(at: target)
+            }
+        }
+    }
 }

@@ -150,7 +150,7 @@ struct LogViewerView: View {
                 }.width(90)
                 TableColumn("×") { r in
                     Text(r.count > 1 ? "×\(r.count)" : "")
-                        .foregroundColor(Theme.purple)
+                        .foregroundColor(.purple)
                 }.width(48)
                 TableColumn("Detail") { r in Text(detail(r.event)).lineLimit(1) }
             }
@@ -163,18 +163,18 @@ struct LogViewerView: View {
             HStack {
                 if let e = detailEvent {
                     Text("▸ \(e.category.rawValue) · \(e.api)")
-                        .font(.caption).foregroundColor(Theme.accent).lineLimit(1)
+                        .font(.caption).foregroundColor(.accentColor).lineLimit(1)
                 }
                 Spacer()
                 if !hookFailures.isEmpty {
                     Text("⚠ \(hookFailures.count) hook issue\(hookFailures.count == 1 ? "" : "s")")
-                        .font(.caption).foregroundColor(Theme.danger)
+                        .font(.caption).foregroundColor(.red)
                         .help("Hooks that failed to install:\n"
                               + hookFailures.map { "• \($0.name): \($0.result)" }.joined(separator: "\n"))
                 }
                 if droppedTotal > 0 {
                     Text("⚠ \(droppedTotal) dropped")
-                        .font(.caption).foregroundColor(Theme.danger)
+                        .font(.caption).foregroundColor(.red)
                         .help("Events the capture ring dropped because it filled faster than it could drain.")
                 }
                 Text("\(filtered.count) events")
@@ -184,9 +184,8 @@ struct LogViewerView: View {
         .padding()
         .frame(minWidth: 560, idealWidth: 900, maxWidth: .infinity,
                minHeight: 320, idealHeight: 640, maxHeight: .infinity)
-        .ophanimTheme()
-        .buttonStyle(TerminalButtonStyle())
-        .textFieldStyle(TerminalTextFieldStyle())
+        .buttonStyle(.bordered)
+        .textFieldStyle(.roundedBorder)
         .onAppear(perform: load)
         .onChange(of: selection) { _, _ in detailEvent = selectedEvent }
         .onReceive(refreshTimer) { _ in if autoRefresh { load() } }
@@ -322,11 +321,11 @@ struct EventDetailView: View {
         }
     }
 
-    @ViewBuilder private func bodyBlock(_ title: String, _ data: Data?) -> some View {
+    @ViewBuilder private func bodyBlock(_ title: String, _ data: Data?, contentType: String? = nil) -> some View {
         if let data = data, !data.isEmpty {
             section("\(title) (\(data.count) bytes)")
             ScrollView(.horizontal) {
-                Text(Self.pretty(data)).font(.caption.monospaced()).textSelection(.enabled)
+                Text(Self.pretty(data, contentType: contentType)).font(.caption.monospaced()).textSelection(.enabled)
             }
         }
     }
@@ -341,16 +340,7 @@ struct EventDetailView: View {
             .background(Color.secondary.opacity(0.15)).cornerRadius(4)
     }
 
-    /// Pretty-print JSON; otherwise show UTF-8 text; otherwise base64.
-    static func pretty(_ data: Data) -> String {
-        if let obj = try? JSONSerialization.jsonObject(with: data),
-           let out = try? JSONSerialization.data(withJSONObject: obj,
-                                                 options: [.prettyPrinted, .withoutEscapingSlashes]),
-           let s = String(data: out, encoding: .utf8) {
-            return s
-        }
-        return String(data: data, encoding: .utf8) ?? data.base64EncodedString()
-    }
+    /// Body rendering (plist/form/multipart/image/inflate chain) lives in EventPretty.swift.
 
     private static let fullFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"; return f

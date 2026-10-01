@@ -91,7 +91,7 @@ struct ReconView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let err = loadError {
-                Text(err).font(.caption).foregroundColor(Theme.danger)
+                Text(err).font(.caption).foregroundColor(.red)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
@@ -108,9 +108,8 @@ struct ReconView: View {
         .padding()
         .frame(minWidth: 560, idealWidth: 900, maxWidth: .infinity,
                minHeight: 360, idealHeight: 640, maxHeight: .infinity)
-        .ophanimTheme()
-        .buttonStyle(TerminalButtonStyle())
-        .textFieldStyle(TerminalTextFieldStyle())
+        .buttonStyle(.bordered)
+        .textFieldStyle(.roundedBorder)
         .onAppear(perform: load)
     }
 
@@ -127,7 +126,7 @@ struct ReconView: View {
             .padding(.vertical, 2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.opacity(0.25))
+        .background(.tertiary.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
     }
 
     private var scanPane: some View {

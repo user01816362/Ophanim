@@ -23,11 +23,6 @@ struct AppLibraryView: View {
 
     var body: some View {
         ZStack {
-            // Always-on, subtle digital-rain backdrop (honors the fx toggle). The grid/empty content
-            // sits on top; cells are transparent so the rain shows between them.
-            DigitalRainView()
-                .opacity(0.18)
-                .allowsHitTesting(false)
             Group {
             if !appsVM.apps.isEmpty || appsVM.updatingApps {
                 ScrollView {
@@ -43,17 +38,14 @@ struct AppLibraryView: View {
                 }
             } else {
                 ZStack {
-                    DigitalRainView()
-                        .opacity(0.5)
                     VStack(spacing: 6) {
                         Text("hostedapp.noSources.title")
-                            .font(Theme.mono(22, .bold))
-                            .foregroundColor(Theme.accentBright)
-                            .phosphorGlow(Theme.purple, radius: 6)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.primary)
                             .padding(.bottom, 2)
                         Text("hostedapp.noSources.subtitle")
-                            .font(Theme.body)
-                            .foregroundColor(Theme.textSecondary)
+                            .font(.body)
+                            .foregroundColor(.secondary)
                         Button("hostedapp.importIPA") {
                             if installVM.inProgress {
                                 Log.shared.error(OphanimError.waitInstallation)
@@ -61,11 +53,10 @@ struct AppLibraryView: View {
                                 selectFile()
                             }
                         }
-                        .buttonStyle(TerminalButtonStyle())
+                        .buttonStyle(.borderedProminent)
                         .padding(.top, 6)
                     }
                     .padding(24)
-                    .background(Theme.bg.opacity(0.55).blur(radius: 8))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

@@ -68,7 +68,6 @@ struct MainView: View {
                 KeyCoverUnlockingPrompt()
             }
             .frame(minWidth: 675, minHeight: 330)
-            .ophanimTheme()
     }
 
     private func updateSelectionColors(scheme: ColorScheme) {
