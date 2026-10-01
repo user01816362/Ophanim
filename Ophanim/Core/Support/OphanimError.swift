@@ -14,6 +14,8 @@ enum OphanimError: Error {
     case invalidFolderName
     case containerRunning
     case containerActive
+    case corruptedFile(String, String)
+    case unsupportedPlatform(String, String)
 }
 
 extension OphanimError: LocalizedError {
@@ -39,6 +41,12 @@ extension OphanimError: LocalizedError {
             return NSLocalizedString("error.invalidFolderName", comment: "")
         case .containerRunning:
             return NSLocalizedString("error.containerRunning", value: "Quit the app before changing its container.", comment: "")
+        case .corruptedFile(let name, let reason):
+            let template = NSLocalizedString("error.corruptedFile", value: "%@ is unusable: %@.", comment: "")
+            return String(format: template, name, reason)
+        case .unsupportedPlatform(let bid, let platform):
+            let template = NSLocalizedString("error.unsupportedPlatform", value: "%@: cannot run here (%@).", comment: "")
+            return String(format: template, bid, platform)
         case .containerActive:
             return NSLocalizedString("error.containerActive", value: "This is the active container. Switch to another one first.", comment: "")
         }

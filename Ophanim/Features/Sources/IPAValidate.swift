@@ -29,10 +29,8 @@ enum IPAValidate {
     /// An installed .app must have a loadable Catalyst executable. Returns the bundle
     /// id from its own Info.plist. Throws the honest reason otherwise.
     static func installedApp(at appURL: URL) throws -> String {
-        let infoURL = appURL.appendingPathComponent("Info.plist")
-        guard let info = (try? Data(contentsOf: infoURL))
-            .flatMap({ try? PropertyListSerialization.propertyList(from: $0, format: nil) as? [String: Any] }),
-              let bid = (info["CFBundleIdentifier"] as? String), !bid.isEmpty else {
+        let info = PlistReader.appInfoDict(at: appURL.appendingPathComponent("Info.plist"))
+        guard let bid = (info["CFBundleIdentifier"] as? String), !bid.isEmpty else {
             throw OphanimError.corruptedFile(appURL.lastPathComponent, "Info.plist unreadable")
         }
         guard let exeName = info["CFBundleExecutable"] as? String, !exeName.isEmpty else {
