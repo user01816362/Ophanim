@@ -4,8 +4,8 @@
 //
 //  Agent-Mode tools over MCP (ported): screenshot, UI-tree read, gestures, class
 //  inventory, snapshots, bookmarks. Single gate (InspectGate.requireLive); wire via
-//  InspectControl; stores via SnapshotStore/BookmarkStore. No dryRun: NEW tools
-//  execute directly like the rest of the router.
+//  InspectControl; stores via SnapshotStore/BookmarkStore. Destructive tools preview
+//  by default (isDryRun, OLD safety contract): pass dryRun:false to execute.
 
 import Foundation
 
@@ -316,6 +316,11 @@ enum InspectTools {
 
         case "inspect_clear_snapshots":
             let (files, bytes) = SnapshotStore.inventory(bundleID: bid)
+            if isDryRun(args) {
+                return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
+                                       "wouldRemove": files.map(\.path),
+                                       "count": files.count, "bytes": bytes])
+            }
             let cleared = SnapshotStore.clear(bundleID: bid)
             return MCPServer.toolResult(id, ["bundleID": bid,
                                    "removed": files.map(\.path),
@@ -444,6 +449,14 @@ enum InspectTools {
                 m.removeAll(where: { remove.contains($0) })
                 return m
             }
+            if isDryRun(args) {
+                let (gid, name, created) = peekBookmarkGroup(in: current, ref: gref)
+                return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
+                                       "group": name, "groupId": gid,
+                                       "wouldCreateGroup": created,
+                                       "added": add, "removed": remove,
+                                       "members": members(after: current, gid: gid)])
+            }
             var gid = ""
             BookmarkStore.modify(bundleID: bid) { store in
                 gid = resolveBookmarkGroup(in: &store, ref: gref)
@@ -542,6 +555,12 @@ enum InspectTools {
             let grpGone = Set(ids.filter { $0.hasPrefix("grp_") })
                 .intersection(before.groups.map(\.id))
             let missing = ids.filter { !bmGone.contains($0) && !grpGone.contains($0) }
+            if isDryRun(args) {
+                return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
+                                       "wouldRemoveBookmarks": Array(bmGone).sorted(),
+                                       "wouldRemoveGroups": Array(grpGone).sorted(),
+                                       "missing": missing])
+            }
             BookmarkStore.modify(bundleID: bid) { store in
                 store.bookmarks.removeAll(where: { bmGone.contains($0.id) })
                 store.groups.removeAll(where: { grpGone.contains($0.id) })
@@ -614,6 +633,10 @@ enum InspectTools {
         store.groups.append(g)
         return g.id
     }
+
+    /// Destructive tools preview by default (OLD safety contract): pass
+    /// dryRun:false to execute. Omitted dryRun previews; nothing is deleted.
+    static func isDryRun(_ args: [String: Any]) -> Bool { (args["dryRun"] as? Bool) ?? true }
 
     /// Read-only twin for dry-runs: reports whether the call would create the group.
     static func peekBookmarkGroup(in store: BookmarkStoreData, ref: String)

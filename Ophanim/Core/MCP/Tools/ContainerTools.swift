@@ -102,14 +102,34 @@ enum ContainerTools {
             }
         }
         let bytes = targets.compactMap { ContainerService.directorySize($0) }.reduce(0, +)
+        // Scope data wipes what the app knew: the container plus the agent analysis that
+        // describes it (snapshot timeline + bookmarks). Marks outliving a data wipe would
+        // point at a UI that no longer exists; uninstall already takes both, so the wipe
+        // matches it. Caches/keychain scopes stay surgical.
+        let analysisFiles: [URL]
+        if scope == "data" {
+            let (snaps, _) = SnapshotStore.inventory(bundleID: bid)
+            let marks = BookmarkStore.fileURL(bundleID: bid)
+            analysisFiles = snaps + ([marks].filter {
+                FileManager.default.fileExists(atPath: $0.path) })
+        } else {
+            analysisFiles = []
+        }
+        var analysisBytes: Int64 = 0
         var removed: [String] = []
         for target in targets {
             if (try? FileManager.default.removeItem(at: target)) != nil {
                 removed.append(target.path)
             }
         }
+        for url in analysisFiles {
+            analysisBytes += ContainerService.directorySize(url) ?? 0
+            if (try? FileManager.default.removeItem(at: url)) != nil {
+                removed.append(url.path)
+            }
+        }
         return try ToolRouter.json(["bundleID": bid, "scope": scope, "removed": removed,
-                             "bytes": bytes])
+                             "bytes": bytes + analysisBytes])
     }
 
     static func backupContainer(_ args: [String: Any]) throws -> String {

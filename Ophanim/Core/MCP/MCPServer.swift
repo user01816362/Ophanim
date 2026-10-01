@@ -964,11 +964,12 @@ final class MCPServer {
         ],
         [
             "name": "inspect_clear_snapshots",
-            "description": "Delete the snapshot timeline.",
+            "description": "Delete the snapshot timeline (dryRun previews by default).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
-                    "bundleID": ["type": "string"]
+                    "bundleID": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report what would be removed. Pass false to delete."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1009,14 +1010,15 @@ final class MCPServer {
         ],
         [
             "name": "bookmark_move",
-            "description": "File bookmarks into groups.",
+            "description": "File bookmarks into groups (dryRun previews by default).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
                     "group": ["type": "string"],
                     "add": ["type": "string"],
-                    "remove": ["type": "string"]
+                    "remove": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report the resulting membership. Pass false to apply."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1039,12 +1041,13 @@ final class MCPServer {
         ],
         [
             "name": "bookmark_remove",
-            "description": "Delete bookmarks/groups.",
+            "description": "Delete bookmarks/groups (dryRun previews by default).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "ids": ["type": "string"]
+                    "ids": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report what would be removed. Pass false to delete."]
                 ],
                 "required": ["bundleID"]
             ]

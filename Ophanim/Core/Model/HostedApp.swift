@@ -91,6 +91,13 @@ class HostedApp: BaseApp, @unchecked Sendable {
                 LogStore.clearPreviousRuns(bundleID: info.bundleIdentifier)
             }
 
+            // Clean timeline on launch: snapshots describe the previous run's UI, so the new
+            // run starts clean. Only agent-pinned entries (referenced by bookmarks) survive -
+            // the mark and its proof stay together across launches. Host-side files the guest
+            // never writes, so unlike the log sweep this needs no running guard and cannot
+            // orphan a writer; failures are silent (stale history, same as a skipped sweep).
+            SnapshotStore.sweepUnpinned(bundleID: info.bundleIdentifier)
+
             if try !Entitlements.areEntitlementsValid(app: self) {
                 sign()
             }

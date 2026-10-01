@@ -29,30 +29,8 @@ enum ReconTools {
         let bid = try ToolRouter.requireBundleID(args)
         let filter = args["filter"] as? String
         let limit = min((args["limit"] as? Int) ?? 200, 2000)
-        // Live-first when Agent Mode runs (generated classes included), static
-        // strings otherwise (ObjC classes invisible statically - stated).
-        var liveClasses: [String]? = nil
-        var liveError: String? = nil
-        if (try? InspectGate.requireLive(bundleID: bid)) != nil {
-            do {
-                let rsp = try InspectControl.transact(bundleID: bid, op: .classes,
-                                                      filter: filter, limit: limit)
-                liveClasses = rsp.classes ?? []
-            } catch let e as ToolRouter.ToolError {
-                liveError = e.message
-            }
-        }
-        let (exe, staticClasses, staticSelectors) = try ReportBuilder.staticClassInventory(bid, filter: filter, limit: limit)
-        let classes = liveClasses ?? staticClasses
-        var payload: [String: Any] = ["bundleID": bid, "executable": exe,
-                             "source": liveClasses == nil ? "static" : "live",
-                             "classes": Array(classes.prefix(limit)),
-                             "selectors": Array(staticSelectors.prefix(limit)),
-                             "count": classes.count + staticSelectors.count]
-        if liveClasses == nil {
-            payload["note"] = "static binary strings only: misses generated classes and plain ObjC classes - launch with Agent Mode for the live list"
-        }
-        if let liveError { payload["liveError"] = liveError }
-        return try ToolRouter.json(payload)
+        // Single live-first implementation (InspectTools.classInventory): one contract,
+        // one field shape; a second copy here would drift silently.
+        return try ToolRouter.json(InspectTools.classInventory(bid, filter: filter, limit: limit))
     }
 }
