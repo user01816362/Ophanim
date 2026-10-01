@@ -55,6 +55,8 @@ struct AppSettingsData: Codable {
 
     /// Custom tweak folder path (nil = default per-app store). Set from the tweak library pane.
     var customTweakFolder: String?
+    var spoofedOSVersion = ""
+    var clearLogsOnLaunch = true
 
     /// Ophanim instrumentation config. Persisted under the "ophanim" key, read in-process by
     /// OphanimCore's OPConfigLoader at agent start.
@@ -99,6 +101,8 @@ struct AppSettingsData: Codable {
         resizableAspectRatioHeight = try container.decodeIfPresent(Int.self, forKey: .resizableAspectRatioHeight) ?? 0
         blockSleepSpamming = try container.decodeIfPresent(Bool.self, forKey: .blockSleepSpamming) ?? false
         customTweakFolder = try container.decodeIfPresent(String.self, forKey: .customTweakFolder)
+        spoofedOSVersion = try container.decodeIfPresent(String.self, forKey: .spoofedOSVersion) ?? ""
+        clearLogsOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .clearLogsOnLaunch) ?? true
         ophanim = try container.decodeIfPresent(OPConfig.self, forKey: .ophanim) ?? OPConfig()
     }
 }

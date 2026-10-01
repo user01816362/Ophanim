@@ -23,6 +23,45 @@ enum ToolRouter {
         return bid
     }
 
+    /// Reject unknown argument names, naming the closest match when there is one.
+    static func rejectUnknownKeys(_ args: [String: Any], allowed: Set<String>, tool: String) throws {
+        let unknown = args.keys.filter { !allowed.contains($0) }.sorted()
+        guard !unknown.isEmpty else { return }
+
+        var message = "\(tool): unknown argument"
+        message += unknown.count == 1 ? " " : "s "
+        message += unknown.map { "'\($0)'" }.joined(separator: ", ")
+
+        let suggestions = unknown.compactMap { key -> String? in
+            guard let best = allowed.min(by: { editDistance(key, $0) < editDistance(key, $1) }),
+                  editDistance(key, best) <= max(2, key.count / 3) else { return nil }
+            return "'\(key)' -> did you mean '\(best)'?"
+        }
+        if !suggestions.isEmpty { message += "; " + suggestions.joined(separator: "; ") }
+
+        let known = allowed.subtracting(["bundleID"]).sorted()
+        message += ". Accepted arguments: \(known.joined(separator: ", "))."
+        throw bail(message)
+    }
+
+    /// Plain Levenshtein distance. Argument names are short and this runs once per call.
+    private static func editDistance(_ a: String, _ b: String) -> Int {
+        let x = Array(a), y = Array(b)
+        if x.isEmpty { return y.count }
+        if y.isEmpty { return x.count }
+        var previous = Array(0...y.count)
+        var current = [Int](repeating: 0, count: y.count + 1)
+        for i in 1...x.count {
+            current[0] = i
+            for j in 1...y.count {
+                let cost = x[i - 1] == y[j - 1] ? 0 : 1
+                current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost)
+            }
+            previous = current
+        }
+        return previous[y.count]
+    }
+
     /// Name → handler. Only file that knows tool names besides the catalog.
     nonisolated(unsafe) static let handlers: [String: ([String: Any]) throws -> String] = [
         "list_apps": AppTools.listApps,

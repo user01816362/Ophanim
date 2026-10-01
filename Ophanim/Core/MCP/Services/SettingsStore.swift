@@ -3,6 +3,22 @@ import Foundation
 /// Sole plist read/write owner for per-app settings. Read-only queries go to
 /// AppQueryService; log aggregation goes to ReportBuilder.
 enum SettingsStore {
+    static let setConfigKeys: Set<String> = [
+        "bundleID",
+        "enabled", "autoOpenLog", "captureBacktraces", "captureNetworkCallers", "bypassPinning", "enableInlineHooks",
+        "categories", "sinks",
+        "logToSharedDir", "bodyCapBytes", "redactionKeys",
+        "jailbreakBypass", "jailbreakBypasses",
+        "chainGuard", "chainGuardDebugging", "iosDeviceModel", "spoofedOSVersion",
+        "disableDisplaySleep", "keymapping", "sensitivity", "alwaysOnTop", "hideTitleBar",
+        "rootWorkDir", "limitMotionUpdateFrequency", "blockSleepSpamming",
+        "checkMicPermissionSync", "noKMOnInput", "enableScrollWheel", "disableBuiltinMouse",
+        "metalHUD", "notch", "inverseScreenValues",
+        "displayRotation", "windowWidth", "windowHeight", "customScaler", "resolution",
+        "aspectRatio", "windowFixMethod",
+        "resizableAspectRatioType", "resizableAspectRatioWidth", "resizableAspectRatioHeight",
+        "customTweakFolder", "agentMode", "inspectDisableRedaction", "clearLogsOnLaunch"
+    ]
     /// Decode the per-app AppSettingsData from its plist (the encoded settings model).
     static func appSettings(_ bundleID: String) -> AppSettingsData? {
         guard let data = try? Data(contentsOf: AppQueryService.settingsURL(bundleID)) else { return nil }
@@ -34,10 +50,9 @@ enum SettingsStore {
     /// Mutate the full per-app settings and persist them. A running app picks the change up live via
     /// the agent's config-file poll (categories/rules/sinks/pinning); newly added hooks and the
     /// injection strategy apply on next launch.
-    static func updateSettings(_ bundleID: String, _ mutate: (inout AppSettingsData) -> Void) throws {
-        var settings = appSettings(bundleID) ?? AppSettingsData()
+    static func updateSettings(_ bundleID: String, _ mutate: (inout AppSettingsData) throws -> Void) throws {        var settings = appSettings(bundleID) ?? AppSettingsData()
         if settings.bundleIdentifier.isEmpty { settings.bundleIdentifier = bundleID }
-        mutate(&settings)
+        try mutate(&settings)
         let encoder = PropertyListEncoder(); encoder.outputFormat = .xml
         try FileManager.default.createDirectory(at: AppQueryService.settingsDir, withIntermediateDirectories: true)
         try encoder.encode(settings).write(to: AppQueryService.settingsURL(bundleID))
@@ -50,6 +65,7 @@ enum SettingsStore {
         if let on = args["enabled"] as? Bool { s.ophanim.enabled = on }
         if let on = args["autoOpenLog"] as? Bool { s.ophanim.autoOpenLog = on }
         if let on = args["captureBacktraces"] as? Bool { s.ophanim.captureBacktraces = on }
+        if let on = args["captureNetworkCallers"] as? Bool { s.ophanim.captureNetworkCallers = on }
         if let on = args["bypassPinning"] as? Bool { s.ophanim.bypassPinning = on }
         if let on = args["enableInlineHooks"] as? Bool { s.ophanim.enableInlineHooks = on }
         if let cats = args["categories"] as? [String] {
@@ -61,6 +77,18 @@ enum SettingsStore {
             if sinks.contains("text") || sinks.contains("plainText") { sel.insert(.plainText) }
             if sinks.contains("console") || sinks.contains("osLog") { sel.insert(.osLog) }
             s.ophanim.sinks = sel
+        }
+        if let on = args["logToSharedDir"] as? Bool { s.ophanim.logToSharedDir = on }
+        if let cap = args["bodyCapBytes"] as? Int {
+            // Bounded so a bad value cannot silence capture entirely or allocate a
+            // pathological buffer per event.
+            guard (1024...8 * 1024 * 1024).contains(cap) else {
+                throw ToolRouter.bail("bodyCapBytes must be between 1024 and \(8 * 1024 * 1024), got \(cap)")
+            }
+            s.ophanim.bodyCapBytes = cap
+        }
+        if let keys = args["redactionKeys"] as? [String] {
+            s.ophanim.redactionKeys = keys
         }
         // Jailbreak / root-detection bypass
         if let on = args["jailbreakBypass"] as? Bool { s.bypass = on }
@@ -76,8 +104,25 @@ enum SettingsStore {
         // Keychain emulation
         if let on = args["chainGuard"] as? Bool { s.chainGuard = on }
         if let on = args["chainGuardDebugging"] as? Bool { s.chainGuardDebugging = on }
+        if let on = args["agentMode"] as? Bool { s.ophanim.agentMode = on }
+        if let on = args["inspectDisableRedaction"] as? Bool { s.ophanim.inspectDisableRedaction = on }
+        if let on = args["clearLogsOnLaunch"] as? Bool { s.clearLogsOnLaunch = on }
+        if let folder = args["customTweakFolder"] as? String {
+            if folder.isEmpty {
+                s.customTweakFolder = nil
+            } else {
+                let expanded = (folder as NSString).expandingTildeInPath
+                var isDir: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir),
+                      isDir.boolValue else {
+                    throw ToolRouter.bail("customTweakFolder must be an existing directory, got '\(folder)'")
+                }
+                s.customTweakFolder = expanded
+            }
+        }
         // Device model the app reports (relevant to how it fingerprints its environment)
         if let model = args["iosDeviceModel"] as? String { s.iosDeviceModel = model }
+        if let v = args["spoofedOSVersion"] as? String { s.spoofedOSVersion = v }
         // Hosting: window / display / graphics / input - full parity with the app's settings.
         if let on = args["disableDisplaySleep"] as? Bool { s.disableTimeout = on }
         if let on = args["keymapping"] as? Bool { s.keymapping = on }

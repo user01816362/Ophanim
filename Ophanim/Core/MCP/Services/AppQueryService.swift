@@ -86,26 +86,40 @@ enum AppQueryService {
     }
 
     /// Uninstall a hosted app: remove its bundle and per-app config (settings, keymap, entitlements,
-    /// ChainGuard) - the same set the GUI's uninstall clears. When `purgeData` is true, also delete
-    /// the app's OS data container (its captured event logs live there). Returns the paths removed.
+    /// tweak store, ChainGuard) - the Uninstaller-resolved set. When `purgeData` is true, also
+    /// delete the app's OS data container (resolved, not composed). Returns removed/missing paths
+    /// plus whether the container resolved, so callers can tell "nothing to remove" apart.
     @discardableResult
-    static func uninstall(_ bundleID: String, purgeData: Bool) -> [String] {
+    static func uninstall(_ bundleID: String, purgeData: Bool) -> [String: Any] {
         let fm = FileManager.default
-        var targets: [URL] = [
-            appsDir.appendingPathComponent(bundleID).appendingPathExtension("app"),
-            settingsURL(bundleID),
-            container.appendingPathComponent("Keymapping").appendingPathComponent(bundleID),
-            container.appendingPathComponent("Entitlements").appendingPathComponent(bundleID).appendingPathExtension("plist"),
-            container.appendingPathComponent("ChainGuard").appendingPathComponent(bundleID)
-        ]
+        var targets = Uninstaller.perAppState(forBundleID: bundleID)
+        var unresolvedContainer = false
         if purgeData {
-            targets.append(home.appendingPathComponent("Library/Containers/\(bundleID)"))
+            let external = Uninstaller.externalState(forBundleID: bundleID)
+            targets += external.paths
+            unresolvedContainer = external.unresolved
         }
         var removed: [String] = []
         for target in targets where fm.fileExists(atPath: target.path) {
             if (try? fm.removeItem(at: target)) != nil { removed.append(target.path) }
         }
-        return removed
+        var missing: [String] = []
+        for target in targets where !removed.contains(target.path) { missing.append(target.path) }
+        var report: [String: Any] = [
+            "bundleID": bundleID,
+            "removed": removed,
+            "missing": missing,
+            "count": removed.count,
+            "purgeData": purgeData
+        ]
+        if purgeData {
+            report["containerResolved"] = !unresolvedContainer
+            if unresolvedContainer {
+                report["note"] = "No data container was found. The app may not have been launched yet, "
+                    + "in which case macOS has not created one."
+            }
+        }
+        return report
     }
 
     static func listApps() -> [AppEntry] {

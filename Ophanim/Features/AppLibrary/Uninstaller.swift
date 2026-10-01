@@ -14,6 +14,67 @@ struct CheckBoxHelper {
 }
 
 class Uninstaller {
+    static let bundleID = "be.ophanim.Ophanim"
+
+    /// Uninstaller-resolved inventory for one app (MCP uninstall path): bundle,
+    /// logs, settings, keymap, entitlements, effective tweak store, ChainGuard.
+    /// No prefs gating here — MCP removal takes all of the app's state.
+    static func perAppState(forBundleID bundleID: String) -> [URL] {
+        let customTweakFolder = SettingsStore.appSettings(bundleID)?.customTweakFolder
+        let chainGuard = KeyCoverKey(appBundleID: bundleID).allFiles
+        let logs: [URL] = [
+            OPPaths.logDirectory(forBundleID: bundleID),
+            OPPaths.legacyLogDirectory(forBundleID: bundleID)
+        ]
+        return [
+            AppsVM.appDirectory.appendingPathComponent(bundleID).appendingPathExtension("app")
+        ] + logs + [
+            AppSettings.appSettingsDir.appendingPathComponent(bundleID).appendingPathExtension("plist"),
+            Keymapping.keymappingDir.appendingPathComponent(bundleID),
+            Entitlements.ophanimEntitlementsDir
+                .appendingPathComponent(bundleID).appendingPathExtension("plist"),
+            Galgal.effectiveTweakStore(bundleIdentifier: bundleID, customPath: customTweakFolder)
+        ] + chainGuard
+    }
+
+    /// OS-owned state for a data wipe, resolved not composed: macOS names
+    /// ~/Library/Containers/<id> with a UUID for ad-hoc-signed apps, so the
+    /// composed path usually does not exist.
+    static func externalState(forBundleID bundleID: String) -> (paths: [URL], unresolved: Bool) {
+        var paths: [URL] = []
+        var unresolved = false
+        if let real = containerURL(for: bundleID) {
+            paths.append(real)
+        } else {
+            unresolved = true
+        }
+        paths.append(ContainerProfiles.storeRoot(bundleID: bundleID))
+        for dir in cacheURLs {
+            guard let items = try? FileManager.default.contentsOfDirectory(
+                at: dir, includingPropertiesForKeys: nil) else { continue }
+            paths += items.filter { $0.path.contains(bundleID) }
+        }
+        return (paths, unresolved)
+    }
+
+    static func containerURL(for bundleID: String) -> URL? {
+        let containers = libraryUrl.appendingPathComponent("Containers")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: containers, includingPropertiesForKeys: nil) else { return nil }
+        for entry in entries where entry.lastPathComponent != Self.bundleID {
+            for metadataName in [".com.apple.containermanagerd.metadata.plist",
+                                 ".com.apple.mobile_container_manager.metadata.plist"] {
+                let metadata = entry.appendingPathComponent(metadataName)
+                guard let data = try? Data(contentsOf: metadata),
+                      let plist = try? PropertyListSerialization.propertyList(from: data, format: nil)
+                        as? [String: Any],
+                      plist["MCMMetadataIdentifier"] as? String == bundleID else { continue }
+                return entry
+            }
+        }
+        return nil
+    }
+
     private static let libraryUrl = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library")
     private static let pruneURLs: [URL] = [
         Galgal.ophanimContainer.appendingPathComponent("App Settings"),

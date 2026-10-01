@@ -193,6 +193,8 @@ public struct OPConfig: Codable, Sendable {
     public var swiftHooks: [OPSwiftHook]                 // user-specified native-Swift vtable hooks
     public var inlineHooks: [OPInlineHook]               // Tier-3 inline (machine-code) hooks
     public var enableInlineHooks: Bool                   // explicit gate for live code patching
+    public var agentMode: Bool                           // Inspect agent-mode providers. Default OFF.
+    public var inspectDisableRedaction: Bool             // Inspect: hand capture raw. Default OFF.
 
     public init(enabled: Bool = false,
                 injectionStrategy: OPInjectionStrategy = .embedded,
@@ -209,7 +211,9 @@ public struct OPConfig: Codable, Sendable {
                 objcHooks: [OPObjCHook] = [],
                 swiftHooks: [OPSwiftHook] = [],
                 inlineHooks: [OPInlineHook] = [],
-                enableInlineHooks: Bool = false) {
+                enableInlineHooks: Bool = false,
+                agentMode: Bool = false,
+                inspectDisableRedaction: Bool = false) {
         self.enabled = enabled
         self.injectionStrategy = injectionStrategy
         self.categories = categories
@@ -226,6 +230,8 @@ public struct OPConfig: Codable, Sendable {
         self.swiftHooks = swiftHooks
         self.inlineHooks = inlineHooks
         self.enableInlineHooks = enableInlineHooks
+        self.agentMode = agentMode
+        self.inspectDisableRedaction = inspectDisableRedaction
     }
 
     // Lenient decoding so adding fields later never invalidates an existing settings plist.
@@ -248,6 +254,8 @@ public struct OPConfig: Codable, Sendable {
         swiftHooks = try c.decodeIfPresent([OPSwiftHook].self, forKey: .swiftHooks) ?? d.swiftHooks
         inlineHooks = try c.decodeIfPresent([OPInlineHook].self, forKey: .inlineHooks) ?? d.inlineHooks
         enableInlineHooks = try c.decodeIfPresent(Bool.self, forKey: .enableInlineHooks) ?? d.enableInlineHooks
+        agentMode = try c.decodeIfPresent(Bool.self, forKey: .agentMode) ?? d.agentMode
+        inspectDisableRedaction = try c.decodeIfPresent(Bool.self, forKey: .inspectDisableRedaction) ?? d.inspectDisableRedaction
     }
 
     public func isActive(_ category: OPCategory) -> Bool {
