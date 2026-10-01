@@ -112,8 +112,13 @@ struct KeyCover {
 
 struct KeyCoverKey {
     static let encryptedKeyExtension = "keyCover"
+    static let decryptedKeyExtension = "db"
 
     var appBundleID: String
+
+    var allFiles: [URL] {
+        [KeyCover.chainGuardPath.appendingPathComponent(appBundleID), decryptedKeyDB, encryptedKeyDB]
+    }
 
     var decryptedKeyDB: URL {
         KeyCover.chainGuardPath

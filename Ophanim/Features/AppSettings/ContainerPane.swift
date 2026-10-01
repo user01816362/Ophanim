@@ -51,59 +51,18 @@ struct ContainerView: View {
         .disabled(busy)
         .task {
             await refreshContainer()
-        }
-        .alert("settings.container.clearTitle", isPresented: $showClearDataConfirm) {
-            Button("settings.container.clear", role: .destructive) {
-                container.clear()
-                Task { await refreshContainer() }
-            }
-            Button("button.Cancel", role: .cancel) { }
-        } message: {
-            Text("settings.container.clearMessage")
-        }
-        .alert("settings.container.clearKeychainTitle", isPresented: $showClearKeychainConfirm) {
-            Button("settings.container.clearKeychain", role: .destructive) {
-                for url in KeyCoverKey(appBundleID: app.info.bundleIdentifier).allFiles {
-                    FileManager.default.delete(at: url)
-                }
-            }
-            Button("button.Cancel", role: .cancel) { }
-        } message: {
-            Text("settings.container.clearKeychainMessage")
-        }
-        .alert("settings.container.restoreTitle", isPresented: Binding(
-            get: { restoreCandidate != nil },
-            set: { if !$0 { restoreCandidate = nil } })) {
-            Button("settings.container.restore", role: .destructive) {
-                if let archive = restoreCandidate {
-                    restoreCandidate = nil
-                    restoreContainer(from: archive)
-                }
-            }
-            Button("button.Cancel", role: .cancel) { }
-        } message: {
-            Text("settings.container.restoreMessage")
-        }
-        .alert("settings.container.deleteProfileTitle", isPresented: Binding(
-            get: { profileToDelete != nil },
-            set: { if !$0 { profileToDelete = nil } })) {
-            Button("settings.container.delete", role: .destructive) {
-                if let name = profileToDelete {
-                    profileToDelete = nil
-                    deleteProfile(name: name)
-                }
-            }
-            Button("button.Cancel", role: .cancel) { }
-        } message: {
-            Text("settings.container.deleteProfileMessage")
-        }
-        .alert("settings.container.noticeTitle", isPresented: Binding(
+        }.alert("settings.container.noticeTitle", isPresented: Binding(
             get: { notice != nil },
             set: { if !$0 { notice = nil } })) {
             Button("button.OK", role: .cancel) { }
         } message: {
             Text(notice ?? "")
         }
+        
+        
+        
+        
+        
     }
 
     @ViewBuilder
@@ -176,7 +135,19 @@ struct ContainerView: View {
                     .disabled(busy || newProfileName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-    }
+    .alert("settings.container.deleteProfileTitle", isPresented: Binding(
+            get: { profileToDelete != nil },
+            set: { if !$0 { profileToDelete = nil } })) {
+            Button("settings.container.delete", role: .destructive) {
+                if let name = profileToDelete {
+                    profileToDelete = nil
+                    deleteProfile(name: name)
+                }
+            }
+            Button("button.Cancel", role: .cancel) { }
+        } message: {
+            Text("settings.container.deleteProfileMessage")
+        }}
 
     @ViewBuilder
     private var snapshotSection: some View {
@@ -195,7 +166,19 @@ struct ContainerView: View {
                     .disabled(busy)
                 }
             }
-    }
+    .alert("settings.container.restoreTitle", isPresented: Binding(
+            get: { restoreCandidate != nil },
+            set: { if !$0 { restoreCandidate = nil } })) {
+            Button("settings.container.restore", role: .destructive) {
+                if let archive = restoreCandidate {
+                    restoreCandidate = nil
+                    restoreContainer(from: archive)
+                }
+            }
+            Button("button.Cancel", role: .cancel) { }
+        } message: {
+            Text("settings.container.restoreMessage")
+        }}
 
     @ViewBuilder
     private var dangerSection: some View {
@@ -228,7 +211,24 @@ struct ContainerView: View {
                     .disabled(busy)
                 }
             }
-    }
+    .alert("settings.container.clearTitle", isPresented: $showClearDataConfirm) {
+            Button("settings.container.clear", role: .destructive) {
+                container.clear()
+                Task { await refreshContainer() }
+            }
+            Button("button.Cancel", role: .cancel) { }
+        } message: {
+            Text("settings.container.clearMessage")
+        }.alert("settings.container.clearKeychainTitle", isPresented: $showClearKeychainConfirm) {
+            Button("settings.container.clearKeychain", role: .destructive) {
+                for url in KeyCoverKey(appBundleID: app.info.bundleIdentifier).allFiles {
+                    FileManager.default.delete(at: url)
+                }
+            }
+            Button("button.Cancel", role: .cancel) { }
+        } message: {
+            Text("settings.container.clearKeychainMessage")
+        }}
 
     @ViewBuilder
     private var revealSection: some View {
@@ -248,8 +248,8 @@ struct ContainerView: View {
         let exists = FileManager.default.fileExists(atPath: url.path)
         let size: Int64 = await Task.detached(priority: .utility) {
             guard FileManager.default.fileExists(atPath: url.path) else { return 0 }
-            guard let subpaths = try? FileManager.default.subpathsOfDirectory(atPath: url.path) else { return 0 }
             var total: Int64 = 0
+            guard let subpaths = try? FileManager.default.subpathsOfDirectory(atPath: url.path) else { return 0 }
             for sub in subpaths {
                 let file = url.appendingPathComponent(sub)
                 guard let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isDirectoryKey]),

@@ -6,6 +6,7 @@
 //  is absent. Decoding happens here at render, never in the log.
 
 import Foundation
+import Compression
 
 extension LogViewerView {
     private static func looksLikePlist(_ data: Data) -> Bool {
