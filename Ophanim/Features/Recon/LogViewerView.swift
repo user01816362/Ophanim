@@ -16,7 +16,7 @@ import Combine
 /// macOS 12 can't use SwiftUI's openWindow/WindowGroup(for:), so we host the SwiftUI view in an
 /// AppKit window directly.
 final class LogWindowManager: NSObject {
-    nonisolated(unsafe) static let shared = LogWindowManager()
+    static let shared = LogWindowManager()
 
     @MainActor
     func show(bundleID: String) {

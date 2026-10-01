@@ -58,7 +58,9 @@ class Installer {
                 || InstallPreferences.shared.showInstallPopup) && !export {
             // Modal answer needed synchronously; GUI import runs on main, MCP forces
             // injectGalgal above and never reaches here (it has no UI to present).
-            installGalgal = MainDispatch.sync { installGalgalPopup() }
+            // Dispatch-then-assert: sync gets us to main, assumeIsolated satisfies
+            // the @MainActor contract without an async hop a modal cannot take.
+            installGalgal = MainDispatch.sync { MainActor.assumeIsolated { installGalgalPopup() } }
         } else {
             installGalgal = InstallPreferences.shared.alwaysInstallGalgal
         }

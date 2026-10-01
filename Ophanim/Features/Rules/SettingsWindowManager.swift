@@ -10,7 +10,7 @@ import AppKit
 /// @MainActor: every method touches AppKit, which is main-thread only.
 @MainActor
 final class SettingsWindowManager: NSObject, NSWindowDelegate {
-    nonisolated(unsafe) static let shared = SettingsWindowManager()
+    static let shared = SettingsWindowManager()
     private var windows: [String: NSWindow] = [:]
 
     func show<Content: View & Sendable>(key: String, title: String,
@@ -52,7 +52,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
 /// the shared instance in place (persisted via its didSet→encode).
 @MainActor
 final class RulesWindowManager: NSObject {
-    nonisolated(unsafe) static let shared = RulesWindowManager()
+    static let shared = RulesWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Interception Rules - \(key)",
@@ -64,7 +64,7 @@ final class RulesWindowManager: NSObject {
 
 @MainActor
 final class ObjCHooksWindowManager: NSObject {
-    nonisolated(unsafe) static let shared = ObjCHooksWindowManager()
+    static let shared = ObjCHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "ObjC Boundary Hooks - \(key)",
@@ -76,7 +76,7 @@ final class ObjCHooksWindowManager: NSObject {
 
 @MainActor
 final class SwiftHooksWindowManager: NSObject {
-    nonisolated(unsafe) static let shared = SwiftHooksWindowManager()
+    static let shared = SwiftHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Swift Vtable Hooks - \(key)",
@@ -88,7 +88,7 @@ final class SwiftHooksWindowManager: NSObject {
 
 @MainActor
 final class InlineHooksWindowManager: NSObject {
-    nonisolated(unsafe) static let shared = InlineHooksWindowManager()
+    static let shared = InlineHooksWindowManager()
     func show(settings: AppSettings) {
         let key = settings.info.bundleIdentifier
         SettingsWindowManager.shared.show(key: key, title: "Inline Hooks - \(key)",

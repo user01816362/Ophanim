@@ -98,7 +98,7 @@ private struct AppSettingsWindowRoot: View {
 /// @MainActor: toolbar/window/delegate work is AppKit main-thread only.
 @MainActor
 final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDelegate, @unchecked Sendable {
-    nonisolated(unsafe) static let shared = AppSettingsWindowManager()
+    static let shared = AppSettingsWindowManager()
 
     private var windows: [String: NSWindow] = [:]
     private var coordinators: [String: AppSettingsPaneCoordinator] = [:]

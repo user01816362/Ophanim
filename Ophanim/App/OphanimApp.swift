@@ -80,7 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                                                object: nil)
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
             // App init runs on the main thread; pin it explicitly (init cannot hop).
-            MainDispatch.sync { powerModal() }
+            MainDispatch.sync { MainActor.assumeIsolated { powerModal() } }
         }
         URLCache.iconCache.removeAllCachedResponses()
         // Code that run once on first launch
