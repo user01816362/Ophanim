@@ -8,8 +8,9 @@ enum MCPStdioTransport {
     /// thread share one pipe, and concurrent FileHandle writes would interleave bytes.
     static let writeLock = NSLock()
     /// Set once the run loop owns stdout. Subscribe tools refuse when false (HTTP/GUI
-    /// process): push belongs to the stdio child that owns the pipe.
-    private(set) static var notifierActive = false
+    /// process): push belongs to the stdio child that owns the pipe. Written once
+    /// before the loop starts, read thereafter.
+    nonisolated(unsafe) private(set) static var notifierActive = false
 
     /// One locked line write (response or notification).
     static func writeLine(_ data: Data) {

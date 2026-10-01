@@ -57,7 +57,8 @@ enum EventTools {
     static func unsubscribeEvents(_ args: [String: Any]) throws -> String {
         let bid = (args["bundleID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let parked = EventNotifier.unsubscribe(bundleID: bid)
-        return try ToolRouter.json(["subscribed": false, "bundleID": bid ?? NSNull(),
-                             "threadParked": parked])
+        var payload: [String: Any] = ["subscribed": false, "threadParked": parked]
+        if let bid { payload["bundleID"] = bid }
+        return try ToolRouter.json(payload)
     }
 }

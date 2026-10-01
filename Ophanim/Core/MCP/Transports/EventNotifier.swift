@@ -10,8 +10,9 @@ import Foundation
 /// owns the stdout pipe, and only StdioTransport.run sets notifierActive.
 enum EventNotifier {
     private static let lock = NSLock()
-    private static var subs: [String: Double] = [:]  // bundleID -> cursor ms
-    private static var running = false
+    /// Lock-guarded (all touches hold `lock`; the emitter parks when empty).
+    nonisolated(unsafe) private static var subs: [String: Double] = [:]  // bundleID -> cursor ms
+    nonisolated(unsafe) private static var running = false
 
     /// Register (or move) a subscription. Refuses outside a stdio child.
     static func subscribe(bundleID bid: String, since: Double) throws -> Double {
