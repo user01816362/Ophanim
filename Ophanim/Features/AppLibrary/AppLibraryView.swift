@@ -81,6 +81,14 @@ struct AppLibraryView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    SourcesWindowManager.shared.show()
+                } label: {
+                    Image(systemName: "arrow.down.circle")
+                        .help("sources.window.title")
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     showSettings.toggle()
                 } label: {
                     Image(systemName: "gear")

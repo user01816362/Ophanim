@@ -51,6 +51,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         }
     }
 
+    /// Background URLSession drain: the system wakes us when source downloads
+    /// finish while suspended. Stored until the session's didFinishEvents fires.
+    var backgroundSessionCompletion: (() -> Void)?
+
+    func application(_ application: NSApplication,
+                     handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        backgroundSessionCompletion = completionHandler
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         UpdateScheme.checkForUpdate()
 

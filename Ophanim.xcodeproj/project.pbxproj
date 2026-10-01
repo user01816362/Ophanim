@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		DA67E8F641CB67E0 /* SourceInstalls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8B04E7B3498E422 /* SourceInstalls.swift */; };
+		B37E60EABA3993F3 /* AppSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48C799E7018F704 /* AppSources.swift */; };
+		46B1D44BC3E3EA08 /* IPAValidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E51CC374D4283408 /* IPAValidate.swift */; };
+		D4CD7861BECC0BFA /* AppSourcesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD95F49140C6F71 /* AppSourcesView.swift */; };
+		79C75F0AFC660F32 /* SourceTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DF59B7004FB0A44 /* SourceTools.swift */; };
 		596E79C0441399E7 /* ContainerPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01F370A4547DBF7E /* ContainerPane.swift */; };
 		4D5AFE84592649D1 /* TweakLibraryPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD096AB0B5DDCBB4 /* TweakLibraryPane.swift */; };
 		7D54157D0BB1E520 /* TweakLibraryVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = B45A4B3DDF464D98 /* TweakLibraryVM.swift */; };
@@ -121,6 +126,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C8B04E7B3498E422 /* SourceInstalls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceInstalls.swift; path = Ophanim/Features/Sources/SourceInstalls.swift; sourceTree = SOURCE_ROOT; };
+		B48C799E7018F704 /* AppSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSources.swift; path = Ophanim/Features/Sources/AppSources.swift; sourceTree = SOURCE_ROOT; };
+		E51CC374D4283408 /* IPAValidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IPAValidate.swift; path = Ophanim/Features/Sources/IPAValidate.swift; sourceTree = SOURCE_ROOT; };
+		3FD95F49140C6F71 /* AppSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSourcesView.swift; path = Ophanim/Features/Sources/AppSourcesView.swift; sourceTree = SOURCE_ROOT; };
+		3DF59B7004FB0A44 /* SourceTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceTools.swift; path = Ophanim/Core/MCP/Tools/SourceTools.swift; sourceTree = SOURCE_ROOT; };
 		01F370A4547DBF7E /* ContainerPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerPane.swift; path = Ophanim/Features/AppSettings/ContainerPane.swift; sourceTree = SOURCE_ROOT; };
 		AD096AB0B5DDCBB4 /* TweakLibraryPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakLibraryPane.swift; path = Ophanim/Features/AppSettings/TweakLibraryPane.swift; sourceTree = SOURCE_ROOT; };
 		B45A4B3DDF464D98 /* TweakLibraryVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakLibraryVM.swift; path = Ophanim/Core/ViewModel/TweakLibraryVM.swift; sourceTree = SOURCE_ROOT; };
@@ -541,10 +551,22 @@
 			name = Engine;
 			sourceTree = "<group>";
 		};
+		89B02418725B8B00 /* Features/Sources */ = {
+			isa = PBXGroup;
+			children = (
+				C8B04E7B3498E422 /* SourceInstalls.swift */,
+				B48C799E7018F704 /* AppSources.swift */,
+				E51CC374D4283408 /* IPAValidate.swift */,
+				3FD95F49140C6F71 /* AppSourcesView.swift */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 		F207D73F32CDDBF9 /* MCP/Tools */ = {
 			isa = PBXGroup;
 			children = (
+				3DF59B7004FB0A44 /* SourceTools.swift */,
 				220847F9046C01C1 /* AppTools.swift */,
 				3765949B44E0A21E /* EventTools.swift */,
 				056DEEFFE3AD0AF6 /* ReconTools.swift */,
@@ -845,6 +867,11 @@
 				7D54157D0BB1E520 /* TweakLibraryVM.swift in Sources */,
 				52E689CE3F9BD3FB /* ContainerProfiles.swift in Sources */,
 				FBE7B076CD383122 /* EventPretty.swift in Sources */,
+				DA67E8F641CB67E0 /* SourceInstalls.swift in Sources */,
+				B37E60EABA3993F3 /* AppSources.swift in Sources */,
+				46B1D44BC3E3EA08 /* IPAValidate.swift in Sources */,
+				D4CD7861BECC0BFA /* AppSourcesView.swift in Sources */,
+				79C75F0AFC660F32 /* SourceTools.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

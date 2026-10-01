@@ -43,5 +43,9 @@ enum ToolRouter {
         "get_config": ConfigTools.getConfig,
         "set_config": ConfigTools.setConfig,
         "list_jailbreak_detectors": ConfigTools.listJailbreakDetectors,
+        "list_sources": SourceTools.listSources,
+        "add_source": SourceTools.addSource,
+        "remove_source": SourceTools.removeSource,
+        "install_source_app": SourceTools.installSourceApp,
     ]
 }

@@ -361,6 +361,41 @@ final class MCPServer {
                 ],
                 "required": ["bundleID"]
             ]
+        ],
+        [
+            "name": "list_sources",
+            "description": "List subscribed AltStore-format app-source feeds with app counts and errors.",
+            "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
+        ],
+        [
+            "name": "add_source",
+            "description": "Subscribe an app-source feed by URL.",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["url": ["type": "string", "description": "Feed URL (AltStore format)."]],
+                "required": ["url"]
+            ]
+        ],
+        [
+            "name": "remove_source",
+            "description": "Unsubscribe an app-source feed by URL.",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["url": ["type": "string", "description": "Feed URL."]],
+                "required": ["url"]
+            ]
+        ],
+        [
+            "name": "install_source_app",
+            "description": "Download and install a feed app (optionally version-pinned), waiting to idle.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "version": ["type": "string", "description": "Optional pinned version."]
+                ],
+                "required": ["bundleID"]
+            ]
         ]
     ]
 }
