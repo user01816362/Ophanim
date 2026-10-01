@@ -60,7 +60,7 @@ enum SettingsStore {
 
     /// Apply a set_config argument patch to settings. Unit-testable without JSON:
     /// pass a plain dictionary, assert on the mutated struct.
-    static func applyPatch(_ args: [String: Any], to s: inout AppSettingsData) {
+    static func applyPatch(_ args: [String: Any], to s: inout AppSettingsData) throws {
         // Instrumentation (OphanimCore)
         if let on = args["enabled"] as? Bool { s.ophanim.enabled = on }
         if let on = args["autoOpenLog"] as? Bool { s.ophanim.autoOpenLog = on }
