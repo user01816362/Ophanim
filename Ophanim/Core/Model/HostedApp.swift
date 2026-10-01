@@ -77,6 +77,20 @@ class HostedApp: BaseApp, @unchecked Sendable {
 
             settings.sync()
 
+            // Previous-run crash summary BEFORE the sweep below destroys evidence: one
+            // file (last-crash.json) carries the explanation across launches; history still
+            // cannot accumulate. A previous run with a log but no crash artifact reports
+            // "no crash artifact" - clean quit and silent kill stay indistinguishable.
+            OPCrashCorrelator.summarizePreviousRun(bundleID: info.bundleIdentifier)
+
+            // Fresh log on launch when enabled (default): delete previous runs BEFORE the
+            // engine mints the new stamp file, so the viewer and MCP read exactly this run.
+            // Fail-open: skipped while an instance still runs (never orphan a live writer),
+            // and a skip just means history survives.
+            if settings.settings.clearLogsOnLaunch {
+                LogStore.clearPreviousRuns(bundleID: info.bundleIdentifier)
+            }
+
             if try !Entitlements.areEntitlementsValid(app: self) {
                 sign()
             }

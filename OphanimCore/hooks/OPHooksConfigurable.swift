@@ -91,8 +91,17 @@ enum OPConfigurableHooks {
 
     /// Log the call and apply the rule decision. Returns true if the original should be SUPPRESSED
     /// (a `.blocked` rule); a `.delayed` rule sleeps first. (Void methods → no return to replace.)
+    ///
+    /// Hook bodies touch app objects (arg rendering above, KVC in rules below): an ObjC exception
+    /// must fail open (disable the hook, note it for the crash record, log, run the original)
+    /// instead of propagating into the app. Swift cannot catch ObjC exceptions, so the body runs
+    /// through the ObjC wrapper.
     @discardableResult
     private static func emit(_ api: String, _ cat: OPCategory, _ args: [AnyObject?]) -> Bool {
+        guardLock.lock()
+        let disabled = disabledAPIs.contains(api)
+        guardLock.unlock()
+        if disabled { return false }
         var fields: [String: String] = [:]
         var body: Data?
         for (i, a) in args.enumerated() {
@@ -103,11 +112,33 @@ enum OPConfigurableHooks {
         }
         let ctx = OPCallContext(category: cat, layer: .objc, api: api, fields: fields)
         ctx.responseBody = body
-        let decision = OPAgent.shared.intercept(ctx)
-        OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision))
-        if decision.disposition == .delayed && decision.delay > 0 {
-            Thread.sleep(forTimeInterval: decision.delay)
+        var suppressed = false
+        var exName: NSString?
+        var exReason: NSString?
+        OPHookGuardRun({
+            let decision = OPAgent.shared.intercept(ctx)
+            OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision))
+            if decision.disposition == .delayed && decision.delay > 0 {
+                Thread.sleep(forTimeInterval: decision.delay)
+            }
+            suppressed = decision.disposition == .blocked
+        }, &exName, &exReason)
+        if exName != nil {
+            guardLock.lock()
+            disabledAPIs.insert(api)
+            guardLock.unlock()
+            OPCrashTrapNoteHook(api)
+            let hookFields = ["api": api,
+                              "exception": (exName as String?) ?? "?",
+                              "reason": String((exReason as String?)?.prefix(256) ?? "")]
+            let failure = OPCallContext(category: cat, layer: .objc, api: "\(api).hookFailure",
+                                        fields: hookFields)
+            OPAgent.shared.observe(OPAgent.shared.event(from: failure, decision: .observe,
+                                                        summary: "hook threw; disabled"))
         }
-        return decision.disposition == .blocked
+        return suppressed
     }
+
+    private static let guardLock = NSLock()
+    private static var disabledAPIs = Set<String>()
 }

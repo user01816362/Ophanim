@@ -37,8 +37,20 @@ public final class OPAgent: @unchecked Sendable {
         let enabled = config.enabled
         lock.unlock()
         startConfigPolling()
+        // Fatal-error recorders, installed once per process on the main thread (never in a
+        // dyld constructor - the trap header states why). Guest-only file: the host target
+        // never compiles OPAgent, so this call cannot execute host-side. The dir/runId come
+        // from the just-resolved config, so records land beside this run's NDJSON.
+        OPCrashTrapInstall(OPAgent.resolveLogDirectory(config).path, runId,
+                           Bundle.main.bundleIdentifier ?? "", config.agentMode)
         return enabled
     }
+
+    /// Run identity, shared with the crash-cause filename stem: "<stamp>-<pid>".
+    /// Minted once per process (the singleton lives exactly one run). Recorders stamp
+    /// their artifacts with this; readers pair them with the NDJSON run.
+    public private(set) lazy var runId: String =
+        "\(OPFileSink.runStamp())-\(ProcessInfo.processInfo.processIdentifier)"
 
     /// (Re)load config and rebuild sinks/interceptor. Caller holds `lock`.
     private func applyConfigLocked(boot: Bool) {
@@ -60,6 +72,7 @@ public final class OPAgent: @unchecked Sendable {
         observe(OPEvent(category: .process, layer: .interpose, api: "ophanim.\(boot ? "start" : "reload")",
                         summary: "agent \(boot ? "attached" : "reloaded") (\(activeSummary()))",
                         fields: ["pid": String(ProcessInfo.processInfo.processIdentifier),
+                                 "runId": runId,
                                  "logDir": dir.path]))
     }
 

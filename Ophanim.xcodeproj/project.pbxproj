@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9974FAE79F46F221 /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B148FA802FF6AA9F /* LogStore.swift */; };
+		5279C436C2969D6D /* OPCrashCorrelator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0AFC45CED613C86 /* OPCrashCorrelator.swift */; };
+		E3BC290722D9385D /* OPCrashWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643346C5B61688F3 /* OPCrashWriter.swift */; };
+		5FC972A4C7E749CB /* OPCrashRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FAB8F28C1229B11 /* OPCrashRecord.swift */; };
 		D5C29B3DCCDF8C25 /* AppSettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B551BAF6C559FDE3 /* AppSettingsWindow.swift */; };
 		30E0A315D2F88E16 /* InspectTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C632249BBFC8BD /* InspectTools.swift */; };
 		54EDEA089AA2191C /* OPAppLiveness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E17E960CFFEACBF /* OPAppLiveness.swift */; };
@@ -139,6 +143,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B148FA802FF6AA9F /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogStore.swift; path = Ophanim/Core/Services/LogStore.swift; sourceTree = SOURCE_ROOT; };
+		D0AFC45CED613C86 /* OPCrashCorrelator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashCorrelator.swift; path = Ophanim/Core/Services/OPCrashCorrelator.swift; sourceTree = SOURCE_ROOT; };
+		643346C5B61688F3 /* OPCrashWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashWriter.swift; path = OphanimCore/crash/OPCrashWriter.swift; sourceTree = SOURCE_ROOT; };
+		8FAB8F28C1229B11 /* OPCrashRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashRecord.swift; path = OphanimCore/crash/OPCrashRecord.swift; sourceTree = SOURCE_ROOT; };
 		B551BAF6C559FDE3 /* AppSettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSettingsWindow.swift; path = Ophanim/Features/AppSettings/AppSettingsWindow.swift; sourceTree = SOURCE_ROOT; };
 		F9C632249BBFC8BD /* InspectTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectTools.swift; path = Ophanim/Core/MCP/Tools/InspectTools.swift; sourceTree = SOURCE_ROOT; };
 		4E17E960CFFEACBF /* OPAppLiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPAppLiveness.swift; path = Ophanim/Core/Services/OPAppLiveness.swift; sourceTree = SOURCE_ROOT; };
@@ -416,6 +424,8 @@
 				92B4D38E2737CF3D0001D7BB /* Galgal.swift */,
 				53F3802726EB6F6B00D6B525 /* NotifyService.swift */,
 				9280871A2824A8D20034C510 /* SoundDeviceService.swift */,
+				D0AFC45CED613C86 /* OPCrashCorrelator.swift */,
+				B148FA802FF6AA9F /* LogStore.swift */,
 			);
 			name = Services;
 			sourceTree = "<group>";
@@ -580,6 +590,8 @@
 				7129536E6D2311B4 /* InspectRequest.swift */,
 				FACE00000000000000000400 /* OPEvent.swift */,
 				FACE00000000000000000401 /* OPConfig.swift */,
+				8FAB8F28C1229B11 /* OPCrashRecord.swift */,
+				643346C5B61688F3 /* OPCrashWriter.swift */,
 			);
 			name = Engine;
 			sourceTree = "<group>";
@@ -924,6 +936,10 @@
 				5F38BAF765A9EAEF /* InspectRequest.swift in Sources */,
 				30E0A315D2F88E16 /* InspectTools.swift in Sources */,
 				D5C29B3DCCDF8C25 /* AppSettingsWindow.swift in Sources */,
+				5FC972A4C7E749CB /* OPCrashRecord.swift in Sources */,
+				E3BC290722D9385D /* OPCrashWriter.swift in Sources */,
+				5279C436C2969D6D /* OPCrashCorrelator.swift in Sources */,
+				9974FAE79F46F221 /* LogStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

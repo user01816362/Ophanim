@@ -93,6 +93,30 @@ enum ReportBuilder {
     ]
 
     /// Summarize a run into a behavior/privacy picture: who it talked to, what it accessed, etc.
+    /// Previous-run crash explanation for analyze_app. Reads last-crash.json (written at
+    /// launch before the sweep) plus any crash files the current run already holds. Absent
+    /// everything: "no-crash-file" - clean quit and silent kill stay indistinguishable,
+    /// stated once here instead of guessed per question.
+    static func crashSection(_ bundleID: String) -> [String: Any] {
+        if let last = OPCrashCorrelator.load(bundleID: bundleID) {
+            var d: [String: Any] = ["runId": last.runId,
+                                    "ndjsonEvents": last.ndjsonEvents,
+                                    "hasCrashFile": last.hasCrashFile,
+                                    "note": last.note]
+            if let kind = last.kind { d["kind"] = kind }
+            if let file = last.crashFile { d["crashFile"] = file }
+            if !last.osReports.isEmpty { d["osReports"] = last.osReports }
+            return d
+        }
+        let current = logDirs(bundleID).flatMap { OPCrashWriter.records(in: $0) }
+        if let newest = current.last {
+            return ["runId": newest.runId, "hasCrashFile": true,
+                    "kind": newest.kind.rawValue, "note": "current run already holds a crash record"]
+        }
+        return ["hasCrashFile": false,
+                "note": "no-crash-file: clean quit or silent kill (indistinguishable)"]
+    }
+
     static func report(_ bundleID: String) -> [String: Any] {
         let events = self.events(bundleID, category: nil, search: nil, limit: 0)
         var byCat: [String: Int] = [:]
@@ -166,6 +190,7 @@ enum ReportBuilder {
             "cryptoOperations": cryptoOps,
             "jailbreak": ["pathProbes": Array(jbProbes).sorted(), "detectorsBypassed": Array(jbBypassed).sorted()] as [String: Any],
             "certificatePinning": ["checks": pinChecks, "forceAccepted": pinBypassed],
+            "crash": crashSection(bundleID),
             "process": [
                 "appsOrURLsLaunched": Array(launches).sorted(),
                 "librariesLoaded": Array(dlopens).sorted(),

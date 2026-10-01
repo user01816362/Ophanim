@@ -111,6 +111,24 @@ struct LogViewerView: View {
         return out
     }
 
+    /// Previous-run crash explanation (last-crash.json, written at launch before the sweep).
+    /// Nil most of the time: healthy runs leave no crash file and clean quits are silent.
+    /// A value here means the run before this log either recorded a cause or left no
+    /// artifact at all (clean quit vs silent kill - the help text says which is known).
+    private var lastCrash: OPLastCrash? {
+        OPCrashCorrelator.load(bundleID: bundleID)
+    }
+
+    /// Help text for the previous-run crash badge: run identity, what is known, where detail lives.
+    private func crashDetailHelp(_ crash: OPLastCrash) -> String {
+        var lines = ["Run \(crash.runId.isEmpty ? "unknown" : crash.runId)",
+                     "\(crash.ndjsonEvents) events logged",
+                     crash.note]
+        if let file = crash.crashFile { lines.append("Detail: \(file)") }
+        for report in crash.osReports.prefix(3) { lines.append("OS report: \(report)") }
+        return lines.joined(separator: "\n")
+    }
+
     var body: some View {
         VStack(spacing: 8) {
             HStack {
@@ -137,6 +155,14 @@ struct LogViewerView: View {
             if let err = loadError {
                 Text(err).font(.caption).foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let crash = lastCrash {
+                Text(crash.hasCrashFile ? "Previous run: \(crash.kind ?? "crash") recorded"
+                                        : "Previous run: no crash artifact")
+                    .font(.caption).foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .help(crashDetailHelp(crash))
             }
 
             Table(filtered, selection: $selection) {
@@ -255,6 +281,7 @@ struct LogViewerView: View {
             for f in files where f.pathExtension == "ndjson" || f.pathExtension == "log" {
                 try? FileManager.default.removeItem(at: f)
             }
+            OPCrashWriter.sweep(in: dir)
         }
         events = []
         lastScanSig = ""   // force the next load() to re-scan even if it races the same second

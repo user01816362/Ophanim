@@ -111,21 +111,21 @@ final class InspectCommandPump: NSObject {
         }
         // One bad op can't wedge the channel: a throw inside execute still answers with
         // the op's id (claim already removed), so the host moves on instead of burning
-        // its full 60 s timeout on silence.
-        // NOTE(B5-crash): OLD wrapped this in OPHookGuardProtect (catches the ObjC
-        // exceptions a walk/screenshot/touch synthesis can raise) + OPCrashTrapNoteHook.
-        // Neither exists in NEW yet; the Crash batch restores both. Until then an ObjC
-        // exception here crashes instead of answering failure.
-        let out: NSData? = {
+        // its full 60 s timeout on silence. Swift cannot catch the ObjC exceptions a walk,
+        // screenshot, or touch synthesis can raise - the ObjC wrapper can.
+        var exName: NSString?
+        var exReason: NSString?
+        let out = OPHookGuardProtect({
             guard let d = try? JSONEncoder().encode(self.execute(cmd, redacted: redacted)) else { return nil }
             return NSData(data: d)
-        }()
+        }, &exName, &exReason) as? NSData
         if let nsdata = out {
             try? (nsdata as Data).write(to: dir.appendingPathComponent(InspectWire.responseName(for: cmd.id)), options: .atomic)
         } else {
+            OPCrashTrapNoteHook("inspect.\(cmd.op.rawValue)")
             let failure = InspectResponse.failure(
                 id: cmd.id,
-                "inspect op \(cmd.op.rawValue) failed without detail")
+                "inspect op \(cmd.op.rawValue) threw \((exName as String?) ?? "?"): \((exReason as String?) ?? "")")
             if let data = try? JSONEncoder().encode(failure) {
                 try? data.write(to: dir.appendingPathComponent(InspectWire.responseName(for: cmd.id)), options: .atomic)
             }

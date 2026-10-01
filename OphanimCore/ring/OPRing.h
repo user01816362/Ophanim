@@ -32,6 +32,11 @@
 // framework (via Galgal.h) and the sibling agent (via -import-objc-header OPRing.h) see it in Swift.
 #include "../hooks/OPInline.h"
 
+// Crash recorders (OPCrashTrap) + hook-body guard (OPHookGuard), exposed to Swift the same
+// way: the sibling agent sees them via -import-objc-header, Galgal via the Galgal.h umbrella.
+#include "../crash/OPCrashTrap.h"
+#include "../crash/OPHookGuard.h"
+
 /// Event kinds emitted by the C interpose wrappers. The Swift consumer (OPRingBridge) maps each to
 /// an (OPCategory, api) pair. `str` carries a path/host/symbol; `arg` a scalar (mode/len/port).
 typedef enum {

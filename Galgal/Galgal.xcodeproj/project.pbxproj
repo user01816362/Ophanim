@@ -11,6 +11,8 @@
 		8930A9AD1E2836AE /* OPCallerAttribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05F943D57CB27AC /* OPCallerAttribution.swift */; };
 		FACE00000000000000000212 /* OPReentry.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000112 /* OPReentry.swift */; };
 		FACE00000000000000000211 /* OPHooksSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000111 /* OPHooksSocket.m */; };
+		FACE00000000000000000302 /* OPCrashTrap.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000301 /* OPCrashTrap.m */; };
+		FACE00000000000000000304 /* OPHookGuard.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000303 /* OPHookGuard.m */; };
 		FACE00000000000000000210 /* OPSocketBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000110 /* OPSocketBridge.swift */; };
 		E0E902E65E317ED0 /* InspectRuntime.m in Sources */ = {isa = PBXBuildFile; fileRef = B0D516A22B7E5011 /* InspectRuntime.m */; };
 		DBACCA3914616148 /* InspectCommandPump.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5FC2F9CF213185 /* InspectCommandPump.swift */; };
@@ -170,6 +172,10 @@
 		246450A5E588E56D /* InspectRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = InspectRuntime.h; path = Inspect/InspectRuntime.h; sourceTree = "<group>"; };
 		B0D516A22B7E5011 /* InspectRuntime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = InspectRuntime.m; path = Inspect/InspectRuntime.m; sourceTree = "<group>"; };
 		FACE00000000000000000106 /* OPHooksDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksDevice.swift; path = ../OphanimCore/hooks/OPHooksDevice.swift; sourceTree = "<group>"; };
+		FACE00000000000000000301 /* OPCrashTrap.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPCrashTrap.m; path = ../OphanimCore/crash/OPCrashTrap.m; sourceTree = "<group>"; };
+		FACE00000000000000000305 /* OPCrashTrap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OPCrashTrap.h; path = ../OphanimCore/crash/OPCrashTrap.h; sourceTree = "<group>"; };
+		FACE00000000000000000303 /* OPHookGuard.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHookGuard.m; path = ../OphanimCore/crash/OPHookGuard.m; sourceTree = "<group>"; };
+		FACE00000000000000000306 /* OPHookGuard.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OPHookGuard.h; path = ../OphanimCore/crash/OPHookGuard.h; sourceTree = "<group>"; };
 		2847AE47298EFC0F00B0F983 /* GalgalScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalScreen.swift; sourceTree = "<group>"; };
 		6E76639A28D0FAE700DE4AF9 /* Plugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plugin.swift; sourceTree = "<group>"; };
 		6E7663A028D0FB5300DE4AF9 /* GalgalPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalgalPlugin.swift; sourceTree = "<group>"; };
@@ -315,6 +321,10 @@
 				FACE00000000000000000104 /* OPAgent.swift */,
 				FACE00000000000000000105 /* OPBootstrap.swift */,
 				FACE00000000000000000106 /* OPHooksDevice.swift */,
+				FACE00000000000000000301 /* OPCrashTrap.m */,
+				FACE00000000000000000305 /* OPCrashTrap.h */,
+				FACE00000000000000000303 /* OPHookGuard.m */,
+				FACE00000000000000000306 /* OPHookGuard.h */,
 			);
 			name = OphanimCore;
 			sourceTree = "<group>";
@@ -926,6 +936,8 @@
 				9E23978B39FCBF6E /* InspectorActivator.swift in Sources */,
 				64A52AEE60015E57 /* InspectorScreenshot.swift in Sources */,
 				05B86EA75C9FA7F6 /* InspectRequest.swift in Sources */,
+				FACE00000000000000000302 /* OPCrashTrap.m in Sources */,
+				FACE00000000000000000304 /* OPHookGuard.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
