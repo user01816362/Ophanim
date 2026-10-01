@@ -85,7 +85,7 @@ final class MCPServer {
 
     /// Per-tool call budget within a rolling minute.
     private static let rateLimitPerMinute = 120
-    private static var callLog: [String: [Date]] = [:]
+    nonisolated(unsafe) private static var callLog: [String: [Date]] = [:]
     private static let rateLogLock = NSLock()
 
     /// Seconds the caller must wait, or nil if the call is allowed.
