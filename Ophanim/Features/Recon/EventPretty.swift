@@ -9,6 +9,39 @@ import Foundation
 import Compression
 
 extension LogViewerView {
+    /// Render a body for display by Content-Type, degrading gracefully: a lying header
+    /// falls back through the chain to UTF-8/base64, never to an exception. Stored bytes
+    /// stay canonical - decoding happens here, at render, never in the log.
+    static func pretty(_ data: Data, contentType: String? = nil,
+                       decodedFrom: String? = nil) -> String {
+        var bytes = data
+        // Request-side codecs arrive raw (responses are pre-inflated by URLSession):
+        // inflate first so everything below sees the real payload. Bombs refuse: a
+        // declared isize over 1 MB inflates to nothing and the raw bytes render instead.
+        if let enc = decodedFrom?.lowercased(), enc.contains("gzip") || enc.contains("deflate"),
+           let inflated = Self.inflate(data) {
+            bytes = inflated
+        }
+        let mime = contentType?.lowercased() ?? ""
+        if mime.contains("plist") || Self.looksLikePlist(bytes) {
+            if let s = Self.prettyPlist(bytes) { return s }
+        }
+        if mime.contains("x-www-form-urlencoded") {
+            return Self.prettyForm(bytes)
+        }
+        if mime.contains("multipart/") {
+            if let s = Self.prettyMultipart(bytes, contentType: contentType ?? "") { return s }
+        }
+        if let obj = try? JSONSerialization.jsonObject(with: bytes),
+           let out = try? JSONSerialization.data(withJSONObject: obj,
+                                                 options: [.prettyPrinted, .withoutEscapingSlashes]),
+           let s = String(data: out, encoding: .utf8) {
+            return s
+        }
+        if let dims = Self.imageDimensions(bytes) { return "[\(dims), \(bytes.count) bytes]" }
+        return String(data: bytes, encoding: .utf8) ?? bytes.base64EncodedString()
+    }
+
     private static func looksLikePlist(_ data: Data) -> Bool {
         let head = [UInt8](data.prefix(200))
         if head.starts(with: [0x62, 0x70, 0x6C, 0x69, 0x73, 0x74]) { return true } // bplist
