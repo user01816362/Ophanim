@@ -19,7 +19,7 @@ enum SettingsTab: Hashable {
 
 /// Bridges the AppKit toolbar selection into the SwiftUI content.
 @Observable
-final class AppSettingsPaneCoordinator {
+final class AppSettingsPaneCoordinator: @unchecked Sendable {
     var selection: SettingsTab {
         didSet { onChange?(selection) }
     }
@@ -83,21 +83,19 @@ final class AppSettingsPaneCoordinator {
 private struct AppSettingsWindowRoot: View {
     let app: HostedApp
     @Bindable var coordinator: AppSettingsPaneCoordinator
-    let onClose: () -> Void
     @State private var showKeymapSheet = false
 
     var body: some View {
         AppSettingsView(viewModel: AppSettingsVM(app: app),
                         showKeymapSheet: $showKeymapSheet,
-                        selectedTab: $coordinator.selection,
-                        onClose: onClose)
+                        selectedTab: $coordinator.selection)
             .sheet(isPresented: $showKeymapSheet) {
                 KeymapView(showKeymapSheet: $showKeymapSheet, viewModel: KeymapViewVM(app: app))
             }
     }
 }
 
-final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDelegate {
+final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDelegate, @unchecked Sendable {
     nonisolated(unsafe) static let shared = AppSettingsWindowManager()
 
     private var windows: [String: NSWindow] = [:]
@@ -119,8 +117,7 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
-        }
-        let coordinator = AppSettingsPaneCoordinator(selection: restoredPane(for: bid))
+        }        let coordinator = AppSettingsPaneCoordinator(selection: restoredPane(for: bid))
         coordinators[bid] = coordinator
 
         // Fixed-size, non-resizable settings window. Pinned via min==max content size because
@@ -135,9 +132,7 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         window.delegate = self
         window.standardWindowButton(.miniaturizeButton)?.isEnabled = false
 
-        let root = AppSettingsWindowRoot(app: app, coordinator: coordinator, onClose: { [weak window] in
-            window?.close()
-        })
+        let root = AppSettingsWindowRoot(app: app, coordinator: coordinator)
         window.contentViewController = NSHostingController(rootView: root)
 
         let toolbar = NSToolbar(identifier: "AppSettingsPanes")
@@ -159,8 +154,7 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
 
         windows[bid] = window
         window.contentMinSize = fixedSize
-        window.contentMaxSize = fixedSize
-        if let parent = NSApp.mainWindow ?? NSApp.keyWindow {
+        window.contentMaxSize = fixedSize        if let parent = NSApp.mainWindow ?? NSApp.keyWindow {
             let topLeft = NSPoint(x: parent.frame.minX, y: parent.frame.maxY)
             window.setFrameTopLeftPoint(parent.cascadeTopLeft(from: topLeft))
         } else {
@@ -168,6 +162,14 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Close the window for a bundle id (called by content instead of a closure,
+    /// which would drag a non-Sendable capture across isolation).
+    func close(_ bid: String) {
+        if let window = windows[bid] {
+            window.close()
+        }
     }
 
     // MARK: NSToolbarDelegate

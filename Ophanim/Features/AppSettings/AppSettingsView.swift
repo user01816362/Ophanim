@@ -17,10 +17,6 @@ struct AppSettingsView: View {
 
     /// The visible pane. Owned by the settings window (toolbar selection), not local state.
     @Binding var selectedTab: SettingsTab
-
-    /// Called when the view asks to close (OK / reset / keymap buttons). The window manager
-    /// supplies this; the sheet-era `dismiss()` below is kept as a no-op fallback.
-    var onClose: (() -> Void)? = nil
     @State var resetSettingsCompletedAlert = false
     @State var closeView = false
     @State var appIcon: NSImage?
@@ -153,7 +149,7 @@ struct AppSettingsView: View {
                 toastDetails: NSLocalizedString("settings.resetSettingsCompleted", comment: ""))
         }
         .onChange(of: closeView) { _, _ in
-            onClose?()
+            AppSettingsWindowManager.shared.close(viewModel.app.info.bundleIdentifier)
             dismiss()
         }
         .task(priority: .background) {
