@@ -11,7 +11,7 @@ enum ConfigTools {
     static func setConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         try ToolRouter.rejectUnknownKeys(args, allowed: SettingsStore.setConfigKeys, tool: "set_config")
-        try SettingsStore.updateSettings(bid) { SettingsStore.applyPatch(args, to: &$0) }
+        try SettingsStore.updateSettings(bid) { try SettingsStore.applyPatch(args, to: &$0) }
         let body = SettingsStore.configProjection(bid).flatMap { try? ToolRouter.json($0) } ?? "{}"
         return "Updated. New config:\n" + body
     }
