@@ -136,7 +136,7 @@ enum InspectControl {
 /// swipe, set_text). Parsed here so the schema enum and the dispatcher cannot drift.
 enum SnapshotCaptureArg {
     static let name = "snapshot"
-    static let schema: [String: Any] = [
+    nonisolated(unsafe) static let schema: [String: Any] = [
         "type": "string", "enum": ["none", "pre", "post", "both"],
         "description": "Pin UI snapshots around the op for flip analysis with inspect_diff "
             + "(pre/post/both; default none). Each leg costs a full tree transaction."]
