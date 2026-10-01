@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3433C8A9A6F46A28 /* AppInstalls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8CFB20714ECE7A /* AppInstalls.swift */; };
 		9974FAE79F46F221 /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B148FA802FF6AA9F /* LogStore.swift */; };
 		5279C436C2969D6D /* OPCrashCorrelator.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0AFC45CED613C86 /* OPCrashCorrelator.swift */; };
 		E3BC290722D9385D /* OPCrashWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643346C5B61688F3 /* OPCrashWriter.swift */; };
@@ -143,6 +144,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		1A8CFB20714ECE7A /* AppInstalls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppInstalls.swift; path = Ophanim/Features/Install/AppInstalls.swift; sourceTree = SOURCE_ROOT; };
 		B148FA802FF6AA9F /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogStore.swift; path = Ophanim/Core/Services/LogStore.swift; sourceTree = SOURCE_ROOT; };
 		D0AFC45CED613C86 /* OPCrashCorrelator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashCorrelator.swift; path = Ophanim/Core/Services/OPCrashCorrelator.swift; sourceTree = SOURCE_ROOT; };
 		643346C5B61688F3 /* OPCrashWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashWriter.swift; path = OphanimCore/crash/OPCrashWriter.swift; sourceTree = SOURCE_ROOT; };
@@ -527,6 +529,7 @@
 		B104EA45D8372532 /* Features/Install */ = {
 			isa = PBXGroup;
 			children = (
+				1A8CFB20714ECE7A /* AppInstalls.swift */,
 				92ECD8A2274E75CD00DB7AC6 /* Installer.swift */,
 				92ECD8A4274E763700DB7AC6 /* IPA.swift */,
 				6E550A8A29BA507200EFC15C /* Macho.swift */,
@@ -940,6 +943,7 @@
 				E3BC290722D9385D /* OPCrashWriter.swift in Sources */,
 				5279C436C2969D6D /* OPCrashCorrelator.swift in Sources */,
 				9974FAE79F46F221 /* LogStore.swift in Sources */,
+				3433C8A9A6F46A28 /* AppInstalls.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

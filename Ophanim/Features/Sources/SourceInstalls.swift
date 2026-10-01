@@ -170,15 +170,11 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         states[bid] = .installing
         // Background-safe: explicit Galgal decision from prefs, never a modal prompt.
         // The installer's own verdict reconciles the row (no timers, no guessing).
-        Installer.install(ipaUrl: dest, export: false,
-                          injectGalgal: InstallPreferences.shared.alwaysInstallGalgal,
-                          returnCompletion: { [weak self] (installed: URL?) in
+        // Postamble stays here (row state); the fetchApps+notify kernel is shared.
+        AppInstalls.installIPA(at: dest,
+                               injectGalgal: InstallPreferences.shared.alwaysInstallGalgal) { [weak self] installed in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                AppsVM.shared.fetchApps()
-                NotifyService.shared.notify(
-                    NSLocalizedString("notification.appInstalled", comment: ""),
-                    NSLocalizedString("notification.appInstalled.message", comment: ""))
                 if installed != nil, self.installedVersion(for: bid) != nil {
                     self.states[bid] = .idle
                     self.activeVersions[bid] = nil
@@ -190,7 +186,7 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
                     self.versionObjects[bid] = nil
                 }
             }
-        })
+        }
     }
 
     func downloadFailed(bundleID bid: String, generation gen: Int,
