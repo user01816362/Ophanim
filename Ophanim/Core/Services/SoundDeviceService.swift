@@ -77,14 +77,11 @@ class SoundDeviceService: @unchecked Sendable {
             if sampleRate == 48000.0 || sampleRate == 44100.0 { return }
         }
         Task { @MainActor in
-            let alert = NSAlert()
-            alert.messageText = NSLocalizedString("soundAlert.messageText", comment: "")
-            alert.informativeText = NSLocalizedString("soundAlert.informativeText", comment: "")
-            alert.addButton(withTitle: NSLocalizedString("button.OK", comment: ""))
-            alert.addButton(withTitle: NSLocalizedString("button.Cancel", comment: ""))
-            alert.alertStyle = .critical
-            let response: NSApplication.ModalResponse = alert.runModal()
-            if response == NSApplication.ModalResponse.alertFirstButtonReturn {
+            if Log.confirm(question: NSLocalizedString("soundAlert.messageText", comment: ""),
+                           text: NSLocalizedString("soundAlert.informativeText", comment: ""),
+                           style: .critical,
+                           ok: NSLocalizedString("button.OK", comment: ""),
+                           cancel: NSLocalizedString("button.Cancel", comment: "")) {
                 if self.setSampleRate(device, sampleRate: 48000) == noErr {
                     Log.shared.msg(NSLocalizedString("soundAlert.successText", comment: ""))
                 } else {

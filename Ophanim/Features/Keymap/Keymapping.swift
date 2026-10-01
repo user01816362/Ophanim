@@ -279,13 +279,10 @@ class Keymapping {
     }
 
     private func differentBundleIdKeymapAlert() -> Bool {
-        let alert = NSAlert()
-        alert.messageText = NSLocalizedString("alert.differentBundleIdKeymap.message", comment: "")
-        alert.informativeText = NSLocalizedString("alert.differentBundleIdKeymap.text", comment: "")
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: NSLocalizedString("button.Proceed", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("button.Cancel", comment: ""))
-
-        return alert.runModal() == .alertFirstButtonReturn
+        Log.confirm(question: NSLocalizedString("alert.differentBundleIdKeymap.message", comment: ""),
+                    text: NSLocalizedString("alert.differentBundleIdKeymap.text", comment: ""),
+                    style: .warning,
+                    ok: NSLocalizedString("button.Proceed", comment: ""),
+                    cancel: NSLocalizedString("button.Cancel", comment: ""))
     }
 }

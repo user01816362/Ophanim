@@ -110,16 +110,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     func powerModal() {
         if showLowPowerModeAlert {
-            let alert = NSAlert()
-            alert.messageText = NSLocalizedString("alert.power.title", comment: "")
-            alert.informativeText = NSLocalizedString("alert.power.subtitle", comment: "")
-            alert.addButton(withTitle: NSLocalizedString("button.OK", comment: ""))
-            alert.showsSuppressionButton = true
-            alert.alertStyle = .critical
-
-            if alert.runModal() == .alertFirstButtonReturn {
-                showLowPowerModeAlert = alert.suppressionButton?.state == .off
-            }
+            let (_, suppressed) = Log.modal(
+                question: NSLocalizedString("alert.power.title", comment: ""),
+                text: NSLocalizedString("alert.power.subtitle", comment: ""),
+                style: .critical,
+                buttons: [NSLocalizedString("button.OK", comment: "")],
+                suppressionTooltip: "")
+            // Suppression checked = don't show again: single-button modal returns
+            // first-button, so the persisted flag is the inverse of suppressed.
+            showLowPowerModeAlert = !suppressed
         }
     }
 }

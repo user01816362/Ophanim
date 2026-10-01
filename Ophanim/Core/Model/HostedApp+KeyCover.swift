@@ -19,12 +19,9 @@ extension HostedApp {
                     // Pop an alert telling the user that keychain was not unlocked
                     // and keychain is disabled for the session
                     Task { @MainActor in
-                        let alert = NSAlert()
-                        alert.messageText = NSLocalizedString("keycover.alert.title", comment: "")
-                        alert.informativeText = NSLocalizedString("keycover.alert.content", comment: "")
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: NSLocalizedString("button.OK", comment: ""))
-                        alert.runModal()
+                        Log.notify(question: NSLocalizedString("keycover.alert.title", comment: ""),
+                                   text: NSLocalizedString("keycover.alert.content", comment: ""),
+                                   style: .warning)
                     }
                     settings.settings.chainGuard = false
                     sessionDisableKeychain = true

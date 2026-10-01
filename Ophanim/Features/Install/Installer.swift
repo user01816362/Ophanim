@@ -10,24 +10,16 @@ import Foundation
 class Installer {
 
     static func installGalgalPopup() -> Bool {
-        let alert = NSAlert()
-        alert.messageText = NSLocalizedString("alert.install.injectGalgalQuestion", comment: "")
-        alert.informativeText = NSLocalizedString("alert.install.galgalInformative", comment: "")
+        let (response, suppressed) = Log.modal(
+            question: NSLocalizedString("alert.install.injectGalgalQuestion", comment: ""),
+            text: NSLocalizedString("alert.install.galgalInformative", comment: ""),
+            style: .informational,
+            buttons: [NSLocalizedString("button.Yes", comment: ""),
+                      NSLocalizedString("button.No", comment: "")],
+            makeFirstDefault: true,
+            suppressionTooltip: NSLocalizedString("alert.supression", comment: "String"))
 
-        alert.alertStyle = .informational
-
-        alert.showsSuppressionButton = true
-        alert.suppressionButton?.toolTip = NSLocalizedString("alert.supression", comment: "String")
-
-        let yes = alert.addButton(withTitle: NSLocalizedString("button.Yes", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("button.No", comment: ""))
-
-        // Set default button to install galgal
-        yes.keyEquivalent = "\r"
-
-        let response = alert.runModal()
-
-        if alert.suppressionButton?.state == .on {
+        if suppressed {
             InstallPreferences.shared.showInstallPopup = false
             InstallPreferences.shared.alwaysInstallGalgal = response == .alertFirstButtonReturn
         }
