@@ -17,6 +17,7 @@ FOUNDATION_EXPORT const unsigned char GalgalVersionString[];
 #import "UIApplication+Private.h"
 #import "UIEvent+Private.h"
 #import "UITouch+Private.h"
+#import "InspectRuntime.h"
 
 // OphanimCore capture ring - exposes op_ring_start()/op_ring_emit() to the framework's Swift (this
 // umbrella doubles as the Swift bridging header) and to the OphanimCore interpose wrappers.
