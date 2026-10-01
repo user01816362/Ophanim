@@ -38,6 +38,11 @@ enum TweakTools {
         if exists && (args["replace"] as? Bool) != true {
             throw ToolRouter.bail("a tweak named '\(source.lastPathComponent)' already exists; pass replace:true to overwrite")
         }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "source": source.path,
+                                 "destination": destination.path, "wouldReplace": exists,
+                                 "loadable": true])
+        }
         try Galgal.addTweakItem(at: source, bundleIdentifier: bid,
                                 appExecutable: exe, customPath: custom)
         return try ToolRouter.json(["bundleID": bid, "added": destination.path, "replaced": exists])
@@ -57,6 +62,10 @@ enum TweakTools {
         guard !FileManager.default.fileExists(atPath: destination.path) else {
             throw ToolRouter.bail("'\(to)' already exists")
         }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid,
+                                 "from": source.path, "to": destination.path])
+        }
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         try FileManager.default.moveItem(at: source, to: destination)
@@ -72,6 +81,9 @@ enum TweakTools {
         let target = store.appendingPathComponent(name)
         guard FileManager.default.fileExists(atPath: target.path) else {
             throw ToolRouter.bail("no such tweak: \(name)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "wouldRemove": target.path])
         }
         try FileManager.default.removeItem(at: target)
         try? Galgal.syncUserDylibs(bundleIdentifier: bid, into: exe, customPath: custom)
@@ -95,6 +107,9 @@ enum TweakTools {
                 || FileManager.default.fileExists(atPath: item.fileUrl.path + Galgal.disabledSuffix) else {
             throw ToolRouter.bail("no such tweak: \(name)")
         }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "name": base, "enabled": enabled])
+        }
         try Galgal.setTweakEnabled(item: item, enabled: enabled, bundleIdentifier: bid,
                                    appExecutable: exe, customPath: custom)
         return try ToolRouter.json(["bundleID": bid, "name": base, "enabled": enabled])
@@ -106,6 +121,9 @@ enum TweakTools {
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
         let (store, custom) = TweakStoreService.store(bundleID: bid)
         let folder = store.appendingPathComponent(name)
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "action": action, "path": folder.path])
+        }
         switch action {
         case "create":
             try Galgal.createNewSubfolder(named: name, bundleIdentifier: bid, customPath: custom)

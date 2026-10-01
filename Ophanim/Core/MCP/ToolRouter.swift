@@ -38,6 +38,10 @@ enum ToolRouter {
         (args[key] as? Int) ?? (args[key] as? Double).map(Int.init)
     }
 
+    /// Destructive tools preview by default (OLD safety contract): pass
+    /// dryRun:false to execute. Omitted dryRun previews; nothing is deleted.
+    static func isDryRun(_ args: [String: Any]) -> Bool { (args["dryRun"] as? Bool) ?? true }
+
     /// Reject unknown argument names, naming the closest match when there is one.
     static func rejectUnknownKeys(_ args: [String: Any], allowed: Set<String>, tool: String) throws {
         let unknown = args.keys.filter { !allowed.contains($0) }.sorted()

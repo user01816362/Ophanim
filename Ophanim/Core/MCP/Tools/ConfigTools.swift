@@ -30,6 +30,10 @@ enum ConfigTools {
         guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
         guard let exe = AppQueryService.appExecutable(bid) else { throw ToolRouter.bail("no executable for \(bid)") }
         let current = SettingsStore.appSettings(bid)?.ophanim.injectionStrategy ?? .embedded
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "current": current.rawValue,
+                                 "requested": requested.rawValue, "wouldChange": current != requested])
+        }
         if current == requested {
             return try ToolRouter.json(["bundleID": bid, "strategy": requested.rawValue, "changed": false])
         }

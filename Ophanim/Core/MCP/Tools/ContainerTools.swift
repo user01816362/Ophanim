@@ -1,7 +1,7 @@
 import Foundation
 
 /// Container/log/profile/data tools. Finder reveal has no headless meaning and
-/// stays GUI-only. Snapshot/bookmark coupling arrives with the Inspect batch.
+/// stays GUI-only.
 enum ContainerTools {
     static func getLogPath(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -31,6 +31,10 @@ enum ContainerTools {
         let bytes = candidates.reduce(0) { total, url in
             total + ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 ?? 0)
         }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "wouldRemove": candidates.map(\.path),
+                                 "count": candidates.count, "bytes": bytes])
+        }
         var removed: [String] = []
         for url in candidates {
             if (try? FileManager.default.removeItem(at: url)) != nil { removed.append(url.path) }
@@ -59,6 +63,10 @@ enum ContainerTools {
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
         let liveExists = FileManager.default.fileExists(
             atPath: ContainerProfiles.liveURL(bundleID: bid).path)
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "name": name,
+                                 "wouldCopyLive": liveExists])
+        }
         try ContainerProfiles.create(bundleID: bid, name: name)
         return try ToolRouter.json(["bundleID": bid, "created": name, "copiedLive": liveExists])
     }
@@ -66,6 +74,13 @@ enum ContainerTools {
     static func switchProfile(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
+        let running = ContainerProfiles.isRunning(bundleID: bid)
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "name": name,
+                                 "active": ContainerProfiles.activeName(bundleID: bid),
+                                 "appRunning": running,
+                                 "wouldRefuse": running])
+        }
         try ContainerProfiles.switchTo(bundleID: bid, name: name)
         return try ToolRouter.json(["bundleID": bid, "active": name])
     }
@@ -73,6 +88,10 @@ enum ContainerTools {
     static func removeProfile(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "name": name,
+                                 "isActive": name == ContainerProfiles.activeName(bundleID: bid)])
+        }
         try ContainerProfiles.remove(bundleID: bid, name: name)
         return try ToolRouter.json(["bundleID": bid, "removed": name])
     }
@@ -116,17 +135,33 @@ enum ContainerTools {
             analysisFiles = []
         }
         var analysisBytes: Int64 = 0
+        for url in analysisFiles {
+            if let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize {
+                analysisBytes += Int64(size)
+            }
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "scope": scope,
+                                 "targets": targets.map(\.path) + analysisFiles.map(\.path),
+                                 "bytes": bytes + analysisBytes])
+        }
         var removed: [String] = []
         for target in targets {
             if (try? FileManager.default.removeItem(at: target)) != nil {
                 removed.append(target.path)
             }
         }
-        for url in analysisFiles {
-            analysisBytes += ContainerService.directorySize(url) ?? 0
-            if (try? FileManager.default.removeItem(at: url)) != nil {
-                removed.append(url.path)
+        if scope == "data" {
+            // SnapshotStore.clear deletes the timeline (manifests + sidecars) and posts
+            // the reset notification; analysisFiles (inventoried above, pre-deletion)
+            // supplies the exact response paths. The marks file rides in the same list
+            // when it existed.
+            _ = SnapshotStore.clear(bundleID: bid)
+            let marks = BookmarkStore.fileURL(bundleID: bid)
+            if FileManager.default.fileExists(atPath: marks.path) {
+                try? FileManager.default.removeItem(at: marks)
             }
+            removed.append(contentsOf: analysisFiles.map(\.path))
         }
         return try ToolRouter.json(["bundleID": bid, "scope": scope, "removed": removed,
                              "bytes": bytes + analysisBytes])
@@ -140,6 +175,11 @@ enum ContainerTools {
         }
         let destURL = ToolRouter.expandedURL(dest)
         let bytes = ContainerService.directorySize(real) ?? 0
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "source": real.path,
+                                 "destination": destURL.path, "bytes": bytes,
+                                 "wouldOverwrite": FileManager.default.fileExists(atPath: destURL.path)])
+        }
         try FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         try Shell.run(print: false, "/usr/bin/ditto", "-c", "-k", "--sequesterRsrc",
@@ -159,6 +199,11 @@ enum ContainerTools {
             throw OphanimError.containerRunning
         }
         let live = ContainerProfiles.liveURL(bundleID: bid)
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "archive": archiveURL.path,
+                                 "destination": live.path,
+                                 "liveExists": FileManager.default.fileExists(atPath: live.path)])
+        }
         if FileManager.default.fileExists(atPath: live.path) {
             try FileManager.default.removeItem(at: live)
         }

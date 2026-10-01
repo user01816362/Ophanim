@@ -515,7 +515,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "purgeData": ["type": "boolean", "description": "Also delete the app's data container (its captured event logs). Default false."]
+                    "purgeData": ["type": "boolean", "description": "Also delete the app's data container (its captured event logs). Default false."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report what would be removed, incl. container resolution. Pass false to delete."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -530,7 +531,8 @@ final class MCPServer {
             "description": "Subscribe an app-source feed by URL.",
             "inputSchema": [
                 "type": "object",
-                "properties": ["url": ["type": "string", "description": "Feed URL (AltStore format)."]],
+                "properties": ["url": ["type": "string", "description": "Feed URL (AltStore format)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to subscribe."]],
                 "required": ["url"]
             ]
         ],
@@ -539,7 +541,8 @@ final class MCPServer {
             "description": "Unsubscribe an app-source feed by URL.",
             "inputSchema": [
                 "type": "object",
-                "properties": ["url": ["type": "string", "description": "Feed URL."]],
+                "properties": ["url": ["type": "string", "description": "Feed URL."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to unsubscribe."]],
                 "required": ["url"]
             ]
         ],
@@ -550,7 +553,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "version": ["type": "string", "description": "Optional pinned version."]
+                    "version": ["type": "string", "description": "Optional pinned version."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report the version that would install. Pass false to install."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -586,7 +590,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "path": ["type": "string"],
-                    "replace": ["type": "string"]
+                    "replace": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to copy."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -599,7 +604,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "from": ["type": "string"],
-                    "to": ["type": "string"]
+                    "to": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to rename."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -611,7 +617,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "name": ["type": "string"]
+                    "name": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to remove."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -624,7 +631,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "name": ["type": "string"],
-                    "enabled": ["type": "string"]
+                    "enabled": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to apply."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -638,7 +646,8 @@ final class MCPServer {
                     "bundleID": ["type": "string"],
                     "action": ["type": "string"],
                     "name": ["type": "string"],
-                    "newName": ["type": "string"]
+                    "newName": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to apply."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -671,7 +680,8 @@ final class MCPServer {
             "inputSchema": [
                 "type": "object",
                 "properties": [
-                    "bundleID": ["type": "string"]
+                    "bundleID": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to delete."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -705,7 +715,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "name": ["type": "string"]
+                    "name": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to create."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -717,7 +728,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "name": ["type": "string"]
+                    "name": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): reports active/running/refusal. Pass false to switch."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -729,7 +741,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "name": ["type": "string"]
+                    "name": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to delete."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -741,7 +754,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "scope": ["type": "string"]
+                    "scope": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report targets + bytes. Pass false to wipe."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -753,7 +767,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "destPath": ["type": "string"]
+                    "destPath": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to write the archive."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -765,14 +780,15 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "archivePath": ["type": "string"]
+                    "archivePath": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to restore."]
                 ],
                 "required": ["bundleID"]
             ]
         ],
         [
             "name": "list_classes",
-            "description": "Static class/selector inventory (live classes arrive with Inspect).",
+            "description": "Class/selector inventory (live runtime classes when Agent Mode runs, else static strings).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -790,7 +806,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "strategy": ["type": "string"]
+                    "strategy": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): report current/requested. Pass false to rewrite load commands."]
                 ],
                 "required": ["bundleID"]
             ]

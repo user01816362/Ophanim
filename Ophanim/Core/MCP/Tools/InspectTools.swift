@@ -316,7 +316,7 @@ enum InspectTools {
 
         case "inspect_clear_snapshots":
             let (files, bytes) = SnapshotStore.inventory(bundleID: bid)
-            if isDryRun(args) {
+            if ToolRouter.isDryRun(args) {
                 return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
                                        "wouldRemove": files.map(\.path),
                                        "count": files.count, "bytes": bytes])
@@ -449,7 +449,7 @@ enum InspectTools {
                 m.removeAll(where: { remove.contains($0) })
                 return m
             }
-            if isDryRun(args) {
+            if ToolRouter.isDryRun(args) {
                 let (gid, name, created) = peekBookmarkGroup(in: current, ref: gref)
                 return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
                                        "group": name, "groupId": gid,
@@ -555,7 +555,7 @@ enum InspectTools {
             let grpGone = Set(ids.filter { $0.hasPrefix("grp_") })
                 .intersection(before.groups.map(\.id))
             let missing = ids.filter { !bmGone.contains($0) && !grpGone.contains($0) }
-            if isDryRun(args) {
+            if ToolRouter.isDryRun(args) {
                 return MCPServer.toolResult(id, ["dryRun": true, "bundleID": bid,
                                        "wouldRemoveBookmarks": Array(bmGone).sorted(),
                                        "wouldRemoveGroups": Array(grpGone).sorted(),
@@ -633,10 +633,6 @@ enum InspectTools {
         store.groups.append(g)
         return g.id
     }
-
-    /// Destructive tools preview by default (OLD safety contract): pass
-    /// dryRun:false to execute. Omitted dryRun previews; nothing is deleted.
-    static func isDryRun(_ args: [String: Any]) -> Bool { (args["dryRun"] as? Bool) ?? true }
 
     /// Read-only twin for dry-runs: reports whether the call would create the group.
     static func peekBookmarkGroup(in store: BookmarkStoreData, ref: String)

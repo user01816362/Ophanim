@@ -23,6 +23,9 @@ enum SourceTools {
 
     static func addSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty else { throw ToolRouter.bail("url is required") }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "url": raw])
+        }
         final class ErrorBox: @unchecked Sendable {
             var value: String?
         }
@@ -42,6 +45,9 @@ enum SourceTools {
         guard let target = AppSourcesStore.shared.sources.first(where: {
             $0.url.absoluteString == raw || $0.url.host == raw
         }) else { throw ToolRouter.bail("no subscribed source matches \(raw)") }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "url": target.url.absoluteString])
+        }
         AppSourcesStore.shared.removeSource(target)
         return try ToolRouter.json(["removed": target.url.absoluteString])
     }
@@ -50,6 +56,12 @@ enum SourceTools {
         let bid = try ToolRouter.requireBundleID(args)
         let version = args["version"] as? String
         let (app, picked) = try sourceApp(bundleID: bid, version: version)
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid,
+                                 "version": picked.version,
+                                 "build": picked.buildVersion ?? "",
+                                 "bytes": picked.size ?? 0])
+        }
         SourceInstalls.shared.start(app: app, version: picked)
         switch try awaitSourceIdle(bundleID: bid, timeout: MCPTimeouts.install) {
         case .idle:

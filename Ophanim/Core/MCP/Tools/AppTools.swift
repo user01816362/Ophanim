@@ -84,6 +84,10 @@ enum AppTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard AppQueryService.appURL(bid) != nil else { throw ToolRouter.bail("app not installed: \(bid)") }
         let purge = (args["purgeData"] as? Bool) ?? false
+        // dryRun defaults to true like every other destructive tool: pass false to delete.
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(AppQueryService.uninstallPreview(bid, purgeData: purge))
+        }
         return try ToolRouter.json(AppQueryService.uninstall(bid, purgeData: purge))
     }
 }

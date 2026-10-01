@@ -85,13 +85,8 @@ enum AppQueryService {
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
     }
 
-    /// Uninstall a hosted app: remove its bundle and per-app config (settings, keymap, entitlements,
-    /// tweak store, ChainGuard) - the Uninstaller-resolved set. When `purgeData` is true, also
-    /// delete the app's OS data container (resolved, not composed). Returns removed/missing paths
-    /// plus whether the container resolved, so callers can tell "nothing to remove" apart.
-    @discardableResult
-    static func uninstall(_ bundleID: String, purgeData: Bool) -> [String: Any] {
-        let fm = FileManager.default
+    /// Target inventory shared by preview and execution, so they agree.
+    static func uninstallTargets(_ bundleID: String, purgeData: Bool) -> (targets: [URL], unresolved: Bool) {
         var targets = Uninstaller.perAppState(forBundleID: bundleID)
         var unresolvedContainer = false
         if purgeData {
@@ -99,6 +94,40 @@ enum AppQueryService {
             targets += external.paths
             unresolvedContainer = external.unresolved
         }
+        return (targets, unresolvedContainer)
+    }
+
+    static func uninstallPreview(_ bundleID: String, purgeData: Bool) -> [String: Any] {
+        let (targets, unresolvedContainer) = uninstallTargets(bundleID, purgeData: purgeData)
+        let existing = targets
+            .map(\.path)
+            .filter { FileManager.default.fileExists(atPath: $0) }
+            .sorted()
+        var report: [String: Any] = [
+            "dryRun": true,
+            "bundleID": bundleID,
+            "wouldRemove": existing,
+            "count": existing.count,
+            "purgeData": purgeData
+        ]
+        if purgeData {
+            report["containerResolved"] = !unresolvedContainer
+            if unresolvedContainer {
+                report["note"] = "No data container was found. The app may not have been launched yet, "
+                    + "in which case macOS has not created one."
+            }
+        }
+        return report
+    }
+
+    /// Uninstall a hosted app: remove its bundle and per-app config (settings, keymap, entitlements,
+    /// tweak store, ChainGuard) - the Uninstaller-resolved set. When `purgeData` is true, also
+    /// delete the app's OS data container (resolved, not composed). Returns removed/missing paths
+    /// plus whether the container resolved, so callers can tell "nothing to remove" apart.
+    @discardableResult
+    static func uninstall(_ bundleID: String, purgeData: Bool) -> [String: Any] {
+        let fm = FileManager.default
+        let (targets, unresolvedContainer) = uninstallTargets(bundleID, purgeData: purgeData)
         var removed: [String] = []
         for target in targets where fm.fileExists(atPath: target.path) {
             if (try? fm.removeItem(at: target)) != nil { removed.append(target.path) }
