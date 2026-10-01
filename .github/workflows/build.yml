@@ -171,7 +171,8 @@ jobs:
         # interpose site must import compat/OPInterpose.h.
         # R10 (single plist helper): PropertyListSerialization.propertyList may
         # only appear in PlistReader.swift + Entitlements.swift (Dictionary.read)
-        # + EventPretty.swift (render-time plist sniff, different shape).
+        # + EventPretty.swift (render-time sniff) + Uninstaller.swift (container
+        # metadata lookup).
         run: |
           set -euo pipefail
           if grep -rn 'define DYLD_INTERPOSE' OphanimCore Galgal/Galgal/ --exclude-dir=compat; then
@@ -179,8 +180,8 @@ jobs:
             exit 1
           fi
           if grep -rln 'PropertyListSerialization\.propertyList' Ophanim/ --include='*.swift' \
-              | grep -v -e 'Core/Support/PlistReader.swift' -e 'Core/Support/Entitlements.swift' -e 'Features/Recon/EventPretty.swift'; then
-            echo "::error::R10: plist decode outside PlistReader/Dictionary.read/EventPretty - use PlistReader.appInfoDict"
+              | grep -v -e 'Core/Support/PlistReader.swift' -e 'Core/Support/Entitlements.swift' -e 'Features/Recon/EventPretty.swift' -e 'Features/AppLibrary/Uninstaller.swift'; then
+            echo "::error::R10: plist decode outside sanctioned owners - use PlistReader.appInfoDict"
             exit 1
           fi
           echo "DRY gates passed."
