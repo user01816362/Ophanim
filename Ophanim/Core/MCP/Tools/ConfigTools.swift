@@ -44,7 +44,7 @@ enum ConfigTools {
         // Poll until the load command reflects the request (or a 15s budget expires).
         // agentInstalledInExec throws when the binary cannot even be read, which is itself
         // the answer: desired=false is unreachable, desired=true is unreached.
-        let deadline = Date().addingTimeInterval(15)
+        let deadline = Date().addingTimeInterval(MCPTimeouts.installSettle)
         var verified = false
         while Date() < deadline {
             let installed = (try? Galgal.agentInstalledInExec(atURL: exe)) ?? false
@@ -54,7 +54,7 @@ enum ConfigTools {
         var result: [String: Any] = ["bundleID": bid, "strategy": requested.rawValue,
                                      "changed": true, "verified": verified]
         if !verified {
-            result["note"] = "Load commands did not settle within 15s; check get_config and relaunch."
+            result["note"] = "Load commands did not settle within \(Int(MCPTimeouts.installSettle))s; check get_config and relaunch."
         }
         return try ToolRouter.json(result)
     }

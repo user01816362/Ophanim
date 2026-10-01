@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8B65571DC49F611B /* MCPTimeouts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF36BBEDA431028 /* MCPTimeouts.swift */; };
 		9A3CE4B786BC519C /* TweakTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D73451F9FFF0D2B /* TweakTools.swift */; };
 		977616121F1C5D48 /* ContainerTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF53023CB47A543F /* ContainerTools.swift */; };
 		7958FF75D95EB547 /* TweakStoreService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E4ADF9344E6F37E /* TweakStoreService.swift */; };
@@ -130,6 +131,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5BF36BBEDA431028 /* MCPTimeouts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPTimeouts.swift; path = Ophanim/Core/MCP/MCPTimeouts.swift; sourceTree = SOURCE_ROOT; };
 		2D73451F9FFF0D2B /* TweakTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakTools.swift; path = Ophanim/Core/MCP/Tools/TweakTools.swift; sourceTree = SOURCE_ROOT; };
 		DF53023CB47A543F /* ContainerTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerTools.swift; path = Ophanim/Core/MCP/Tools/ContainerTools.swift; sourceTree = SOURCE_ROOT; };
 		1E4ADF9344E6F37E /* TweakStoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakStoreService.swift; path = Ophanim/Core/MCP/Services/TweakStoreService.swift; sourceTree = SOURCE_ROOT; };
@@ -427,6 +429,7 @@
 		7FD966D5DBC50F1A /* Core/MCP */ = {
 			isa = PBXGroup;
 			children = (
+				5BF36BBEDA431028 /* MCPTimeouts.swift */,
 				F207D73F32CDDBF9 /* MCP/Tools */,
 				1892FDC0292E78C6 /* MCP/Transports */,
 				59E19E2FB313A34F /* MCP/Services */,
@@ -888,6 +891,7 @@
 				977616121F1C5D48 /* ContainerTools.swift in Sources */,
 				7958FF75D95EB547 /* TweakStoreService.swift in Sources */,
 				71CB35DB99B57660 /* ContainerService.swift in Sources */,
+				8B65571DC49F611B /* MCPTimeouts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

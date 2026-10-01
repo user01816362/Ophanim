@@ -97,6 +97,16 @@ final class MCPHTTPTransport {
             (status, payload) = ("403 Forbidden", Data(#"{"error":"forbidden"}"#.utf8))
         } else if method != "POST" {
             (status, payload) = ("405 Method Not Allowed", Data("POST only".utf8))
+        } else if let hv = headers["mcp-protocol-version"],
+                  !MCPServer.supportedProtocolVersions.contains(hv) {
+            // Spec requires MCP-Protocol-Version on every POST. Unsupported value:
+            // version error with the supported list (body _meta is gated per-request after).
+            let err: [String: Any] = ["jsonrpc": "2.0", "id": NSNull(),
+                "error": ["code": MCPServer.versionErrorCode, "message": "Unsupported protocol version",
+                          "data": ["supported": MCPServer.supportedProtocolVersions,
+                                   "requested": hv]]]
+            (status, payload) = ("400 Bad Request",
+                (try? JSONSerialization.data(withJSONObject: err)) ?? Data())
         } else if let msg = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
             if let response = MCPServer.shared.handle(msg) {
                 let data = (try? JSONSerialization.data(withJSONObject: response, options: [.withoutEscapingSlashes])) ?? Data()

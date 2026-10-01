@@ -14,14 +14,14 @@ enum TweakTools {
 
     static func inspectTweak(_ args: [String: Any]) throws -> String {
         guard let path = args["path"] as? String, !path.isEmpty else { throw ToolRouter.bail("path is required") }
-        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        let url = ToolRouter.expandedURL(path)
         return try ToolRouter.json(try Macho.inspect(url))
     }
 
     static func addTweak(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let path = args["path"] as? String, !path.isEmpty else { throw ToolRouter.bail("path is required") }
-        let source = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        let source = ToolRouter.expandedURL(path)
         guard FileManager.default.fileExists(atPath: source.path) else {
             throw ToolRouter.bail("no such file: \(source.path)")
         }

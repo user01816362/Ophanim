@@ -44,8 +44,8 @@ enum AppTools {
             await app.launch()
             sema.signal()
         }
-        if sema.wait(timeout: .now() + 120) == .timedOut {
-            throw ToolRouter.bail("launch did not finish within 120s: \(bid)")
+        if sema.wait(timeout: .now() + MCPTimeouts.launch) == .timedOut {
+            throw ToolRouter.bail("launch did not finish within \(Int(MCPTimeouts.launch))s: \(bid)")
         }
         return "Launched \(bid)."
         #else
@@ -55,7 +55,7 @@ enum AppTools {
 
     static func installApp(_ args: [String: Any]) throws -> String {
         guard let path = args["ipaPath"] as? String, !path.isEmpty else { throw ToolRouter.bail("ipaPath is required") }
-        let ipaURL = URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
+        let ipaURL = ToolRouter.expandedURL(path)
         guard FileManager.default.fileExists(atPath: ipaURL.path) else { throw ToolRouter.bail("no file at \(ipaURL.path)") }
         guard ipaURL.pathExtension.lowercased() == "ipa" else {
             throw ToolRouter.bail("expected an .ipa file, got \(ipaURL.lastPathComponent)")
@@ -69,7 +69,7 @@ enum AppTools {
             installed = url
             sema.signal()
         }
-        guard sema.wait(timeout: .now() + 600) == .success else { throw ToolRouter.bail("install timed out") }
+        guard sema.wait(timeout: .now() + MCPTimeouts.install) == .success else { throw ToolRouter.bail("install timed out") }
         guard let appURL = installed else { throw ToolRouter.bail("install failed - see the Ophanim log for details") }
         // Same boundary check as a source install: a bundle that is not a runnable
         // Catalyst app must fail stated here, not as "Installed" followed by a dead run.

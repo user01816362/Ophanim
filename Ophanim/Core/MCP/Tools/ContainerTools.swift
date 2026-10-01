@@ -118,7 +118,7 @@ enum ContainerTools {
         guard let real = Uninstaller.containerURL(for: bid) else {
             throw ToolRouter.bail("no data container could be resolved for \(bid); it may never have launched")
         }
-        let destURL = URL(fileURLWithPath: (dest as NSString).expandingTildeInPath)
+        let destURL = ToolRouter.expandedURL(dest)
         let bytes = ContainerService.directorySize(real) ?? 0
         try FileManager.default.createDirectory(at: destURL.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
@@ -131,7 +131,7 @@ enum ContainerTools {
     static func restoreContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let archive = args["archivePath"] as? String, !archive.isEmpty else { throw ToolRouter.bail("archivePath is required") }
-        let archiveURL = URL(fileURLWithPath: (archive as NSString).expandingTildeInPath)
+        let archiveURL = ToolRouter.expandedURL(archive)
         guard FileManager.default.fileExists(atPath: archiveURL.path) else {
             throw ToolRouter.bail("no such archive: \(archiveURL.path)")
         }

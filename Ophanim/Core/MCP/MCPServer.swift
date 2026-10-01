@@ -14,13 +14,49 @@ final class MCPServer {
     private let serverName = "ophanim"
     private let serverVersion = "1.0.0"
 
+    /// Protocol revisions this server implements. `2026-07-28` is stateless
+    /// (version travels per-request in `_meta`); older revisions negotiate
+    /// through the `initialize` handshake.
+    static let supportedProtocolVersions = ["2026-07-28", "2025-06-18", "2025-11-25"]
+
+    /// The specification's error code for an unimplemented version. The server
+    /// MUST list what it supports so a client can retry.
+    static let versionErrorCode = -32022
+
+    private static let metaProtocolVersion = "io.modelcontextprotocol/protocolVersion"
+
+    /// The version a request declared, if any. Modern requests carry it in
+    /// `_meta`; a request with no version is treated as legacy.
+    private static func requestedVersion(_ params: [String: Any]) -> String? {
+        guard let meta = params["_meta"] as? [String: Any] else { return nil }
+        return meta[metaProtocolVersion] as? String
+    }
+
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
     func handle(_ msg: [String: Any]) -> [String: Any]? {
         let id = msg["id"]
         guard let method = msg["method"] as? String else { return nil }
         let params = msg["params"] as? [String: Any] ?? [:]
 
+        // Version gate, modern era only. A request declaring an unimplemented
+        // version is rejected with the supported list so the client can retry.
+        if let requested = Self.requestedVersion(params),
+           !Self.supportedProtocolVersions.contains(requested) {
+            return error(id, code: Self.versionErrorCode, message: "Unsupported protocol version",
+                         data: ["supported": Self.supportedProtocolVersions, "requested": requested])
+        }
+
         switch method {
+        case "server/discover":
+            return result(id, [
+                "resultType": "complete",
+                "supportedVersions": Self.supportedProtocolVersions,
+                "capabilities": ["tools": [:] as [String: Any]],
+                "ttlMs": 300000,
+                "instructions": "Ophanim instruments iOS apps running on macOS. Use list_apps to "
+                    + "find a bundle ID, query_events to read captured behavior, get_config/set_config "
+                    + "to inspect and change what is captured, and launch_app to run one."
+            ])
         case "initialize":
             let pv = params["protocolVersion"] as? String ?? "2025-06-18"
             return result(id, [
@@ -36,7 +72,7 @@ final class MCPServer {
         case "notifications/initialized", "notifications/cancelled":
             return nil   // notifications take no reply
         case "tools/list":
-            return result(id, ["tools": Self.toolDefinitions])
+            return result(id, ["tools": Self.toolDefinitions, "ttlMs": 300000, "cacheScope": "process"])
         case "tools/call":
             return callTool(id, name: params["name"] as? String ?? "",
                             arguments: params["arguments"] as? [String: Any] ?? [:])
@@ -47,14 +83,49 @@ final class MCPServer {
 
     // MARK: Tool dispatch (via ToolRouter.handlers)
 
+    /// Per-tool call budget within a rolling minute.
+    private static let rateLimitPerMinute = 120
+    private static var callLog: [String: [Date]] = [:]
+    private static let rateLogLock = NSLock()
+
+    /// Seconds the caller must wait, or nil if the call is allowed.
+    private func rateLimited(tool: String) -> Int? {
+        Self.rateLogLock.lock()
+        defer { Self.rateLogLock.unlock() }
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-MCPTimeouts.rateWindow)
+        var recent = (Self.callLog[tool] ?? []).filter { $0 > cutoff }
+        Self.callLog[tool] = recent
+        guard recent.count >= Self.rateLimitPerMinute else {
+            recent.append(now)
+            Self.callLog[tool] = recent
+            return nil
+        }
+        // The oldest call in the window is the one that has to age out first.
+        let wait = (recent.first ?? now).addingTimeInterval(MCPTimeouts.rateWindow).timeIntervalSince(now)
+        return max(1, Int(ceil(wait)))
+    }
+
     private func callTool(_ id: Any?, name: String, arguments args: [String: Any]) -> [String: Any]? {
+        // Per-tool limit so a chatty read cannot starve a destructive call; the
+        // refusal states the wait so a model retries rather than guesses.
+        if let retry = rateLimited(tool: name) {
+            return toolError(id, "rate limited: \(name) has been called \(Self.rateLimitPerMinute) times in "
+                + "the last minute. Wait \(retry) second\(retry == 1 ? "" : "s") and retry.")
+        }
         do {
             let text = try runTool(name, args)
-            return result(id, ["content": [["type": "text", "text": text]], "isError": false])
+            // A JSON object result is both the legacy content block and the
+            // serialised structuredContent; a plain message gets the text form.
+            if let payload = try? JSONSerialization.jsonObject(with: Data(text.utf8)),
+               let object = payload as? [String: Any] {
+                return toolResult(id, object)
+            }
+            return toolText(id, text)
         } catch let e as ToolRouter.ToolError {
-            return result(id, ["content": [["type": "text", "text": "Error: \(e.message)"]], "isError": true])
+            return toolError(id, "Error: \(e.message)")
         } catch {
-            return result(id, ["content": [["type": "text", "text": "Error: \(error.localizedDescription)"]], "isError": true])
+            return toolError(id, "Error: \(error.localizedDescription)")
         }
     }
 
@@ -68,8 +139,38 @@ final class MCPServer {
     private func result(_ id: Any?, _ value: [String: Any]) -> [String: Any] {
         ["jsonrpc": "2.0", "id": id ?? NSNull(), "result": value]
     }
-    private func error(_ id: Any?, code: Int, message: String) -> [String: Any] {
-        ["jsonrpc": "2.0", "id": id ?? NSNull(), "error": ["code": code, "message": message]]
+
+    /// A tool result with machine-readable payload: `resultType` marks it
+    /// complete, `structuredContent` carries the payload, and the text block
+    /// keeps older clients working.
+    private func toolResult(_ id: Any?, _ payload: [String: Any]) -> [String: Any] {
+        let text = (try? ToolRouter.json(payload)) ?? "{}"
+        return result(id, [
+            "resultType": "complete",
+            "content": [["type": "text", "text": text]],
+            "structuredContent": payload
+        ])
+    }
+
+    private func toolText(_ id: Any?, _ message: String) -> [String: Any] {
+        result(id, [
+            "resultType": "complete",
+            "content": [["type": "text", "text": message]],
+            "isError": false
+        ])
+    }
+
+    private func toolError(_ id: Any?, _ message: String) -> [String: Any] {
+        result(id, [
+            "resultType": "complete",
+            "content": [["type": "text", "text": message]],
+            "isError": true
+        ])
+    }
+    private func error(_ id: Any?, code: Int, message: String, data: [String: Any]? = nil) -> [String: Any] {
+        var body: [String: Any] = ["code": code, "message": message]
+        if let data { body["data"] = data }
+        return ["jsonrpc": "2.0", "id": id ?? NSNull(), "error": body]
     }
 
     // MARK: Tool catalog

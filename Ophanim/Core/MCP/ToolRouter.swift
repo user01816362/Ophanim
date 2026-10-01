@@ -23,6 +23,11 @@ enum ToolRouter {
         return bid
     }
 
+    /// Expand a user-supplied path (tilde + standardize) into a file URL.
+    static func expandedURL(_ path: String) -> URL {
+        URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
+    }
+
     /// Reject unknown argument names, naming the closest match when there is one.
     static func rejectUnknownKeys(_ args: [String: Any], allowed: Set<String>, tool: String) throws {
         let unknown = args.keys.filter { !allowed.contains($0) }.sorted()

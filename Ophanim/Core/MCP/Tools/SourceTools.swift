@@ -51,7 +51,7 @@ enum SourceTools {
         let version = args["version"] as? String
         let (app, picked) = try sourceApp(bundleID: bid, version: version)
         SourceInstalls.shared.start(app: app, version: picked)
-        switch try awaitSourceIdle(bundleID: bid, timeout: 600) {
+        switch try awaitSourceIdle(bundleID: bid, timeout: MCPTimeouts.install) {
         case .idle:
             let installed = SourceInstalls.shared.installedVersion(for: bid)?.version
             guard installed != nil else { throw ToolRouter.bail("install failed for \(bid) - see the Ophanim log") }
