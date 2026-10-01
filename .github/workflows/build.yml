@@ -170,7 +170,8 @@ jobs:
         # R7 (single interpose macro): no local DYLD_INTERPOSE defines; every
         # interpose site must import compat/OPInterpose.h.
         # R10 (single plist helper): PropertyListSerialization.propertyList may
-        # only appear in PlistReader.swift + Entitlements.swift (Dictionary.read).
+        # only appear in PlistReader.swift + Entitlements.swift (Dictionary.read)
+        # + EventPretty.swift (render-time plist sniff, different shape).
         run: |
           set -euo pipefail
           if grep -rn 'define DYLD_INTERPOSE' OphanimCore Galgal/Galgal/ --exclude-dir=compat; then
@@ -178,8 +179,8 @@ jobs:
             exit 1
           fi
           if grep -rln 'PropertyListSerialization\.propertyList' Ophanim/ --include='*.swift' \
-              | grep -v -e 'Core/Support/PlistReader.swift' -e 'Core/Support/Entitlements.swift'; then
-            echo "::error::R10: plist decode outside PlistReader/Dictionary.read - use PlistReader.appInfoDict"
+              | grep -v -e 'Core/Support/PlistReader.swift' -e 'Core/Support/Entitlements.swift' -e 'Features/Recon/EventPretty.swift'; then
+            echo "::error::R10: plist decode outside PlistReader/Dictionary.read/EventPretty - use PlistReader.appInfoDict"
             exit 1
           fi
           echo "DRY gates passed."
