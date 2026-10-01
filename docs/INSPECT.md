@@ -59,6 +59,20 @@ are filled black pre-encode (masked pixels never exist). `WKWebView` content is 
 in-process — a container node, never invented. Keychain/crypto capture is out of scope
 for this channel. The consent UX for raw capture is owned separately.
 
+## Node labels (framework / layer / scene)
+
+Each `InspectNode` carries label-only annotations
+(`Galgal/Galgal/Inspect/InspectRequest.swift:152-174`): `framework` (owning UI
+framework, inherited down subtrees; nil = indistinguishable UIKit, never a
+guess), `layer` (backing-layer class only when not a plain `CALayer`, else nil
+— payloads stay small). Responses name `frameworksDetected` (instance-proven
+union over the walked tree), `frameworkEvidence` (framework → ≤5 class/VC
+names), `rnArch` (`paper`/`fabric`/`both`/`unknown`, uiTree only), and `scene`
+(key-window `"<sceneId>:level<n>:key..."`) (`InspectRequest.swift:101-111`;
+guest fills them in `Inspector.snapshot`/`keyWindowFramework`,
+`Inspector.swift:109-215`). Rule: nil-means-unknown; old timelines decode via
+nil defaults. Full rationale: `docs/DECISIONS/0011-framework-layer-scene.md`.
+
 ## MCP tools
 
 `uitree_read`, `screenshot` (read-only); `tap_element`, `swipe`, `set_text` (touch the
@@ -70,8 +84,13 @@ enabled" when the app never opted in.
 `inspect_snapshot` pins one tree (+ optional JPEG) under `Logs/<bundleID>/snapshots/`
 (newest 20 kept, pruned on capture, purged on uninstall). `inspect_timeline` lists
 entries; `inspect_diff` compares into named events (`class_flip`, `content_change`,
-`nodes_added/removed`, `subtree_rebuild`, `scroll`, `count_delta`); same-mode/same-filter
-pairs only, budget-cut pairs marked `partial`. `inspect_clear_snapshots` deletes the
+`layer_flip` (same slot+class, both layers non-nil and different; both-nil old
+timelines never fire — `SnapshotStore.swift:387-392`), `nodes_added/removed`,
+`subtree_rebuild`, `scroll`, `count_delta`); same-mode/same-filter pairs only,
+budget-cut pairs marked `partial`. Diffs only pair equal mode/filter/root/caps/**scene**
+— cross-scene pairs refuse stated (`InspectTools.swift:305-311`); the manifest carries
+the pairing keys plus informational `scene`/`frameworks`
+(`SnapshotManifest`, `SnapshotStore.swift:49-84`). `inspect_clear_snapshots` deletes the
 timeline (dryRun-default). Gestures take `snapshot: none|pre|post|both` (default none —
 each leg costs a transaction).
 

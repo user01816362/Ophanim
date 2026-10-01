@@ -32,11 +32,21 @@ Ownership: Keychain = Galgal-owned. FS raw POSIX = sibling-only
 
 ## MCP families (ported from OLD MCP-GUIDE)
 
-60 tools, stable names. Cache `tools/list` (`listChanged: false`,
+63 tools, stable names. Cache `tools/list` (`listChanged: false`,
 `ttlMs: 300000`). One page, no pagination; no prompts/resources/sampling —
-tools-only by design. Transport: `Ophanim --mcp` stdio (one child per client
+tools-only by design. Catalog: `MCPServer.toolDefinitions`
+(`Ophanim/Core/MCP/MCPServer.swift:226`, 63 entries) routed via
+`ToolRouter.handlers` (46, `ToolRouter.swift:85-132`) + `InspectTools`
+(17, `InspectTools.swift:719-726`). Annotations: 24 read-only
+(`MCPServer.swift:36-43`), 15 destructive (`MCPServer.swift:46-51`).
+Transport: `Ophanim --mcp` stdio (one child per client
 is normal; shared state is file-backed — settings, NDJSON, inspect slot).
-HTTP only when launched with `--port` (opt-in, never default).
+HTTP only when launched with `--port`/`--bind` (opt-in, never default;
+`Ophanim/App/OphanimApp.swift:8-13`). Bearer posture
+(`Ophanim/Core/MCP/Transports/HTTPTransport.swift:18-38`): loopback stays
+open (same-machine trust); non-loopback fails closed (first use mints a UUID,
+persists `ophanim.mcp.token`, prints to stderr; write tools need
+`Authorization: Bearer <token>`).
 
 Conventions: **R** read-only, **D** destructive, **I** idempotent. Tool
 names/args live in code (`MCPServer.toolDefinitions`); this reproduces
@@ -48,7 +58,12 @@ semantics, never parameters.
   runtime classes when Agent Mode runs, else static strings, limit ≤2000),
   `list_jailbreak_detectors`.
 - **Events** — `query_events` (R/I), `tail_events` (R/I live poll, `since`
-  ms epoch; `since: 0` = latest batch).
+  ms epoch; `since: 0` = latest batch; `waitMs` long-poll, block up to N ms,
+  cap 30000, default 0 — `EventTools.swift:21-26`; catalog `MCPServer.swift:259`),
+  `subscribe_events` (push cursor+count `notifications/events/added` on stdout,
+  bodies via `tail_events`; stdio children only — refuses over HTTP,
+  `EventTools.swift:49-55`), `unsubscribe_events` (one bundleID, or all when
+  omitted; reports `threadParked` — `EventTools.swift:57-63`).
 - **Config** — `get_config` (R/I), `set_config` (field-level; unknown keys
   rejected with did-you-mean; capture applies live, hooks/strategy need
   relaunch).
@@ -60,7 +75,9 @@ semantics, never parameters.
   `launch_app`, `uninstall_app` (D/I dryRun; `purgeData` deletes container).
 - **Tweaks** — `list_tweaks`, `inspect_tweak` (run BEFORE add),
   `add/move/remove_tweak`, `set_tweak_enabled`, `tweak_folder`, `resync_tweaks`,
-  `get_keymap` (read-only by design).
+  `get_keymap` (read-only by design), `set_keymap` (D dryRun: validated
+  full-blob replace — name gate, enforced bundle binding, backup,
+  atomic replace; `ConfigTools.swift:80-122`, catalog `MCPServer.swift:850-863`).
 - **Logs/Container** — `get_log_path`, `clear_logs` (D/I dryRun),
   `container_info`, `list/create/switch/remove_profile` (dryRun; active
   refused; switch refuses while running), `clear_container` (D/I dryRun;
@@ -106,7 +123,11 @@ keychain values are never readable.
 <bid> - launch it first (launch_app), then retry` · `Agent Mode is not
 enabled for <bid>; turn it on in the app's Hacking settings, then relaunch
 the app` · `take a fresh tree` (stale elementId) · `did you mean…` (unknown
-set_config key) · `rate limited: <tool> … wait <N>s` · `inspect timed out
+set_config key) · `rate limited: <tool> … wait <N>s` · `bearer token required
+for '<name>' on non-loopback HTTP (UserDefaults ophanim.mcp.token)` (401,
+`HTTPTransport.swift:192-194`; handshake + read-only tools never pay,
+`HTTPTransport.swift:184-189`) · `subscriptions need a stdio --mcp child;
+over HTTP use tail_events waitMs` (`EventNotifier.swift:20`) · `inspect timed out
 after 60s - guest pump silent since <t> - relaunch the app with Agent Mode
 on` (or `no pump heartbeat` when the pump never beat). Liveness is one
 shared definition (`InspectControl.isAppRunning`): workspace match OR fresh

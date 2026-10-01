@@ -36,3 +36,28 @@ re-check the cited path before reopening.
   the release process, not in code.
 - Checklist items 3–5 (install/launch/capture/MCP drive + crash check) →
   automated in `scripts/test/integration-test.sh`.
+
+## Verdicts (code-verified 2026-10-01; do not reopen without new evidence)
+
+- HostWindow → deduped, no reopen. Zero `HostWindow` matches in the tree
+  (grep, 2026-10-01). Window fan-out lives in `SettingsWindowManager`
+  (`Ophanim/Features/Rules/SettingsWindowManager.swift:10-11`) plus
+  `AppSettingsWindowManager`
+  (`Ophanim/Features/AppSettings/AppSettingsWindow.swift:98-99`), with live
+  call sites (`AppLibraryView.swift:92`, `HostedAppView.swift:39`,
+  `LogViewerView.swift:22`, `ReconView.swift:25`, `AppSourcesView.swift:22`).
+- OPSwizzle → inlined/upstream, no separate layer to revive. Zero `OPSwizzle`
+  matches in the tree. ObjC swizzle helpers
+  (`swizzleInstanceMethod`/`swizzleExchangeMethod`/`swizzleClassMethod`) plus
+  the `PTSwizzleLoader` +load applier live upstream in Galgal
+  (`Galgal/Galgal/Controls/PTFakeTouch/NSObject+Swizzle.m:25-64,248-356`),
+  which this repo does not reorganize (see `ARCHITECTURE.md`).
+- Keymap writes → SHIPPED as `set_keymap` (catalog
+  `Ophanim/Core/MCP/MCPServer.swift:850-863`, route
+  `ToolRouter.swift:131`, validated writer `ConfigTools.swift:80-122`:
+  name gate, enforced bundle binding, backup, atomic replace, dryRun default).
+- Streaming → SHIPPED as `tail_events waitMs` (catalog
+  `MCPServer.swift:259`, long-poll cap 30000 `EventTools.swift:21-26`) plus
+  `subscribe_events`/`unsubscribe_events` (catalog `MCPServer.swift:265-285`,
+  handlers `EventTools.swift:49-63`, emitter `Transports/EventNotifier.swift`);
+  design in ADR-0010.
