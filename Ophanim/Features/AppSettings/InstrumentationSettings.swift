@@ -56,6 +56,12 @@ struct InstrumentationView: View {
                         .disabled(!enabled)
                         .help("Record the calling stack for ObjC-level events (device, privacy, attestation, "
                               + "process launches) so you can see which code made each call. Adds overhead.")
+                    Toggle("Attribute network callers", isOn: bind(\.captureNetworkCallers))
+                        .toggleStyle(.switch)
+                        .disabled(!enabled)
+                        .help("Record which thread and classes sent each HTTP request (symbolicated in-app; "
+                              + "Swift frames stay mangled). Default off: requests are the hottest category "
+                              + "and stack capture costs per request.")
                     Toggle("Open log window on launch", isOn: bind(\.autoOpenLog))
                         .toggleStyle(.switch)
                         .disabled(!enabled)
@@ -130,6 +136,8 @@ struct InstrumentationView: View {
                     Text("Logs are written to the app's container; open them with “View log…”.")
                         .font(.caption).foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    Toggle("Clear on launch", isOn: $settings.settings.clearLogsOnLaunch)
+                        .help("Delete previous runs when a new launch begins, so the log always shows exactly the current run. Off keeps history across launches.")
                 }
                 .disabled(!enabled)
 

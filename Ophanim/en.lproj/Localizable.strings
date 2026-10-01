@@ -224,6 +224,9 @@
 
 // Added tooltips
 "settings.picker.iosDevice.help" = "Chooses the iOS hardware model the app reports as its device.";
+"settings.picker.spoofedOSVersion" = "iOS version:";
+"settings.picker.spoofedOSVersion.placeholder" = "e.g. 17.6.1 (empty = real version)";
+"settings.picker.spoofedOSVersion.help" = "Reports a different iOS version to the app (kern.osproductversion/osrelease) to test version-gated API behavior. Empty reports the real version.";
 "settings.picker.aspectRatio.help" = "Picks the aspect ratio applied when a fixed resolution is selected.";
 "settings.picker.scaler.help" = "Scales the render resolution up or down - larger values look crisper but cost more.";
 "settings.settings.displayRotation.help" = "Sets the window orientation; choose “Fix flipped” for apps drawn upside-down.";

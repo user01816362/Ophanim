@@ -11,7 +11,6 @@ struct BypassesView: View {
     @Binding var task: BlockingTask
     @AppStorage("settings.settings.chainGuard") private var chainGuard = false
     @AppStorage("settings.settings.chainGuardDebugging") private var chainGuardDebugging = false
-    @AppStorage("settings.settings.bypass") private var bypass = false
     @State private var hasIntrospection: Bool
     @State private var hasIosFrameworks: Bool
     @State private var appCategory: LSApplicationCategoryType = .none
