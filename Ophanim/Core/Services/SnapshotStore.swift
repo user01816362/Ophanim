@@ -69,6 +69,12 @@ struct SnapshotManifest: Codable {
     /// Which caps cut this read (nil/empty = uncut or pre-cap manifest). Informational:
     /// pairing keys on caps, not on this list.
     var truncatedBy: [String]? = nil
+    /// Key-window scene at capture (nil = pre-scene manifest). Diffs only pair equal
+    /// scenes, so cross-window pairs refuse stated instead of mixing windows silently.
+    var scene: String? = nil
+    /// Instance-proven frameworks owning pixels at capture (nil = pre-framework
+    /// manifest or indistinguishable UIKit). Informational: never a pairing key.
+    var frameworks: [String]? = nil
     var nodes: Int
     var treeHash: String
     var shotFile: String?
@@ -94,6 +100,7 @@ enum SnapshotStore {
                         depthLimit: Int = 24, nodeLimit: Int = 2000,
                         redacted: Bool,
                         truncated: Bool, truncatedBy: [String]? = nil,
+                        scene: String? = nil, frameworks: [String]? = nil,
                         tree: InspectNode, treeBytes: Data,
                         jpeg: Data? = nil, width: Int? = nil, height: Int? = nil) -> SnapshotManifest {
         let dir = snapshotsDir(bundleID: bundleID)
@@ -125,6 +132,7 @@ enum SnapshotStore {
             trigger: trigger, opRef: opRef, mode: mode.rawValue, filter: filter,
             rootId: rootId, depthLimit: depthLimit, nodeLimit: nodeLimit,
             redacted: redacted, truncated: truncated, truncatedBy: truncatedBy,
+            scene: scene, frameworks: frameworks,
             nodes: nodeCount(tree), treeHash: hash(treeBytes),
             shotFile: shotFile, width: width, height: height, tree: tree)
         if let data = try? JSONEncoder().encode(manifest) {
@@ -262,6 +270,7 @@ enum SnapshotStore {
         var text: String?
         var secure: Bool
         var axIdentifier: String?
+        var layer: String?
     }
 
     /// Flattened node for keying. Path is the guest's positional id verbatim ("0.2.1"):
@@ -271,7 +280,7 @@ enum SnapshotStore {
     static func flatten(_ node: InspectNode, out: inout [FlatNode]) {
         out.append(FlatNode(path: node.id, cls: node.cls, role: node.role, frame: node.frame,
                             text: node.text, secure: node.secure,
-                            axIdentifier: node.axIdentifier))
+                            axIdentifier: node.axIdentifier, layer: node.layer))
         for c in node.children { flatten(c, out: &out) }
     }
 
@@ -375,6 +384,12 @@ enum SnapshotStore {
                     replacedA.insert(k)
                     changedPaths.append(nb.path)
                 }
+            } else if na.layer != nil && nb.layer != nil && na.layer != nb.layer {
+                // Same slot, same class, different backing layer (video started, transform
+                // layer swapped): sibling to class_flip. Both-nil (old timelines) never fires.
+                changedPaths.append(nb.path)
+                events.append(["event": "layer_flip", "key": k,
+                               "from": na.layer ?? "", "to": nb.layer ?? "", "path": nb.path])
             } else if na.text != nb.text {
                 changedPaths.append(nb.path)
                 if nb.secure {

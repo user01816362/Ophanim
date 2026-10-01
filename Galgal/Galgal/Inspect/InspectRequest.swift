@@ -98,6 +98,17 @@ struct InspectResponse: Codable {
     var totalCount: Int? = nil
     /// classDetail: method/ivar inventory for hook targeting (nil for other ops).
     var classDetail: InspectClassDetail? = nil
+    /// uiTree/screenshot: frameworks owning pixels, instance-proven in the walked tree
+    /// (nil/empty = indistinguishable UIKit). Values: uikit-objc, uikit-swift, swiftui,
+    /// react-native, flutter, unity, capacitor, cordova, xamarin.
+    var frameworksDetected: [String]? = nil
+    /// framework -> up to 5 matched class/VC names, so operators can audit the claim.
+    var frameworkEvidence: [String: [String]]? = nil
+    /// uiTree only: react-native arch from sentinel presence (paper/fabric/both/unknown).
+    var rnArch: String? = nil
+    /// Key-window scene at capture ("<sceneId>:level<n>:key"), so diffs can refuse
+    /// cross-scene pairs stated instead of mixing windows silently.
+    var scene: String? = nil
 
     static func failure(id: String, _ message: String) -> InspectResponse {
         InspectResponse(id: id, ok: false, error: message, truncated: nil, truncatedBy: nil, tree: nil, imageBase64: nil,
@@ -152,6 +163,13 @@ struct InspectNode: Codable {
     var axIdentifier: String?
     var enabled: Bool
     var secure: Bool      // true when the text was masked (redaction on + secure field)
+    /// Owning UI framework, per node (nil = indistinguishable UIKit, never a guess).
+    /// Inherited down subtrees, so 500 RCTView descendants cost one ancestor decision.
+    var framework: String? = nil
+    /// Backing layer class when it is not a plain CALayer (e.g. AVPlayerLayer,
+    /// CATransformLayer) — nil otherwise, so payloads stay small and diffs only fire
+    /// on real layer changes, never on old layer-less timelines.
+    var layer: String? = nil
     var children: [InspectNode]
 }
 

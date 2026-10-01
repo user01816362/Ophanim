@@ -172,7 +172,7 @@ final class InspectCommandPump: NSObject {
                                        imageBase64: nil, mimeType: nil, width: nil, height: nil,
                                        acted: nil, targetClass: nil)
             }
-            let (nodes, truncated, by) = Inspector.snapshot(redact: redacted,
+            let (nodes, truncated, by, frameworks, evidence, rnArch, scene) = Inspector.snapshot(redact: redacted,
                                                             mode: mode,
                                                             filter: cmd.filter,
                                                             maxDepth: depthCap,
@@ -180,21 +180,32 @@ final class InspectCommandPump: NSObject {
             // Forest root: one synthetic node so the payload shape is uniform.
             let root = InspectNode(id: "root", cls: "Windows", role: "container", frame: [0, 0, 0, 0],
                                    text: nil, placeholder: nil, axLabel: nil, axIdentifier: nil,
-                                   enabled: true, secure: false, children: nodes)
-            return InspectResponse(id: cmd.id, ok: true, error: nil,
+                                   enabled: true, secure: false, framework: nil, layer: nil,
+                                   children: nodes)
+            var rsp = InspectResponse(id: cmd.id, ok: true, error: nil,
                                    truncated: truncated, truncatedBy: by.isEmpty ? nil : by,
                                    tree: root,
                                    imageBase64: nil, mimeType: nil, width: nil, height: nil,
                                    acted: nil, targetClass: nil)
+            if !frameworks.isEmpty { rsp.frameworksDetected = frameworks }
+            if !evidence.isEmpty { rsp.frameworkEvidence = evidence }
+            rsp.rnArch = rnArch
+            rsp.scene = scene
+            return rsp
 
         case .screenshot:
             guard let shot = InspectorScreenshot.capture(redact: redacted) else {
                 return .failure(id: cmd.id, "no window available for capture")
             }
-            return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+            let key = Inspector.keyWindowFramework()
+            var shot_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                    imageBase64: shot.data.base64EncodedString(),
                                    mimeType: "image/jpeg", width: shot.width, height: shot.height,
                                    acted: nil, targetClass: nil)
+            if !key.frameworks.isEmpty { shot_rsp.frameworksDetected = key.frameworks }
+            shot_rsp.rnArch = key.rnArch
+            shot_rsp.scene = key.scene
+            return shot_rsp
 
         case .tap:
             // Touches only ever land in the key window (the touch path targets it): an element

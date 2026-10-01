@@ -106,10 +106,13 @@ enum Inspector {
 
     /// Snapshot every window, key window first. Pure read: no first-responder changes, no layout.
     /// Agent-narrowable caps (depthLimit/nodeLimit) only ever narrow the hard ceilings -
-    /// the guest clamps, never raises.
+    /// the guest clamps, never raises. Also reports instance-proven frameworks (union of
+    /// per-node verdicts + evidence), the RN arch from sentinel presence, and the key
+    /// window's scene (so diffs can refuse cross-scene pairs stated).
     static func snapshot(redact: Bool, mode: InspectMode, filter: String?,
                          maxDepth: Int = maxDepth, maxNodes: Int = maxNodes)
-    -> (nodes: [InspectNode], truncated: Bool, truncatedBy: [String]) {
+    -> (nodes: [InspectNode], truncated: Bool, truncatedBy: [String],
+        frameworks: [String], evidence: [String: [String]], rnArch: String?, scene: String) {
         let depthCap = min(max(maxDepth, 1), maxDepth)
         let nodeCap = min(max(maxNodes, 1), maxNodes)
         let windows = sortedWindows()
@@ -118,8 +121,15 @@ enum Inspector {
         var depthCut = false
         var nodeCut = false
         var budget = nodeCap
+        var scene = "unknown:level0:keyfalse"
+        var sceneTaken = false
         for (wi, window) in windows.enumerated() {
             guard !window.isHidden, window.alpha > 0.01 else { continue }
+            if !sceneTaken {
+                let sid = window.windowScene?.session.persistentIdentifier ?? "unknown"
+                scene = "\(sid):level\(Int(window.windowLevel.rawValue)):key\(window.isKeyWindow)"
+                sceneTaken = true
+            }
             if budget <= 0 { truncated = true; nodeCut = true; break }
             let (node, used, dCut, nCut) = walk(window, id: "\(wi)", window: window,
                                                depth: 0, budget: budget, redact: redact,
@@ -133,7 +143,76 @@ enum Inspector {
         var by: [String] = []
         if depthCut { by.append("depth") }
         if nodeCut { by.append("nodes") }
-        return (nodes, truncated, by)
+        // Evidence, post-hoc over nodes (instance-proven by construction): framework ->
+        // up to 5 matched class names. Class presence alone never claims pixels.
+        var evidence: [String: [String]] = [:]
+        var found: [String] = []
+        func collect(_ n: InspectNode) {
+            if let fw = n.framework {
+                if !found.contains(fw) { found.append(fw) }
+                if (evidence[fw]?.count ?? 0) < 5 && !(evidence[fw]?.contains(n.cls) ?? false) {
+                    evidence[fw, default: []].append(n.cls)
+                }
+            }
+            for c in n.children { collect(c) }
+        }
+        for n in nodes { collect(n) }
+        // RN arch from sentinel presence (meaningful only when react-native detected).
+        var rnArch: String? = nil
+        if found.contains("react-native") {
+            let paper = NSClassFromString("RCTUIManager") != nil
+            let fabric = NSClassFromString("RCTRootViewFactory") != nil
+                || NSClassFromString("RCTSurfaceView") != nil
+            if paper && fabric { rnArch = "both" }
+            else if fabric { rnArch = "fabric" }
+            else if paper { rnArch = "paper" }
+            else { rnArch = "unknown" }
+        }
+        return (nodes, truncated, by, found, evidence, rnArch, scene)
+    }
+
+    /// Framework owning the key window's pixels, for the screenshot op (no tree walk).
+    /// Claimed only via the root VC / first-level views — class presence alone never fires.
+    static func keyWindowFramework() -> (frameworks: [String], rnArch: String?, scene: String) {
+        let windows = sortedWindows()
+        guard let window = windows.first(where: { !$0.isHidden && $0.alpha > 0.01 }) else {
+            return ([], nil, "unknown:level0:keyfalse")
+        }
+        let sid = window.windowScene?.session.persistentIdentifier ?? "unknown"
+        let scene = "\(sid):level\(Int(window.windowLevel.rawValue)):key\(window.isKeyWindow)"
+        var chain: [String] = []
+        var rootCls = String(describing: type(of: window))
+        if let rootVC = window.rootViewController {
+            rootCls = NSStringFromClass(type(of: rootVC))
+            var c: AnyClass? = class_getSuperclass(type(of: rootVC))
+            while let k = c, chain.count < 8 {
+                chain.append(NSStringFromClass(k))
+                c = class_getSuperclass(k)
+            }
+        }
+        var fw = chainFramework(of: rootCls, superclasses: chain)
+        if fw == nil { fw = vcFramework(rootCls) }
+        if fw == nil {
+            for sub in window.subviews {
+                let sc = String(describing: type(of: sub))
+                if let hit = chainFramework(of: sc, superclasses: superclasses(of: sub)) {
+                    fw = hit
+                    break
+                }
+            }
+        }
+        guard let found = fw else { return ([], nil, scene) }
+        var rnArch: String? = nil
+        if found == "react-native" {
+            let paper = NSClassFromString("RCTUIManager") != nil
+            let fabric = NSClassFromString("RCTRootViewFactory") != nil
+                || NSClassFromString("RCTSurfaceView") != nil
+            if paper && fabric { rnArch = "both" }
+            else if fabric { rnArch = "fabric" }
+            else if paper { rnArch = "paper" }
+            else { rnArch = "unknown" }
+        }
+        return ([found], rnArch, scene)
     }
 
     /// Resolve a positional id ("0.2.1") by re-walking IN THE SAME MODE. ids are only meaningful
@@ -160,6 +239,52 @@ enum Inspector {
         }
         let final = (mode == .compact) ? collapse(current) : current
         return (final, window, String(describing: type(of: final)))
+    }
+
+    /// Per-class framework verdict memo (capped: mirrors the maxClassNames ethos).
+    /// Keyed by class name; VC-chain verdicts are per-instance and stay uncached.
+    private static var frameworkCache: [String: String?] = [:]
+
+    /// Framework owning one class + superclass chain. Exact sentinels first, then
+    /// prefix families (the node IS the instance, so instance evidence holds), then
+    /// the Swift dot rule (dotted Module.Class; ObjC identifiers cannot contain dots).
+    /// Nil = indistinguishable UIKit, never a guess. classify() stays untouched
+    /// (redaction depends on it); the VC chain is checked by the caller, not here.
+    private static func chainFramework(of cls: String, superclasses: [String]) -> String? {
+        if let hit = frameworkCache[cls] { return hit }
+        var out: String? = nil
+        let chain = [cls] + superclasses
+        for c in chain {
+            if c == "RCTRootView" || c == "RCTSurfaceView" { out = "react-native"; break }
+            if c == "FlutterView" { out = "flutter"; break }
+            if c == "UnityView" || c == "UnityGetGLView" { out = "unity"; break }
+        }
+        if out == nil {
+            for c in chain {
+                if c.hasPrefix("RCT") { out = "react-native"; break }
+                if c.hasPrefix("Flutter") || c.hasPrefix("FLT") { out = "flutter"; break }
+                if c.hasPrefix("Unity") { out = "unity"; break }
+                if c.hasPrefix("CAP") { out = "capacitor"; break }
+                if c.hasPrefix("CDV") { out = "cordova"; break }
+                if c.hasPrefix("Xamarin") || c.contains("Maui") { out = "xamarin"; break }
+            }
+        }
+        if out == nil && cls.contains(".") { out = "uikit-swift" }
+        if frameworkCache.count > 512 { frameworkCache.removeAll() }
+        frameworkCache[cls] = out
+        return out
+    }
+
+    /// Owning view controller verdict (responder chain): hosting/bridge controllers.
+    /// Called only when the chain says nothing, so the responder walk stays off the
+    /// hot path for plain UIKit subtrees.
+    private static func vcFramework(_ vc: String?) -> String? {
+        guard let vc = vc else { return nil }
+        if vc.contains("UIHostingController") { return "swiftui" }
+        if vc.contains("FlutterViewController") { return "flutter" }
+        if vc.contains("CAPBridgeViewController") { return "capacitor" }
+        if vc.contains("CDVViewController") { return "cordova" }
+        return nil
     }
 
     /// Superclass chain, nearest first, capped. Public runtime API.
@@ -246,7 +371,8 @@ enum Inspector {
     /// them up; a subtree can carry both, and inference from one bool would lose that.
     static func walk(_ view: UIView, id: String, window: UIWindow,
                      depth: Int, budget: Int, redact: Bool,
-                     mode: InspectMode, filter: String?, maxDepth: Int = maxDepth)
+                     mode: InspectMode, filter: String?, maxDepth: Int = maxDepth,
+                     inherited: String? = nil)
     -> (InspectNode?, Int, Bool, Bool) {
         guard budget > 0 else { return (nil, 0, false, true) }
         guard depth <= maxDepth else { return (nil, 0, true, false) }
@@ -274,6 +400,17 @@ enum Inspector {
         var children: [InspectNode] = []
         var depthCut = false
         var nodeCut = false
+        // Framework, inherited down subtrees: one ancestor decision covers hundreds of
+        // descendants. Chain first (cached), responder chain only when the chain is mute.
+        let supers = superclasses(of: target)
+        var fw = inherited ?? chainFramework(of: cls, superclasses: supers)
+        if fw == nil {
+            fw = vcFramework(viewController(of: target)) ?? fw
+        }
+        // Backing layer, only when it is not a plain CALayer (keeps payloads small and
+        // diffs honest: a nil layer never flips against an old layer-less timeline).
+        let layerName = String(describing: type(of: target.layer))
+        let layer: String? = layerName == "CALayer" ? nil : layerName
         // Web content is opaque in-process: report the container, never invent children.
         let isWeb = cls.contains("WKWebView")
         if !isWeb {
@@ -283,7 +420,7 @@ enum Inspector {
                 let (child, used, dCut, nCut) = walk(kid, id: "\(id).\(i)", window: window,
                                                      depth: depth + 1, budget: budget - consumed,
                                                      redact: redact, mode: mode, filter: filter,
-                                                     maxDepth: maxDepth)
+                                                     maxDepth: maxDepth, inherited: fw)
                 consumed += used
                 depthCut = depthCut || dCut
                 nodeCut = nodeCut || nCut
@@ -306,6 +443,7 @@ enum Inspector {
             axLabel: target.accessibilityLabel, axIdentifier: target.accessibilityIdentifier,
             enabled: (target as? UIControl)?.isEnabled ?? true,
             secure: secure && redact,
+            framework: fw, layer: layer,
             children: children)
         return (node, consumed, depthCut, nodeCut)
     }

@@ -841,7 +841,7 @@ final class MCPServer {
         ],
         [
             "name": "uitree_read",
-            "description": "Read the app UI tree (JSON text + structured summary).",
+            "description": "Read the app UI tree (JSON text + structured summary). Nodes carry framework/layer; response names detected frameworks + scene.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -857,7 +857,7 @@ final class MCPServer {
         ],
         [
             "name": "screenshot",
-            "description": "Capture a screenshot (image block + dimensions).",
+            "description": "Capture a screenshot (image block + dimensions). Response names detected frameworks + scene.",
             "inputSchema": [
                 "type": "object",
                 "properties": [

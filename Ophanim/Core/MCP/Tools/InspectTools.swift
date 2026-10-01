@@ -244,6 +244,7 @@ enum InspectTools {
                 redacted: redacted,
                 truncated: treeRsp.truncated ?? false,
                 truncatedBy: treeRsp.truncatedBy,
+                scene: treeRsp.scene, frameworks: treeRsp.frameworksDetected,
                 tree: tree, treeBytes: treeData, jpeg: jpeg, width: w, height: h)
             var payload: [String: Any] = [
                 "bundleID": bid, "id": man.id, "capturedAt": man.capturedAt,
@@ -302,9 +303,10 @@ enum InspectTools {
                 a = all[idx - 1]
             }
             guard a.mode == b.mode && a.filter == b.filter && a.rootId == b.rootId
-                && a.depthLimit == b.depthLimit && a.nodeLimit == b.nodeLimit else {
+                && a.depthLimit == b.depthLimit && a.nodeLimit == b.nodeLimit
+                && a.scene == b.scene else {
                 throw ToolRouter.bail("snapshots \(a.id) (\(a.mode)/\(a.filter ?? "-")/\(a.rootId ?? "-")/d\(a.depthLimit)n\(a.nodeLimit)) and "
-                    + "\(b.id) (\(b.mode)/\(b.filter ?? "-")/\(b.rootId ?? "-")/d\(b.depthLimit)n\(b.nodeLimit)) differ in mode, filter, root, or caps - "
+                    + "\(b.id) (\(b.mode)/\(b.filter ?? "-")/\(b.rootId ?? "-")/d\(b.depthLimit)n\(b.nodeLimit)) differ in mode, filter, root, caps, or scene - "
                     + "diff only same-walk pairs, like element ids resolve only in one mode")
             }
             let (events, partial, reason) = SnapshotStore.diff(from: a, to: b)
@@ -375,6 +377,7 @@ enum InspectTools {
                         bundleID: bid, trigger: "manual", opRef: nil,
                         mode: mode, filter: nil, redacted: redacted,
                         truncated: rsp.truncated ?? false,
+                        scene: rsp.scene, frameworks: rsp.frameworksDetected,
                         tree: tree, treeBytes: treeData).id
                 }
             }
@@ -602,7 +605,9 @@ enum InspectTools {
                                  x1: x1, y1: y1, x2: x2, y2: y2,
                                  steps: steps, textLength: textLength),
             mode: mode, filter: nil, redacted: redacted,
-            truncated: rsp.truncated ?? false, tree: tree, treeBytes: treeData)
+            truncated: rsp.truncated ?? false,
+            scene: rsp.scene, frameworks: rsp.frameworksDetected,
+            tree: tree, treeBytes: treeData)
     }
 
     /// Manifest without the tree: listings carry metadata, trees stay on disk until a diff.
@@ -614,6 +619,8 @@ enum InspectTools {
             "nodes": m.nodes, "treeHash": m.treeHash]
         if let filter = m.filter { d["filter"] = filter }
         if let rootId = m.rootId { d["rootId"] = rootId }
+        if let scene = m.scene { d["scene"] = scene }
+        if let frameworks = m.frameworks { d["frameworks"] = frameworks }
         d["depthLimit"] = m.depthLimit
         d["nodeLimit"] = m.nodeLimit
         if let shotFile = m.shotFile { d["shotFile"] = shotFile }
