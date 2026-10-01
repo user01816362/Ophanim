@@ -155,7 +155,8 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
 
         windows[bid] = window
         window.contentMinSize = fixedSize
-        window.contentMaxSize = fixedSize        if let parent = NSApp.mainWindow ?? NSApp.keyWindow {
+        window.contentMaxSize = fixedSize
+        if let parent = NSApp.mainWindow ?? NSApp.keyWindow {
             let topLeft = NSPoint(x: parent.frame.minX, y: parent.frame.maxY)
             window.setFrameTopLeftPoint(parent.cascadeTopLeft(from: topLeft))
         } else {
