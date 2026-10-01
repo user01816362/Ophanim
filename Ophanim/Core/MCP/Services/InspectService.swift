@@ -134,3 +134,22 @@ enum InspectControl {
 
 /// Opt-in auto-capture around hand ops (`snapshot:"pre"|"post"|"both"` on tap_element,
 /// swipe, set_text). Parsed here so the schema enum and the dispatcher cannot drift.
+enum SnapshotCaptureArg {
+    static let name = "snapshot"
+    static let schema: [String: Any] = [
+        "type": "string", "enum": ["none", "pre", "post", "both"],
+        "description": "Pin UI snapshots around the op for flip analysis with inspect_diff "
+            + "(pre/post/both; default none). Each leg costs a full tree transaction."]
+    static func parse(_ args: [String: Any]) throws -> (pre: Bool, post: Bool) {
+        guard let raw = args[name] as? String else { return (false, false) }
+        switch raw {
+        case "none": return (false, false)
+        case "pre": return (true, false)
+        case "post": return (false, true)
+        case "both": return (true, true)
+        default:
+            throw ToolRouter.bail(
+                "snapshot must be none, pre, post, or both - got '\(raw)'")
+        }
+    }
+}
