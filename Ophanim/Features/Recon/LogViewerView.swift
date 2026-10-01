@@ -15,10 +15,11 @@ import Combine
 /// sheet). One window per host app bundle id - re-opening brings the existing one to the front.
 /// macOS 12 can't use SwiftUI's openWindow/WindowGroup(for:), so we host the SwiftUI view in an
 /// AppKit window directly.
+/// @MainActor: pure UI manager, every method touches AppKit.
+@MainActor
 final class LogWindowManager: NSObject {
     static let shared = LogWindowManager()
 
-    @MainActor
     func show(bundleID: String) {
         SettingsWindowManager.shared.show(key: bundleID, title: "Hacking Log - \(bundleID)",
                                           size: NSSize(width: 1200, height: 640),

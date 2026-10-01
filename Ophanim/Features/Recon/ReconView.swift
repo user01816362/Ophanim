@@ -18,10 +18,11 @@ import AppKit
 
 /// Opens the recon view as a standalone, resizable window (one per app bundle id), mirroring
 /// LogWindowManager so macOS 12 (no SwiftUI openWindow(for:)) is supported.
+/// @MainActor: pure UI manager, every method touches AppKit.
+@MainActor
 final class ReconWindowManager: NSObject {
     static let shared = ReconWindowManager()
 
-    @MainActor
     func show(executable: URL, bundleID: String, appName: String) {
         SettingsWindowManager.shared.show(key: bundleID, title: "Recon - \(appName)",
                                           size: NSSize(width: 980, height: 640),
