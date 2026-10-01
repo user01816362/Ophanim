@@ -4,6 +4,21 @@ import Darwin
 // MARK: - stdio transport (headless `--mcp`)
 
 enum MCPStdioTransport {
+    /// Serializes stdout writes: the request loop below and the event-notifier
+    /// thread share one pipe, and concurrent FileHandle writes would interleave bytes.
+    static let writeLock = NSLock()
+    /// Set once the run loop owns stdout. Subscribe tools refuse when false (HTTP/GUI
+    /// process): push belongs to the stdio child that owns the pipe.
+    private(set) static var notifierActive = false
+
+    /// One locked line write (response or notification).
+    static func writeLine(_ data: Data) {
+        writeLock.lock()
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data([0x0a]))
+        writeLock.unlock()
+    }
+
     /// Blocking newline-delimited JSON-RPC loop over stdin/stdout. Never returns.
     static func run() -> Never {
         // stdio mode is meant to be spawned by an MCP client that drives requests over the stdin
@@ -21,6 +36,7 @@ enum MCPStdioTransport {
         }
         let out = FileHandle.standardOutput
         let newline = Data([0x0a])
+        notifierActive = true
         while let line = readLine(strippingNewline: true) {
             if line.isEmpty { continue }
             guard let data = line.data(using: .utf8),
@@ -28,7 +44,9 @@ enum MCPStdioTransport {
             else { continue }
             guard let response = MCPServer.shared.handle(msg) else { continue }
             if let rdata = try? JSONSerialization.data(withJSONObject: response, options: [.withoutEscapingSlashes]) {
+                writeLock.lock()
                 out.write(rdata); out.write(newline)
+                writeLock.unlock()
             }
         }
         exit(0)

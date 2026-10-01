@@ -42,4 +42,22 @@ enum EventTools {
             Thread.sleep(forTimeInterval: 0.25)
         }
     }
+
+    /// Best-effort push: register this stdio child for cursor+count notifications
+    /// (`notifications/events/added` on stdout). Bodies still come via tail_events.
+    /// Refuses outside a stdio child (HTTP stays poll-only).
+    static func subscribeEvents(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let since = (args["since"] as? Double) ?? Double((args["since"] as? Int) ?? 0)
+        let cursor = try EventNotifier.subscribe(bundleID: bid, since: since)
+        return try ToolRouter.json(["subscribed": true, "bundleID": bid, "cursor": cursor,
+                             "note": "watch stdout for notifications/events/added; fetch bodies with tail_events"])
+    }
+
+    static func unsubscribeEvents(_ args: [String: Any]) throws -> String {
+        let bid = (args["bundleID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let parked = EventNotifier.unsubscribe(bundleID: bid)
+        return try ToolRouter.json(["subscribed": false, "bundleID": bid ?? NSNull(),
+                             "threadParked": parked])
+    }
 }

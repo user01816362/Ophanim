@@ -89,6 +89,8 @@ enum ToolRouter {
         "uninstall_app": AppTools.uninstallApp,
         "query_events": EventTools.queryEvents,
         "tail_events": EventTools.tailEvents,
+        "subscribe_events": EventTools.subscribeEvents,
+        "unsubscribe_events": EventTools.unsubscribeEvents,
         "analyze_app": ReconTools.analyzeApp,
         "app_imports": ReconTools.appImports,
         "find_symbols": ReconTools.findSymbols,

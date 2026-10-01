@@ -262,6 +262,28 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "subscribe_events",
+            "description": "Push cursor+count notifications (notifications/events/added) on stdout; bodies via tail_events. Stdio children only.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "since": ["type": "number", "description": "Cursor (epoch ms); omit/0 for latest."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "unsubscribe_events",
+            "description": "Stop push notifications (one bundleID, or all when omitted).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "Omit to unsubscribe all."]
+                ]
+            ]
+        ],
+        [
             "name": "analyze_app",
             "description": "Produce a behavior/privacy report for an app from its captured events: hosts "
                 + "contacted, identifiers & privacy APIs accessed, keychain items, crypto usage, jailbreak "
