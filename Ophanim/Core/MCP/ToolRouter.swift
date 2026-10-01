@@ -28,6 +28,16 @@ enum ToolRouter {
         URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
     }
 
+    /// JSON numbers arrive as Int or Double depending on the client: accept both.
+    static func coerceDouble(_ args: [String: Any], _ key: String) -> Double? {
+        (args[key] as? Double) ?? (args[key] as? Int).map(Double.init)
+    }
+
+    /// Integer twin of coerceDouble (limits, steps: a client may send 8.0 for 8).
+    static func coerceInt(_ args: [String: Any], _ key: String) -> Int? {
+        (args[key] as? Int) ?? (args[key] as? Double).map(Int.init)
+    }
+
     /// Reject unknown argument names, naming the closest match when there is one.
     static func rejectUnknownKeys(_ args: [String: Any], allowed: Set<String>, tool: String) throws {
         let unknown = args.keys.filter { !allowed.contains($0) }.sorted()

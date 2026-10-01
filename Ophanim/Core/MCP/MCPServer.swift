@@ -48,7 +48,7 @@ final class MCPServer {
 
         switch method {
         case "server/discover":
-            return result(id, [
+            return Self.result(id, [
                 "resultType": "complete",
                 "supportedVersions": Self.supportedProtocolVersions,
                 "capabilities": ["tools": [:] as [String: Any]],
@@ -59,7 +59,7 @@ final class MCPServer {
             ])
         case "initialize":
             let pv = params["protocolVersion"] as? String ?? "2025-06-18"
-            return result(id, [
+            return Self.result(id, [
                 "protocolVersion": pv,
                 "capabilities": ["tools": ["listChanged": false]],
                 "serverInfo": ["name": serverName, "version": serverVersion],
@@ -68,11 +68,11 @@ final class MCPServer {
                     + "to inspect and change what is captured, and launch_app to run one."
             ])
         case "ping":
-            return result(id, [:])
+            return Self.result(id, [:])
         case "notifications/initialized", "notifications/cancelled":
             return nil   // notifications take no reply
         case "tools/list":
-            return result(id, ["tools": Self.toolDefinitions, "ttlMs": 300000, "cacheScope": "process"])
+            return Self.result(id, ["tools": Self.toolDefinitions, "ttlMs": 300000, "cacheScope": "process"])
         case "tools/call":
             return callTool(id, name: params["name"] as? String ?? "",
                             arguments: params["arguments"] as? [String: Any] ?? [:])
@@ -110,8 +110,18 @@ final class MCPServer {
         // Per-tool limit so a chatty read cannot starve a destructive call; the
         // refusal states the wait so a model retries rather than guesses.
         if let retry = rateLimited(tool: name) {
-            return toolError(id, "rate limited: \(name) has been called \(Self.rateLimitPerMinute) times in "
+            return Self.toolError(id, "rate limited: \(name) has been called \(Self.rateLimitPerMinute) times in "
                 + "the last minute. Wait \(retry) second\(retry == 1 ? "" : "s") and retry.")
+        }
+        // Inspect tools return full responses (including image blocks), not Strings.
+        if InspectTools.inspectToolNames.contains(name) {
+            do {
+                return try InspectTools.runInspectTool(id, name, args)
+            } catch let e as ToolRouter.ToolError {
+                return Self.toolError(id, "Error: \(e.message)")
+            } catch {
+                return Self.toolError(id, "Error: \(error.localizedDescription)")
+            }
         }
         do {
             let text = try runTool(name, args)
@@ -119,13 +129,13 @@ final class MCPServer {
             // serialised structuredContent; a plain message gets the text form.
             if let payload = try? JSONSerialization.jsonObject(with: Data(text.utf8)),
                let object = payload as? [String: Any] {
-                return toolResult(id, object)
+                return Self.toolResult(id, object)
             }
-            return toolText(id, text)
+            return Self.toolText(id, text)
         } catch let e as ToolRouter.ToolError {
-            return toolError(id, "Error: \(e.message)")
+            return Self.toolError(id, "Error: \(e.message)")
         } catch {
-            return toolError(id, "Error: \(error.localizedDescription)")
+            return Self.toolError(id, "Error: \(error.localizedDescription)")
         }
     }
 
@@ -136,37 +146,50 @@ final class MCPServer {
 
     // MARK: JSON-RPC helpers
 
-    private func result(_ id: Any?, _ value: [String: Any]) -> [String: Any] {
+    static func result(_ id: Any?, _ value: [String: Any]) -> [String: Any] {
         ["jsonrpc": "2.0", "id": id ?? NSNull(), "result": value]
     }
 
     /// A tool result with machine-readable payload: `resultType` marks it
     /// complete, `structuredContent` carries the payload, and the text block
     /// keeps older clients working.
-    private func toolResult(_ id: Any?, _ payload: [String: Any]) -> [String: Any] {
+    static func toolResult(_ id: Any?, _ payload: [String: Any]) -> [String: Any] {
         let text = (try? ToolRouter.json(payload)) ?? "{}"
-        return result(id, [
+        return Self.result(id, [
             "resultType": "complete",
             "content": [["type": "text", "text": text]],
             "structuredContent": payload
         ])
     }
 
-    private func toolText(_ id: Any?, _ message: String) -> [String: Any] {
-        result(id, [
+    static func toolText(_ id: Any?, _ message: String) -> [String: Any] {
+        Self.result(id, [
             "resultType": "complete",
             "content": [["type": "text", "text": message]],
             "isError": false
         ])
     }
 
-    private func toolError(_ id: Any?, _ message: String) -> [String: Any] {
-        result(id, [
+    static func toolError(_ id: Any?, _ message: String) -> [String: Any] {
+        Self.result(id, [
             "resultType": "complete",
             "content": [["type": "text", "text": message]],
             "isError": true
         ])
     }
+    /// Image result per the spec content-block shape ({type, data, mimeType}) plus
+    /// dimensions as structured content. Text fallback first so pre-structuredContent
+    /// clients still get a readable summary.
+    static func toolResultImage(_ id: Any?, base64: String, mimeType: String,
+                                summary: String, structured: [String: Any]) -> [String: Any] {
+        Self.result(id, [
+            "resultType": "complete",
+            "content": [["type": "text", "text": summary],
+                        ["type": "image", "data": base64, "mimeType": mimeType]],
+            "structuredContent": structured
+        ])
+    }
+
     private func error(_ id: Any?, code: Int, message: String, data: [String: Any]? = nil) -> [String: Any] {
         var body: [String: Any] = ["code": code, "message": message]
         if let data { body["data"] = data }
@@ -745,6 +768,249 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "uitree_read",
+            "description": "Read the app UI tree (JSON text + structured summary).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "rootId": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "filter": ["type": "string"],
+                    "depthLimit": ["type": "string"],
+                    "nodeLimit": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "screenshot",
+            "description": "Capture a screenshot (image block + dimensions).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "tap_element",
+            "description": "Tap by element id or x/y with optional snapshot pins.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "x": ["type": "string"],
+                    "y": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "snapshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "swipe",
+            "description": "Swipe with optional snapshot pins.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "x1": ["type": "string"],
+                    "y1": ["type": "string"],
+                    "x2": ["type": "string"],
+                    "y2": ["type": "string"],
+                    "steps": ["type": "string"],
+                    "snapshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "set_text",
+            "description": "Set text on an element with optional snapshot pins.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "text": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "snapshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_classes",
+            "description": "Live runtime classes (falls back to binary with stated error).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "filter": ["type": "string"],
+                    "limit": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_element",
+            "description": "Single node detail + superclasses.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "mode": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_class_detail",
+            "description": "Method/ivar inventory for a class.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "className": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_snapshot",
+            "description": "Pin a tree (+optional screenshot) to the timeline.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "rootId": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "filter": ["type": "string"],
+                    "depthLimit": ["type": "string"],
+                    "nodeLimit": ["type": "string"],
+                    "withScreenshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_timeline",
+            "description": "Timeline with latest-pair diff.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "limit": ["type": "string"],
+                    "trigger": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_diff",
+            "description": "Diff two snapshots.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "from": ["type": "string"],
+                    "to": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_clear_snapshots",
+            "description": "Delete the snapshot timeline.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "bookmark_add",
+            "description": "Pin a class, element, or symbol with comment/tags/group.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "kind": ["type": "string"],
+                    "name": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "snapshot": ["type": "string"],
+                    "comment": ["type": "string"],
+                    "tags": ["type": "string"],
+                    "group": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "bookmark_note",
+            "description": "Comment on a bookmark or group.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "id": ["type": "string"],
+                    "ref": ["type": "string"],
+                    "comment": ["type": "string"],
+                    "tags": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "bookmark_move",
+            "description": "File bookmarks into groups.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "group": ["type": "string"],
+                    "add": ["type": "string"],
+                    "remove": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "bookmark_list",
+            "description": "List bookmarks with staleness.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "limit": ["type": "string"],
+                    "kind": ["type": "string"],
+                    "tag": ["type": "string"],
+                    "group": ["type": "string"],
+                    "checkFresh": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "bookmark_remove",
+            "description": "Delete bookmarks/groups.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "ids": ["type": "string"]
                 ],
                 "required": ["bundleID"]
             ]

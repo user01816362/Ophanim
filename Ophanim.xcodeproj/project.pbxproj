@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		30E0A315D2F88E16 /* InspectTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C632249BBFC8BD /* InspectTools.swift */; };
 		54EDEA089AA2191C /* OPAppLiveness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E17E960CFFEACBF /* OPAppLiveness.swift */; };
 		EF55B86C65609681 /* SnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 152221A2059674F5 /* SnapshotStore.swift */; };
 		AD286CC5B6100EA9 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3D0C3B16EA77D0 /* BookmarkStore.swift */; };
@@ -137,6 +138,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		F9C632249BBFC8BD /* InspectTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectTools.swift; path = Ophanim/Core/MCP/Tools/InspectTools.swift; sourceTree = SOURCE_ROOT; };
 		4E17E960CFFEACBF /* OPAppLiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPAppLiveness.swift; path = Ophanim/Core/Services/OPAppLiveness.swift; sourceTree = SOURCE_ROOT; };
 		152221A2059674F5 /* SnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SnapshotStore.swift; path = Ophanim/Core/Services/SnapshotStore.swift; sourceTree = SOURCE_ROOT; };
 		2E3D0C3B16EA77D0 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BookmarkStore.swift; path = Ophanim/Core/Services/BookmarkStore.swift; sourceTree = SOURCE_ROOT; };
@@ -594,6 +596,7 @@
 		F207D73F32CDDBF9 /* MCP/Tools */ = {
 			isa = PBXGroup;
 			children = (
+				F9C632249BBFC8BD /* InspectTools.swift */,
 				2D73451F9FFF0D2B /* TweakTools.swift */,
 				DF53023CB47A543F /* ContainerTools.swift */,
 				3DF59B7004FB0A44 /* SourceTools.swift */,
@@ -916,6 +919,7 @@
 				4E43543B9CB271DB /* InspectService.swift in Sources */,
 				D39108BAD98AAD74 /* InspectGate.swift in Sources */,
 				5F38BAF765A9EAEF /* InspectRequest.swift in Sources */,
+				30E0A315D2F88E16 /* InspectTools.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
