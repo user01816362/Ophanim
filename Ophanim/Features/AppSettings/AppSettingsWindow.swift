@@ -117,7 +117,8 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
             existing.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
-        }        let coordinator = AppSettingsPaneCoordinator(selection: restoredPane(for: bid))
+        }
+        let coordinator = AppSettingsPaneCoordinator(selection: restoredPane(for: bid))
         coordinators[bid] = coordinator
 
         // Fixed-size, non-resizable settings window. Pinned via min==max content size because
