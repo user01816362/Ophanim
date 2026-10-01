@@ -16,8 +16,9 @@ import AppKit
 /// drive the window size (its stretched list makes the preferred size ambiguous), so
 /// setContentSize is the source of truth and the content fills it.
 final class SourcesWindowManager: NSObject, @unchecked Sendable {
-    nonisolated(unsafe) static let shared = SourcesWindowManager()
+    static let shared = SourcesWindowManager()
 
+    @MainActor
     func show() {
         SettingsWindowManager.shared.show(key: "sources",
                                           title: NSLocalizedString("sources.window.title", comment: ""),

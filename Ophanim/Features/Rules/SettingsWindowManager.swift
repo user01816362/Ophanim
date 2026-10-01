@@ -7,6 +7,8 @@ import AppKit
 /// macOS 12 can't use SwiftUI's openWindow/WindowGroup(for:), so views are
 /// hosted in AppKit windows directly. Callers keep their tiny manager shims
 /// (same `.shared.show(...)` signatures); this class owns all NSWindow work.
+/// @MainActor: every method touches AppKit, which is main-thread only.
+@MainActor
 final class SettingsWindowManager: NSObject, NSWindowDelegate {
     nonisolated(unsafe) static let shared = SettingsWindowManager()
     private var windows: [String: NSWindow] = [:]
@@ -48,6 +50,7 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
 
 /// Opens the rules editor. AppSettings is a reference type, so the editor mutates
 /// the shared instance in place (persisted via its didSet→encode).
+@MainActor
 final class RulesWindowManager: NSObject {
     nonisolated(unsafe) static let shared = RulesWindowManager()
     func show(settings: AppSettings) {
@@ -59,6 +62,7 @@ final class RulesWindowManager: NSObject {
     }
 }
 
+@MainActor
 final class ObjCHooksWindowManager: NSObject {
     nonisolated(unsafe) static let shared = ObjCHooksWindowManager()
     func show(settings: AppSettings) {
@@ -70,6 +74,7 @@ final class ObjCHooksWindowManager: NSObject {
     }
 }
 
+@MainActor
 final class SwiftHooksWindowManager: NSObject {
     nonisolated(unsafe) static let shared = SwiftHooksWindowManager()
     func show(settings: AppSettings) {
@@ -81,6 +86,7 @@ final class SwiftHooksWindowManager: NSObject {
     }
 }
 
+@MainActor
 final class InlineHooksWindowManager: NSObject {
     nonisolated(unsafe) static let shared = InlineHooksWindowManager()
     func show(settings: AppSettings) {

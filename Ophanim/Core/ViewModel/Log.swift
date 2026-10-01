@@ -45,6 +45,7 @@ import SwiftUI
         logdata.append("\n")
     }
 
+    @MainActor
     private func dialog(question: String, text: String, style: NSAlert.Style) {
         let alert = NSAlert()
         alert.messageText = question
@@ -57,6 +58,7 @@ import SwiftUI
     /// Centralized modal dialogs (R11: `runModal` lives here only; sheets, which
     /// need a local window, stay at their call sites). Must run on the main thread,
     /// like every `runModal` call it replaces.
+    @MainActor
     static func modal(question: String, text: String,
                       style: NSAlert.Style = .informational,
                       buttons: [String],
@@ -82,6 +84,7 @@ import SwiftUI
     }
 
     /// Two-button question. Returns true when the first button is chosen.
+    @MainActor
     static func confirm(question: String, text: String,
                         style: NSAlert.Style = .warning,
                         ok: String, cancel: String) -> Bool {
@@ -91,6 +94,7 @@ import SwiftUI
     }
 
     /// One-button notice.
+    @MainActor
     static func notify(question: String, text: String, style: NSAlert.Style = .warning) {
         let ok = NSLocalizedString("button.OK", comment: "")
         _ = modal(question: question, text: text, style: style, buttons: [ok])

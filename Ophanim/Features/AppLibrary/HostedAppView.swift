@@ -36,7 +36,9 @@ struct HostedAppView: View {
             })
             .contextMenu {
                 Button("hostedapp.settings", systemImage: "gear", action: {
-                    AppSettingsWindowManager.shared.show(app: viewModel.app)
+                    Task { @MainActor in
+                        AppSettingsWindowManager.shared.show(app: viewModel.app)
+                    }
                 })
                 Button("hostedapp.openCache", systemImage: "folder", action: {
                     viewModel.app.openAppCache()

@@ -170,32 +170,44 @@ struct InstrumentationView: View {
 
                 HStack {
                     Button("Recon…") {
-                        ReconWindowManager.shared.show(executable: app.executable,
-                                                       bundleID: settings.info.bundleIdentifier,
-                                                       appName: app.name)
+                        Task { @MainActor in
+                            ReconWindowManager.shared.show(executable: app.executable,
+                                                           bundleID: settings.info.bundleIdentifier,
+                                                           appName: app.name)
+                        }
                     }.help("Inspect the binary's hookable surface before reaching for a disassembler: "
                            + "imported symbols (interpose), ObjC classes (swizzle), text symbols (inline), "
                            + "linked libraries, and a byte-signature scanner.")
                     Button("Edit rules…") {
-                        RulesWindowManager.shared.show(settings: settings)
+                        Task { @MainActor in
+                            RulesWindowManager.shared.show(settings: settings)
+                        }
                     }.disabled(!enabled)
                     Button("ObjC hooks…") {
-                        ObjCHooksWindowManager.shared.show(settings: settings)
+                        Task { @MainActor in
+                            ObjCHooksWindowManager.shared.show(settings: settings)
+                        }
                     }.disabled(!enabled)
                         .help("Swizzle arbitrary @objc (class, selector) boundaries and capture their args - "
                               + "for SDKs / the @objc layer of statically-linked apps.")
                     Button("Swift hooks…") {
-                        SwiftHooksWindowManager.shared.show(settings: settings)
+                        Task { @MainActor in
+                            SwiftHooksWindowManager.shared.show(settings: settings)
+                        }
                     }.disabled(!enabled)
                         .help("Patch overridable, non-@objc Swift method vtable slots to capture calls "
                               + "ObjC swizzling can't reach (native-Swift vtable patch). Observe-only; arm64.")
                     Button("Inline hooks…") {
-                        InlineHooksWindowManager.shared.show(settings: settings)
+                        Task { @MainActor in
+                            InlineHooksWindowManager.shared.show(settings: settings)
+                        }
                     }.disabled(!enabled)
                         .help("Patch arbitrary function machine code (inline) to reach statically-linked "
                               + "/ stripped / static-dispatch code. Requires the inline-hooks gate below.")
                     Button("View log…") {
-                        LogWindowManager.shared.show(bundleID: settings.info.bundleIdentifier)
+                        Task { @MainActor in
+                            LogWindowManager.shared.show(bundleID: settings.info.bundleIdentifier)
+                        }
                     }
                     Spacer()
                 }

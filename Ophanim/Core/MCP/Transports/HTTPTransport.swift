@@ -101,7 +101,9 @@ final class MCPHTTPTransport {
         boundPort = port
         boundHost = bindMode
         isRunning = true
-        queue.async { [weak self] in self?.acceptLoop(fd) }
+        // Singleton outlives every closure: capture shared (nonisolated(unsafe)) instead
+        // of weak self, which drags a non-Sendable capture into the @Sendable closure.
+        queue.async { MCPHTTPTransport.shared.acceptLoop(fd) }
     }
 
     func stop() {
@@ -113,7 +115,7 @@ final class MCPHTTPTransport {
         while true {
             let client = accept(fd, nil, nil)
             if client < 0 { if listenFD < 0 { return }; continue }
-            queue.async { [weak self] in self?.handleClient(client) }
+            queue.async { MCPHTTPTransport.shared.handleClient(client) }
         }
     }
 

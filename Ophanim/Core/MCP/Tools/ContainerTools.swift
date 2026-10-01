@@ -29,7 +29,7 @@ enum ContainerTools {
             candidates.append(contentsOf: entries.filter { $0.pathExtension == "ndjson" })
         }
         let bytes = candidates.reduce(0) { total, url in
-            total + ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 ?? 0)
+            total + ((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
         }
         if ToolRouter.isDryRun(args) {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid, "wouldRemove": candidates.map(\.path),

@@ -79,7 +79,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                                                name: Notification.Name.NSProcessInfoPowerStateDidChange,
                                                object: nil)
         if ProcessInfo.processInfo.isLowPowerModeEnabled {
-            powerModal()
+            // App init runs on the main thread; pin it explicitly (init cannot hop).
+            MainDispatch.sync { powerModal() }
         }
         URLCache.iconCache.removeAllCachedResponses()
         // Code that run once on first launch
@@ -108,6 +109,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         }
     }
 
+    @MainActor
     func powerModal() {
         if showLowPowerModeAlert {
             let (_, suppressed) = Log.modal(

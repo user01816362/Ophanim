@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AF9290E8BFB704B6 /* MainDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE9404A777ED8EC9 /* MainDispatch.swift */; };
 		F6E7018A781CE860 /* EventNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE918903B6214035 /* EventNotifier.swift */; };
 		3433C8A9A6F46A28 /* AppInstalls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A8CFB20714ECE7A /* AppInstalls.swift */; };
 		9974FAE79F46F221 /* LogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B148FA802FF6AA9F /* LogStore.swift */; };
@@ -145,6 +146,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		FE9404A777ED8EC9 /* MainDispatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MainDispatch.swift; path = Ophanim/Core/Support/MainDispatch.swift; sourceTree = SOURCE_ROOT; };
 		FE918903B6214035 /* EventNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventNotifier.swift; path = Ophanim/Core/MCP/Transports/EventNotifier.swift; sourceTree = SOURCE_ROOT; };
 		1A8CFB20714ECE7A /* AppInstalls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppInstalls.swift; path = Ophanim/Features/Install/AppInstalls.swift; sourceTree = SOURCE_ROOT; };
 		B148FA802FF6AA9F /* LogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LogStore.swift; path = Ophanim/Core/Services/LogStore.swift; sourceTree = SOURCE_ROOT; };
@@ -437,6 +439,7 @@
 		87F39D6E993627EE /* Core/Support */ = {
 			isa = PBXGroup;
 			children = (
+				FE9404A777ED8EC9 /* MainDispatch.swift */,
 				24C13AF73619B1C6 /* PlistReader.swift */,
 				9087A86A5DC671E8 /* ResolutionMath.swift */,
 				92F8500927675124005CE6BE /* AppIntegrity.swift */,
@@ -948,6 +951,7 @@
 				9974FAE79F46F221 /* LogStore.swift in Sources */,
 				3433C8A9A6F46A28 /* AppInstalls.swift in Sources */,
 				F6E7018A781CE860 /* EventNotifier.swift in Sources */,
+				AF9290E8BFB704B6 /* MainDispatch.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

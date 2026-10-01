@@ -116,7 +116,9 @@ struct KeymapView: View {
                     Text("hostedapp.importKm")
                 })
                 Button(action: {
-                    viewModel.app.keymapping.exportKeymap(name: viewModel.kmName)
+                    Task { @MainActor in
+                        viewModel.app.keymapping.exportKeymap(name: viewModel.kmName)
+                    }
                 }, label: {
                     Text("hostedapp.exportKm")
                 })
@@ -143,11 +145,13 @@ struct KeymapView: View {
             KeymapNamerView(app: viewModel.app,
                             title: NSLocalizedString("keymap.title.import", comment: ""),
                             callback: { name in
-                                viewModel.app.keymapping.importKeymap(name: name) { success in
-                                    viewModel.reloadKeymapCache()
+                                Task { @MainActor in
+                                    viewModel.app.keymapping.importKeymap(name: name) { success in
+                                        viewModel.reloadKeymapCache()
 
-                                    if !success {
-                                        Log.shared.error(localized: "alert.errorImportKm")
+                                        if !success {
+                                            Log.shared.error(localized: "alert.errorImportKm")
+                                        }
                                     }
                                 }
                             },

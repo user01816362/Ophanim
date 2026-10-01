@@ -9,6 +9,7 @@ import Foundation
 
 class Installer {
 
+    @MainActor
     static func installGalgalPopup() -> Bool {
         let (response, suppressed) = Log.modal(
             question: NSLocalizedString("alert.install.injectGalgalQuestion", comment: ""),
@@ -55,7 +56,9 @@ class Installer {
             installGalgal = injectGalgal
         } else if (ModifierKeyObserver.shared.isOptionKeyPressed
                 || InstallPreferences.shared.showInstallPopup) && !export {
-            installGalgal = installGalgalPopup()
+            // Modal answer needed synchronously; GUI import runs on main, MCP forces
+            // injectGalgal above and never reaches here (it has no UI to present).
+            installGalgal = MainDispatch.sync { installGalgalPopup() }
         } else {
             installGalgal = InstallPreferences.shared.alwaysInstallGalgal
         }

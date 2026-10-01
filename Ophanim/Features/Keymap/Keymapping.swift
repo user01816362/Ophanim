@@ -264,6 +264,7 @@ class Keymapping {
         return keymapConfig
     }
 
+    @MainActor
     public func importKeymap(name: String, success: @escaping (Bool) -> Void) {
         let openPanel = NSOpenPanel()
         openPanel.canChooseFiles = true
@@ -314,6 +315,7 @@ class Keymapping {
         }
     }
 
+    @MainActor
     public func exportKeymap(name: String) {
         let savePanel = NSSavePanel()
         savePanel.title = NSLocalizedString("hostedapp.exportKm", comment: "")
@@ -338,6 +340,7 @@ class Keymapping {
         }
     }
 
+    @MainActor
     private func differentBundleIdKeymapAlert() -> Bool {
         Log.confirm(question: NSLocalizedString("alert.differentBundleIdKeymap.message", comment: ""),
                     text: NSLocalizedString("alert.differentBundleIdKeymap.text", comment: ""),

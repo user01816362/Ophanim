@@ -267,7 +267,7 @@ private struct SourceRecord: Codable {
 /// its source - plus an orphan sweep on load, so removed feeds leave nothing behind.
 @Observable
 final class AppSourcesStore: @unchecked Sendable {
-    nonisolated(unsafe) static let shared = AppSourcesStore()
+    static let shared = AppSourcesStore()
 
     private(set) var sources: [SourceItem] = []
     private(set) var isRefreshingAll = false

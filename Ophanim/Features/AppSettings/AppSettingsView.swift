@@ -149,7 +149,9 @@ struct AppSettingsView: View {
                 toastDetails: NSLocalizedString("settings.resetSettingsCompleted", comment: ""))
         }
         .onChange(of: closeView) { _, _ in
-            AppSettingsWindowManager.shared.close(viewModel.app.info.bundleIdentifier)
+            Task { @MainActor in
+                AppSettingsWindowManager.shared.close(viewModel.app.info.bundleIdentifier)
+            }
             dismiss()
         }
         .task(priority: .background) {

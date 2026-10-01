@@ -80,7 +80,7 @@ struct AppLibraryView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    SourcesWindowManager.shared.show()
+                    Task { @MainActor in SourcesWindowManager.shared.show() }
                 } label: {
                     Image(systemName: "arrow.down.circle")
                         .help("sources.window.title")
@@ -88,8 +88,10 @@ struct AppLibraryView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    if let selected {
-                        AppSettingsWindowManager.shared.show(app: selected)
+                    Task { @MainActor in
+                        if let selected {
+                            AppSettingsWindowManager.shared.show(app: selected)
+                        }
                     }
                 } label: {
                     Image(systemName: "gear")

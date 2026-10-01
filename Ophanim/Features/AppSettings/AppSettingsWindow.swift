@@ -95,6 +95,8 @@ private struct AppSettingsWindowRoot: View {
     }
 }
 
+/// @MainActor: toolbar/window/delegate work is AppKit main-thread only.
+@MainActor
 final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDelegate, @unchecked Sendable {
     nonisolated(unsafe) static let shared = AppSettingsWindowManager()
 
@@ -145,8 +147,12 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         toolbar.selectedItemIdentifier = AppSettingsPaneCoordinator.itemID(for: coordinator.selection)
 
         coordinator.onChange = { [weak self, weak window] pane in
-            toolbar.selectedItemIdentifier = AppSettingsPaneCoordinator.itemID(for: pane)
-            window?.title = AppSettingsPaneCoordinator.title(for: pane)
+            // Main-only callback chain (toolbar action → selection didSet): assert it
+            // instead of widening the closure type through didSet (which cannot hop).
+            MainActor.assumeIsolated {
+                toolbar.selectedItemIdentifier = AppSettingsPaneCoordinator.itemID(for: pane)
+                window?.title = AppSettingsPaneCoordinator.title(for: pane)
+            }
             if let self {
                 UserDefaults.standard.set(AppSettingsPaneCoordinator.itemID(for: pane).rawValue,
                                           forKey: self.defaultsKey(for: bid))

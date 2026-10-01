@@ -21,6 +21,7 @@ import AppKit
 final class ReconWindowManager: NSObject {
     nonisolated(unsafe) static let shared = ReconWindowManager()
 
+    @MainActor
     func show(executable: URL, bundleID: String, appName: String) {
         SettingsWindowManager.shared.show(key: bundleID, title: "Recon - \(appName)",
                                           size: NSSize(width: 980, height: 640),

@@ -91,7 +91,7 @@ public final class OPFileSink: OPLogSink {
             FileManager.default.createFile(atPath: url.path, contents: nil)
         }
         let h = try? FileHandle(forWritingTo: url)
-        try? h?.seekToEnd()
+        _ = try? h?.seekToEnd()
         self.handle = h
     }
 

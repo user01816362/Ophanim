@@ -90,6 +90,7 @@ class Uninstaller {
         Uninstaller.libraryUrl.appendingPathComponent("Saved Application State")
     ]
 
+    @MainActor
     private static func createButtonView(_ yaxis: CGFloat, _ text: String, _ varname: String) -> CheckBoxHelper {
         let button = NSButton(checkboxWithTitle: text, target: self, action: nil)
 

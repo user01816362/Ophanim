@@ -18,6 +18,7 @@ import Combine
 final class LogWindowManager: NSObject {
     nonisolated(unsafe) static let shared = LogWindowManager()
 
+    @MainActor
     func show(bundleID: String) {
         SettingsWindowManager.shared.show(key: bundleID, title: "Hacking Log - \(bundleID)",
                                           size: NSSize(width: 1200, height: 640),

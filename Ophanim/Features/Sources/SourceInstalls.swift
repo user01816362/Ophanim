@@ -27,7 +27,7 @@ enum SourceInstallState: Equatable {
 
 @Observable
 final class SourceInstalls: NSObject, @unchecked Sendable {
-    nonisolated(unsafe) static let shared = SourceInstalls()
+    static let shared = SourceInstalls()
 
     private(set) var states: [String: SourceInstallState] = [:]
     /// Human version string of the in-flight/paused transfer, for row display.
@@ -329,7 +329,9 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
 
 /// URLSession delegate (nonisolated by necessity): forwards to the MainActor store.
 /// Kept separate so session callbacks never touch published state off-main.
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+/// @unchecked Sendable: `owner` is set once in init and only re-read via weak
+/// MainActor hops, never reassigned afterwards.
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     weak var owner: SourceInstalls?
 
     init(owner: SourceInstalls) { self.owner = owner }
