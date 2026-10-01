@@ -184,6 +184,7 @@ public struct OPConfig: Codable, Sendable {
     public var logToSharedDir: Bool                     // ~/Library/Logs/Ophanim vs app container
     public var bodyCapBytes: Int                        // max captured payload size
     public var captureBacktraces: Bool
+    public var captureNetworkCallers: Bool   // dladdr symbolication per request (default off, hot-path cost)
     public var redactionKeys: [String]                  // header/field keys whose values are masked ([] = nothing redacted)
     public var rules: [OPRule]
     public var autoOpenLog: Bool                         // GUI: open the log window when the app launches
@@ -200,6 +201,7 @@ public struct OPConfig: Codable, Sendable {
                 logToSharedDir: Bool = false,
                 bodyCapBytes: Int = 64 * 1024,
                 captureBacktraces: Bool = false,
+                captureNetworkCallers: Bool = false,
                 redactionKeys: [String] = [],   // nothing redacted by default - this is an analysis tool
                 rules: [OPRule] = [],
                 autoOpenLog: Bool = false,
@@ -215,6 +217,7 @@ public struct OPConfig: Codable, Sendable {
         self.logToSharedDir = logToSharedDir
         self.bodyCapBytes = bodyCapBytes
         self.captureBacktraces = captureBacktraces
+        self.captureNetworkCallers = captureNetworkCallers
         self.redactionKeys = redactionKeys
         self.rules = rules
         self.autoOpenLog = autoOpenLog
@@ -236,6 +239,7 @@ public struct OPConfig: Codable, Sendable {
         logToSharedDir = try c.decodeIfPresent(Bool.self, forKey: .logToSharedDir) ?? d.logToSharedDir
         bodyCapBytes = try c.decodeIfPresent(Int.self, forKey: .bodyCapBytes) ?? d.bodyCapBytes
         captureBacktraces = try c.decodeIfPresent(Bool.self, forKey: .captureBacktraces) ?? d.captureBacktraces
+        captureNetworkCallers = try c.decodeIfPresent(Bool.self, forKey: .captureNetworkCallers) ?? d.captureNetworkCallers
         redactionKeys = try c.decodeIfPresent([String].self, forKey: .redactionKeys) ?? d.redactionKeys
         rules = try c.decodeIfPresent([OPRule].self, forKey: .rules) ?? d.rules
         autoOpenLog = try c.decodeIfPresent(Bool.self, forKey: .autoOpenLog) ?? d.autoOpenLog

@@ -10,14 +10,10 @@ import Foundation
 
 @objc(OPCryptoBridge) public final class OPCryptoBridge: NSObject {
     @objc public static func log(api: NSString, detail: NSString) {
-        guard !OPReentry.active else { return }
-        OPReentry.guarded {
-            guard OPAgent.shared.isActive(.crypto) else { return }
+        OPObserve.emit(category: .crypto) {
             let ctx = OPCallContext(category: .crypto, layer: .interpose, api: api as String,
                                     fields: ["detail": detail as String])
-            let decision = OPAgent.shared.intercept(ctx)
-            OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision,
-                                                        summary: "\(api) \(detail)"))
+            return (ctx, "\(api) \(detail)")
         }
     }
 }

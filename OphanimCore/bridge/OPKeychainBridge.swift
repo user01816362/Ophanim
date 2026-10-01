@@ -11,9 +11,7 @@ import Foundation
 
 @objc(OPKeychainBridge) public final class OPKeychainBridge: NSObject {
     @objc public static func log(api: NSString, query: NSDictionary?, status: Int32) {
-        guard !OPReentry.active else { return }
-        OPReentry.guarded {
-            guard OPAgent.shared.isActive(.keychain) else { return }
+        OPObserve.emit(category: .keychain) {
             var fields: [String: String] = ["status": String(status)]
             // Pull the human-meaningful attributes without dumping secret material.
             if let q = query {
@@ -23,9 +21,7 @@ import Foundation
                 if let v = q["agrp"] as? String { fields["accessGroup"] = v } // kSecAttrAccessGroup
             }
             let ctx = OPCallContext(category: .keychain, layer: .interpose, api: api as String, fields: fields)
-            let decision = OPAgent.shared.intercept(ctx)
-            OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision,
-                                                        summary: "\(api) status=\(status)"))
+            return (ctx, "\(api) status=\(status)")
         }
     }
 }

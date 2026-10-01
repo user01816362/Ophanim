@@ -121,6 +121,19 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
         let req = request
         var fields: [String: String] = ["method": req.httpMethod ?? "GET"]
         if let h = req.allHTTPHeaderFields { for (k, v) in h { fields["req.\(k)"] = v } }
+        // Caller attribution (opt-in, default off) happens HERE at load start, never at
+        // completion: didComplete runs on the session delegate queue, whose stack attributes
+        // the loader. startLoading is the closest observable point to the originator.
+        if OPAgent.shared.config.captureNetworkCallers {
+            let callers = OPCallerAttribution.attribute()
+            fields["callerThread"] = callers.thread
+            if !callers.classes.isEmpty {
+                fields["callerClasses"] = callers.classes.joined(separator: ",")
+            }
+            if !callers.symbols.isEmpty {
+                fields["callerSymbols"] = callers.symbols.joined(separator: ",")
+            }
+        }
         let ctx = OPCallContext(category: .network, layer: .urlProtocol, api: "URLSession.request",
                                 fields: fields, host: req.url?.host, url: req.url?.absoluteString,
                                 requestBody: req.httpBody)

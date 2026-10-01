@@ -15,13 +15,10 @@ import Foundation
     // heap setup, so the caller MUST NOT allocate. We set the re-entrancy guard first, then build
     // the Swift String - any malloc→stat→hook re-entry then bails before allocating.
     @objc public static func log(api: NSString, cpath: UnsafePointer<CChar>?) {
-        guard !OPReentry.active else { return }
-        OPReentry.guarded {
-            guard OPAgent.shared.isActive(.filesystem) else { return }
+        OPObserve.emit(category: .filesystem) {
             let path = cpath.map { String(cString: $0) } ?? ""
             let ctx = OPCallContext(category: .filesystem, layer: .interpose, api: api as String, path: path)
-            let decision = OPAgent.shared.intercept(ctx)
-            OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision))
+            return (ctx, "")
         }
     }
 }

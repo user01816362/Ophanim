@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		070778A0DD71FD19 /* OPObserve.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4790996ABFE70CFE /* OPObserve.swift */; };
+		8930A9AD1E2836AE /* OPCallerAttribution.swift in Sources */ = {isa = PBXBuildFile; fileRef = C05F943D57CB27AC /* OPCallerAttribution.swift */; };
 		FACE00000000000000000212 /* OPReentry.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000112 /* OPReentry.swift */; };
 		FACE00000000000000000211 /* OPHooksSocket.m in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000111 /* OPHooksSocket.m */; };
 		FACE00000000000000000210 /* OPSocketBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = FACE00000000000000000110 /* OPSocketBridge.swift */; };
@@ -128,6 +130,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4790996ABFE70CFE /* OPObserve.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPObserve.swift; path = ../OphanimCore/bridge/OPObserve.swift; sourceTree = "<group>"; };
+		C05F943D57CB27AC /* OPCallerAttribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCallerAttribution.swift; path = ../OphanimCore/bridge/OPCallerAttribution.swift; sourceTree = "<group>"; };
 		FACE00000000000000000112 /* OPReentry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPReentry.swift; path = ../OphanimCore/bridge/OPReentry.swift; sourceTree = "<group>"; };
 		FACE00000000000000000111 /* OPHooksSocket.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksSocket.m; path = ../OphanimCore/hooks/OPHooksSocket.m; sourceTree = "<group>"; };
 		FACE00000000000000000110 /* OPSocketBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPSocketBridge.swift; path = ../OphanimCore/bridge/OPSocketBridge.swift; sourceTree = "<group>"; };
@@ -266,6 +270,8 @@
 		FACE00000000000000000300 /* OphanimCore */ = {
 			isa = PBXGroup;
 			children = (
+				4790996ABFE70CFE /* OPObserve.swift */,
+				C05F943D57CB27AC /* OPCallerAttribution.swift */,
 				FACE00000000000000000112 /* OPReentry.swift */,
 				FACE00000000000000000111 /* OPHooksSocket.m */,
 				FACE00000000000000000110 /* OPSocketBridge.swift */,
@@ -883,6 +889,8 @@
 				B1E8CF8A28BBE2AB004340D3 /* Keymapping.swift in Sources */,
 				AB7DA47529B85BFB0034ACB2 /* GalgalShadow.m in Sources */,
 				9562D1662AB5049B002C329D /* KeyboardEventAdapter.swift in Sources */,
+				070778A0DD71FD19 /* OPObserve.swift in Sources */,
+				8930A9AD1E2836AE /* OPCallerAttribution.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
