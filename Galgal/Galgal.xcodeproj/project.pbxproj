@@ -314,15 +314,15 @@
 				FACE00000000000000000305 /* OPCrashTrap.h */,
 				FACE00000000000000000303 /* OPHookGuard.m */,
 				FACE00000000000000000306 /* OPHookGuard.h */,
-				FACE00000000000000000302 /* capture */,
-				FACE00000000000000000304 /* boundary */,
+				FACECA970000000000000001 /* capture */,
+				FACECA970000000000000002 /* boundary */,
 				FACE00000000000000000307 /* interpose */,
 				FACE00000000000000000308 /* inline */,
 			);
 			name = OphanimCore;
 			sourceTree = "<group>";
 		};
-		FACE00000000000000000302 /* capture */ = {
+		FACECA970000000000000001 /* capture */ = {
 			isa = PBXGroup;
 			children = (
 				FACE00000000000000000107 /* OPHooksNetwork.swift */,
@@ -332,7 +332,7 @@
 			name = capture;
 			sourceTree = "<group>";
 		};
-		FACE00000000000000000304 /* boundary */ = {
+		FACECA970000000000000002 /* boundary */ = {
 			isa = PBXGroup;
 			children = (
 				FACE00000000000000000118 /* OPHooksConfigurable.swift */,
