@@ -11,6 +11,8 @@ import Foundation
 
 enum InspectTools {
 
+    // MARK: - Shared helpers
+
     /// Snapshot bracketing shared by tap/swipe/set_text: optional pre/post tree pins
     /// around one inspect op. `capture` builds the pin for a phase ("pre"/"post" is
     /// folded into the trigger name by the caller); `perform` runs the op and returns
@@ -37,6 +39,8 @@ enum InspectTools {
         return (mode, filter, rootId, caps.depth, caps.nodes)
     }
 
+    // MARK: - Tool dispatch
+
     /// Dispatch for the three Inspect tools. Gate first: Agent Mode off means refuse, stated -
     /// never an empty tree or a black screenshot that looks like success.
     static func runInspectTool(_ id: Any?, _ name: String, _ args: [String: Any]) throws -> [String: Any] {
@@ -51,11 +55,11 @@ enum InspectTools {
             // The tree ships as a JSON *string* in a text block, not as nested structured
             // content: real trees nest 20+ levels and blow past client object-depth limits
             // (hit at 32 on first live use). The summary stays structured for filtering.
-            let t = try treeArgs(args)
+            let treeParams = try treeArgs(args)
             let rsp = try InspectControl.transact(bundleID: bid, op: .uiTree,
-                                                  elementId: t.rootId,
-                                                  mode: t.mode, filter: t.filter,
-                                                  depthLimit: t.depth, nodeLimit: t.nodes)
+                                                  elementId: treeParams.rootId,
+                                                  mode: treeParams.mode, filter: treeParams.filter,
+                                                  depthLimit: treeParams.depth, nodeLimit: treeParams.nodes)
             guard let tree = rsp.tree,
                   let data = try? JSONEncoder().encode(tree),
                   let text = String(data: data, encoding: .utf8) else {
@@ -66,8 +70,8 @@ enum InspectTools {
             var summary: [String: Any] = ["bundleID": bid,
                                           "redacted": redacted,
                                           "truncated": rsp.truncated ?? false,
-                                          "windows": t.rootId == nil ? (tree.children).count : 1]
-            if let rootId = t.rootId { summary["rootId"] = rootId }
+                                          "windows": treeParams.rootId == nil ? (tree.children).count : 1]
+            if let rootId = treeParams.rootId { summary["rootId"] = rootId }
             if let by = rsp.truncatedBy, !by.isEmpty { summary["truncatedBy"] = by }
             return MCPServer.result(id, [
                 "resultType": "complete",
@@ -179,6 +183,8 @@ enum InspectTools {
                         "targetClass": rsp.targetClass ?? "unknown"]
             })
 
+        // MARK: - Class inventory
+
         case "inspect_classes":
             let filter = (args["filter"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let limit = (args["limit"] as? Int) ?? 200
@@ -233,10 +239,12 @@ enum InspectTools {
                                       "truncated": detail.truncated]
             ])
 
+        // MARK: - Snapshots
+
         case "inspect_snapshot":
-            let t = try treeArgs(args)
-            let mode = t.mode, filter = t.filter, rootId = t.rootId
-            let caps = (depth: t.depth, nodes: t.nodes)
+            let treeParams = try treeArgs(args)
+            let mode = treeParams.mode, filter = treeParams.filter, rootId = treeParams.rootId
+            let caps = (depth: treeParams.depth, nodes: treeParams.nodes)
             let withShot = (args["withScreenshot"] as? Bool) ?? false
             let treeRsp = try InspectControl.transact(bundleID: bid, op: .uiTree,
                                                       elementId: rootId,
@@ -348,6 +356,8 @@ enum InspectTools {
                                    "removed": files.map(\.path),
                                    "count": cleared.removed, "bytes": bytes])
 
+        // MARK: - Bookmarks
+
         case "bookmark_add":
             guard let kind = (args["kind"] as? String),
                   ["class", "element", "symbol"].contains(kind) else {
@@ -404,24 +414,24 @@ enum InspectTools {
             let comment = (args["comment"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let tags = (args["tags"] as? [String]) ?? []
             let groupName = (args["group"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            let bm = AgentBookmark(id: BookmarkStore.mintID("bm_"), bundleID: bid,
+            let bookmark = AgentBookmark(id: BookmarkStore.mintID("bm_"), bundleID: bid,
                                    target: target, comment: comment, tags: tags,
                                    createdAt: BookmarkStore.stamp(),
                                    updatedAt: BookmarkStore.stamp(),
                                    snapshotRef: snapshotRef)
             BookmarkStore.modify(bundleID: bid) { store in
-                store.bookmarks.append(bm)
+                store.bookmarks.append(bookmark)
                 if let groupName {
                     let gid = resolveBookmarkGroup(in: &store, ref: groupName)
                     if let i = store.groups.firstIndex(where: { $0.id == gid }) {
-                        if !store.groups[i].bookmarkIds.contains(bm.id) {
-                            store.groups[i].bookmarkIds.append(bm.id)
+                        if !store.groups[i].bookmarkIds.contains(bookmark.id) {
+                            store.groups[i].bookmarkIds.append(bookmark.id)
                             store.groups[i].updatedAt = BookmarkStore.stamp()
                         }
                     }
                 }
             }
-            var payload: [String: Any] = ["bundleID": bid, "id": bm.id, "kind": kind]
+            var payload: [String: Any] = ["bundleID": bid, "id": bookmark.id, "kind": kind]
             if let snapshotRef { payload["snapshotRef"] = snapshotRef }
             if let groupName { payload["group"] = groupName }
             return MCPServer.toolResult(id, payload)
@@ -438,12 +448,12 @@ enum InspectTools {
             var touched: String? = nil
             BookmarkStore.modify(bundleID: bid) { store in
                 if let i = store.bookmarks.firstIndex(where: { $0.id == refID }) {
-                    if let c = args["comment"] as? String { store.bookmarks[i].comment = c }
-                    if let t = args["tags"] as? [String] { store.bookmarks[i].tags = t }
+                    if let newComment = args["comment"] as? String { store.bookmarks[i].comment = newComment }
+                    if let newTags = args["tags"] as? [String] { store.bookmarks[i].tags = newTags }
                     store.bookmarks[i].updatedAt = BookmarkStore.stamp()
                     touched = store.bookmarks[i].id
                 } else if let i = store.groups.firstIndex(where: { $0.id == refID }) {
-                    if let c = args["comment"] as? String { store.groups[i].note = c }
+                    if let newNote = args["comment"] as? String { store.groups[i].note = newNote }
                     store.groups[i].updatedAt = BookmarkStore.stamp()
                     touched = store.groups[i].id
                 }
@@ -462,15 +472,15 @@ enum InspectTools {
             let remove = (args["remove"] as? [String]) ?? []
             // Unknown ids fail stated before anything changes: no silent partial membership.
             let current = BookmarkStore.load(bundleID: bid)
-            for x in add + remove
-            where !current.bookmarks.contains(where: { $0.id == x }) {
-                throw ToolRouter.bail("unknown bookmark id '\(x)' - no membership changed")
+            for candidateID in add + remove
+            where !current.bookmarks.contains(where: { $0.id == candidateID }) {
+                throw ToolRouter.bail("unknown bookmark id '\(candidateID)' - no membership changed")
             }
             func members(after store: BookmarkStoreData, gid: String) -> [String] {
-                var m = store.groups.first(where: { $0.id == gid })?.bookmarkIds ?? []
-                m.append(contentsOf: add.filter { !m.contains($0) })
-                m.removeAll(where: { remove.contains($0) })
-                return m
+                var memberIDs = store.groups.first(where: { $0.id == gid })?.bookmarkIds ?? []
+                memberIDs.append(contentsOf: add.filter { !memberIDs.contains($0) })
+                memberIDs.removeAll(where: { remove.contains($0) })
+                return memberIDs
             }
             if ToolRouter.isDryRun(args) {
                 let (gid, name, created) = peekBookmarkGroup(in: current, ref: gref)
@@ -508,10 +518,10 @@ enum InspectTools {
             if let kind { list = list.filter { $0.target.kind == kind } }
             if let tag { list = list.filter { $0.tags.contains(tag) } }
             if let gref {
-                guard let g = store.groups.first(where: { $0.id == gref || $0.name == gref }) else {
+                guard let group = store.groups.first(where: { $0.id == gref || $0.name == gref }) else {
                     throw ToolRouter.bail("unknown group '\(gref)'")
                 }
-                let ids = Set(g.bookmarkIds)
+                let ids = Set(group.bookmarkIds)
                 list = list.filter { ids.contains($0.id) }
             }
             let page = Array(list.prefix(limit))
@@ -519,8 +529,8 @@ enum InspectTools {
             // pinned manifest. Default off - each check costs a single-slot transaction.
             var freshHashes: [String: String?] = [:]
             if checkFresh {
-                let walks = Set(page.compactMap { b -> String? in
-                    guard b.target.kind == "element", let ref = b.snapshotRef,
+                let walks = Set(page.compactMap { bookmark -> String? in
+                    guard bookmark.target.kind == "element", let ref = bookmark.snapshotRef,
                           let man = SnapshotStore.load(bundleID: bid, id: ref) else { return nil }
                     return "\(man.mode)|\(man.filter ?? "")"
                 })
@@ -539,13 +549,13 @@ enum InspectTools {
                     }
                 }
             }
-            let dicts: [[String: Any]] = page.map { b in
+            let dicts: [[String: Any]] = page.map { bookmark in
                 var stale = false
                 var reason: String? = nil
-                if b.target.kind == "element" {
-                    if let ref = b.snapshotRef,
+                if bookmark.target.kind == "element" {
+                    if let ref = bookmark.snapshotRef,
                        let man = SnapshotStore.load(bundleID: bid, id: ref) {
-                        if man.mode != (b.target.mode ?? "full") {
+                        if man.mode != (bookmark.target.mode ?? "full") {
                             stale = true; reason = "mode-changed"
                         } else if checkFresh {
                             let walk = "\(man.mode)|\(man.filter ?? "")"
@@ -559,7 +569,7 @@ enum InspectTools {
                         stale = true; reason = "snapshot-gone"
                     }
                 }
-                return bookmarkDict(b, stale: stale, staleReason: reason)
+                return bookmarkDict(bookmark, stale: stale, staleReason: reason)
             }
             return MCPServer.toolResult(id, ["bundleID": bid, "count": dicts.count,
                                    "total": list.count, "bookmarks": dicts,
@@ -569,8 +579,8 @@ enum InspectTools {
             guard let ids = args["ids"] as? [String], !ids.isEmpty else {
                 throw ToolRouter.bail("bookmark_remove needs ids")
             }
-            for x in ids where !(x.hasPrefix("bm_") || x.hasPrefix("grp_")) {
-                throw ToolRouter.bail("unknown id '\(x)' - bookmarks are bm_*, groups are grp_*")
+            for candidateID in ids where !(candidateID.hasPrefix("bm_") || candidateID.hasPrefix("grp_")) {
+                throw ToolRouter.bail("unknown id '\(candidateID)' - bookmarks are bm_*, groups are grp_*")
             }
             let before = BookmarkStore.load(bundleID: bid)
             let bmGone = Set(ids.filter { $0.hasPrefix("bm_") })
@@ -606,6 +616,8 @@ enum InspectTools {
 
     /// One plain uiTree transaction pinned as a timeline entry. No new op, no guest change:
     /// the guest cannot tell this read from a normal uitree_read.
+    // MARK: - Snapshot and bookmark helpers
+
     static func captureTreeSnapshot(_ bid: String, trigger: String, op: String,
                                      mode: InspectMode, redacted: Bool,
                                      elementId: String? = nil,
@@ -631,73 +643,73 @@ enum InspectTools {
     }
 
     /// Manifest without the tree: listings carry metadata, trees stay on disk until a diff.
-    static func manifestSummary(_ m: SnapshotManifest) -> [String: Any] {
-        var d: [String: Any] = [
-            "id": m.id, "bundleID": m.bundleID, "capturedAt": m.capturedAt,
-            "epochMs": m.epochMs, "trigger": m.trigger, "mode": m.mode,
-            "redacted": m.redacted, "truncated": m.truncated,
-            "nodes": m.nodes, "treeHash": m.treeHash]
-        if let filter = m.filter { d["filter"] = filter }
-        if let rootId = m.rootId { d["rootId"] = rootId }
-        if let scene = m.scene { d["scene"] = scene }
-        if let frameworks = m.frameworks { d["frameworks"] = frameworks }
-        if let vcs = m.vcs { d["vcs"] = vcs }
-        d["depthLimit"] = m.depthLimit
-        d["nodeLimit"] = m.nodeLimit
-        if let shotFile = m.shotFile { d["shotFile"] = shotFile }
-        if let w = m.width { d["width"] = w }
-        if let h = m.height { d["height"] = h }
-        return d
+    static func manifestSummary(_ manifest: SnapshotManifest) -> [String: Any] {
+        var summary: [String: Any] = [
+            "id": manifest.id, "bundleID": manifest.bundleID, "capturedAt": manifest.capturedAt,
+            "epochMs": manifest.epochMs, "trigger": manifest.trigger, "mode": manifest.mode,
+            "redacted": manifest.redacted, "truncated": manifest.truncated,
+            "nodes": manifest.nodes, "treeHash": manifest.treeHash]
+        if let filter = manifest.filter { summary["filter"] = filter }
+        if let rootId = manifest.rootId { summary["rootId"] = rootId }
+        if let scene = manifest.scene { summary["scene"] = scene }
+        if let frameworks = manifest.frameworks { summary["frameworks"] = frameworks }
+        if let vcs = manifest.vcs { summary["vcs"] = vcs }
+        summary["depthLimit"] = manifest.depthLimit
+        summary["nodeLimit"] = manifest.nodeLimit
+        if let shotFile = manifest.shotFile { summary["shotFile"] = shotFile }
+        if let w = manifest.width { summary["width"] = w }
+        if let h = manifest.height { summary["height"] = h }
+        return summary
     }
 
     /// Resolve a group ref (id or name), creating by name when absent. Returns the group id.
     /// Creation-on-reference keeps filing a one-call act; pure renames go through
     /// bookmark_note.
     static func resolveBookmarkGroup(in store: inout BookmarkStoreData, ref: String) -> String {
-        if let g = store.groups.first(where: { $0.id == ref || $0.name == ref }) { return g.id }
-        let g = BookmarkGroup(id: BookmarkStore.mintID("grp_"), name: ref, note: nil,
+        if let existing = store.groups.first(where: { $0.id == ref || $0.name == ref }) { return existing.id }
+        let group = BookmarkGroup(id: BookmarkStore.mintID("grp_"), name: ref, note: nil,
                               bookmarkIds: [], createdAt: BookmarkStore.stamp(),
                               updatedAt: BookmarkStore.stamp())
-        store.groups.append(g)
-        return g.id
+        store.groups.append(group)
+        return group.id
     }
 
     /// Read-only twin for dry-runs: reports whether the call would create the group.
     static func peekBookmarkGroup(in store: BookmarkStoreData, ref: String)
     -> (id: String, name: String, created: Bool) {
-        if let g = store.groups.first(where: { $0.id == ref || $0.name == ref }) {
-            return (g.id, g.name, false)
+        if let group = store.groups.first(where: { $0.id == ref || $0.name == ref }) {
+            return (group.id, group.name, false)
         }
         return (BookmarkStore.mintID("grp_"), ref, true)
     }
 
-    static func bookmarkDict(_ b: AgentBookmark, stale: Bool, staleReason: String?)
+    static func bookmarkDict(_ bookmark: AgentBookmark, stale: Bool, staleReason: String?)
     -> [String: Any] {
-        var t: [String: Any] = ["kind": b.target.kind]
-        if let v = b.target.className { t["className"] = v }
-        if let v = b.target.symbol { t["symbol"] = v }
-        if let v = b.target.elementId { t["elementId"] = v }
-        if let v = b.target.mode { t["mode"] = v }
-        if let v = b.target.role { t["role"] = v }
-        if let v = b.target.frame { t["frame"] = v }
-        if let v = b.target.axLabel { t["axLabel"] = v }
-        if let v = b.target.viewController { t["viewController"] = v }
-        if let v = b.target.superclasses { t["superclasses"] = v }
-        var d: [String: Any] = ["id": b.id, "bundleID": b.bundleID, "target": t,
-                                "tags": b.tags, "createdAt": b.createdAt,
-                                "updatedAt": b.updatedAt, "stale": stale]
-        if let c = b.comment { d["comment"] = c }
-        if let s = b.snapshotRef { d["snapshotRef"] = s }
-        if let r = staleReason { d["staleReason"] = r }
-        return d
+        var target: [String: Any] = ["kind": bookmark.target.kind]
+        if let value = bookmark.target.className { target["className"] = value }
+        if let value = bookmark.target.symbol { target["symbol"] = value }
+        if let value = bookmark.target.elementId { target["elementId"] = value }
+        if let value = bookmark.target.mode { target["mode"] = value }
+        if let value = bookmark.target.role { target["role"] = value }
+        if let value = bookmark.target.frame { target["frame"] = value }
+        if let value = bookmark.target.axLabel { target["axLabel"] = value }
+        if let value = bookmark.target.viewController { target["viewController"] = value }
+        if let value = bookmark.target.superclasses { target["superclasses"] = value }
+        var summary: [String: Any] = ["id": bookmark.id, "bundleID": bookmark.bundleID, "target": target,
+                                "tags": bookmark.tags, "createdAt": bookmark.createdAt,
+                                "updatedAt": bookmark.updatedAt, "stale": stale]
+        if let comment = bookmark.comment { summary["comment"] = comment }
+        if let snapshotID = bookmark.snapshotRef { summary["snapshotRef"] = snapshotID }
+        if let reason = staleReason { summary["staleReason"] = reason }
+        return summary
     }
 
-    static func groupDict(_ g: BookmarkGroup) -> [String: Any] {
-        var d: [String: Any] = ["id": g.id, "name": g.name,
-                                "members": g.bookmarkIds,
-                                "createdAt": g.createdAt, "updatedAt": g.updatedAt]
-        if let n = g.note { d["note"] = n }
-        return d
+    static func groupDict(_ group: BookmarkGroup) -> [String: Any] {
+        var summary: [String: Any] = ["id": group.id, "name": group.name,
+                                "members": group.bookmarkIds,
+                                "createdAt": group.createdAt, "updatedAt": group.updatedAt]
+        if let note = group.note { summary["note"] = note }
+        return summary
     }
 
     /// Host-side mirror of the guest ceilings (Inspector.maxDepth/maxNodes - the guest

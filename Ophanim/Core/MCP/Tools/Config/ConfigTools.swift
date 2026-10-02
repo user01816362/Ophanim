@@ -2,11 +2,16 @@ import Foundation
 
 /// Config projection + patch tools.
 enum ConfigTools {
+
+    // MARK: - Reads
+
     static func getConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let projection = SettingsStore.configProjection(bid) else { throw ToolRouter.bail("no settings found for \(bid)") }
         return try ToolRouter.json(projection)
     }
+
+    // MARK: - Writes
 
     static func setConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -62,6 +67,8 @@ enum ConfigTools {
         }
         return try ToolRouter.json(result)
     }
+
+    // MARK: - Keymaps
 
     static func getKeymap(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)

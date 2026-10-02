@@ -105,13 +105,13 @@ final class MCPServer {
         case "notifications/initialized", "notifications/cancelled":
             return nil   // notifications take no reply
         case "tools/list":
-            return Self.result(id, ["tools": Self.toolDefinitions.map { def -> [String: Any] in
-                var d = def
-                if let name = d["name"] as? String {
-                    d["annotations"] = ["readOnlyHint": Self.readOnlyTools.contains(name),
+            return Self.result(id, ["tools": Self.toolDefinitions.map { toolDef -> [String: Any] in
+                var annotated = toolDef
+                if let name = annotated["name"] as? String {
+                    annotated["annotations"] = ["readOnlyHint": Self.readOnlyTools.contains(name),
                                         "destructiveHint": Self.destructiveTools.contains(name)]
                 }
-                return d
+                return annotated
             }, "ttlMs": 300000, "cacheScope": "process"])
         case "tools/call":
             return callTool(id, name: params["name"] as? String ?? "",

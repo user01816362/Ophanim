@@ -1,3 +1,10 @@
+//
+//  AppTools.swift
+//  Ophanim
+//
+//  App lifecycle tools. Sole caller of NSWorkspace/Installer from MCP.
+//
+
 import Foundation
 #if canImport(AppKit)
 import AppKit
@@ -5,8 +12,17 @@ import AppKit
 
 /// App lifecycle tools. Sole caller of NSWorkspace/Installer from MCP.
 enum AppTools {
-    /// Whether the app is currently running (workspace check; pump-authoritative
-    /// liveness arrives with the Inspect batch).
+
+    // MARK: - Reads
+
+    /// Whether the app is currently running.
+    ///
+    /// Workspace check only; pump-authoritative liveness arrives with the
+    /// Inspect batch. Host-only (`canImport(AppKit)`); always false in other
+    /// builds so agents must not treat false as "safe to skip launch".
+    ///
+    /// - Parameter bid: App bundle ID.
+    /// - Returns: True when `NSWorkspace` reports the app running.
     static func isAppRunning(bundleID bid: String) -> Bool {
         #if canImport(AppKit)
         return NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bid })
@@ -15,6 +31,13 @@ enum AppTools {
         #endif
     }
 
+    /// Lists known apps with instrumentation state.
+    ///
+    /// Read-only and idempotent. Read-only.
+    ///
+    /// - Parameter args: Ignored.
+    /// - Returns: JSON with `count` and per-app `bundleID`, `name`,
+    ///   `version`, `instrumentationEnabled`, `captureCategories`, `running`.
     static func listApps(_ args: [String: Any]) throws -> String {
         let apps = AppQueryService.listApps().map { app -> [String: Any] in
             let cfg = SettingsStore.config(app.bundleID)
@@ -29,6 +52,18 @@ enum AppTools {
         }
         return try ToolRouter.json(["count": apps.count, "apps": apps])
     }
+
+    /// Launches an installed app through the hosted-app path.
+    ///
+    /// Goes through the same launch path the app library uses (not the bundle
+    /// directly) so PROHIBITED/MALICIOUS gates and unlockKeyCover binding
+    /// apply. Host-only; waits up to `MCPTimeouts.launch` for completion.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: Confirmation string.
+    /// - Throws: `ToolRouter.bail` when the app is not installed, the launch
+    ///   times out, or the build cannot launch.
+    // MARK: - Mutations (destructive: dryRun defaults true)
 
     static func launchApp(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -53,6 +88,18 @@ enum AppTools {
         #endif
     }
 
+    /// Installs an .ipa with Galgal injection forced on.
+    ///
+    /// Runs the same importer the GUI uses (no modal prompt) and blocks until
+    /// it completes. A bundle that is not a runnable Catalyst app fails here
+    /// as a stated error, never as a phantom "Installed" row. Host-only.
+    ///
+    /// - Parameter args: `ipaPath` (required, must name an existing `.ipa`).
+    /// - Returns: Confirmation naming the installed bundle ID and the
+    ///   `set_config` → `launch_app` next steps.
+    /// - Throws: `ToolRouter.bail` when the path is missing, not an `.ipa`,
+    ///   the install times out or fails, validation rejects the bundle, or
+    ///   the build cannot install.
     static func installApp(_ args: [String: Any]) throws -> String {
         guard let path = args["ipaPath"] as? String, !path.isEmpty else { throw ToolRouter.bail("ipaPath is required") }
         let ipaURL = ToolRouter.expandedURL(path)
@@ -80,6 +127,15 @@ enum AppTools {
         #endif
     }
 
+    /// Uninstalls an app, optionally purging its data container.
+    ///
+    /// Destructive: `dryRun` defaults to true like every other destructive
+    /// tool — pass `dryRun: false` to delete.
+    ///
+    /// - Parameter args: `bundleID` (required); `purgeData` (bool, default
+    ///   false — also deletes the container); `dryRun: false` to execute.
+    /// - Returns: Preview or result JSON from `AppQueryService`.
+    /// - Throws: `ToolRouter.bail` when the app is not installed.
     static func uninstallApp(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard AppQueryService.appURL(bid) != nil else { throw ToolRouter.bail("app not installed: \(bid)") }
@@ -91,9 +147,20 @@ enum AppTools {
         return try ToolRouter.json(AppQueryService.uninstall(bid, purgeData: purge))
     }
 
-    /// Install/remove the Galgal runtime in an app's executable — the headless twin
-    /// of the settings-window Galgal button (AppSettingsView install/remove + relist).
-    /// Destructive (rewrites load commands): dryRun previews by default.
+    /// Installs or removes the Galgal runtime in an app's executable.
+    ///
+    /// Headless twin of the settings-window Galgal button (AppSettingsView
+    /// install/remove + relist). Destructive (rewrites load commands):
+    /// `dryRun` previews by default. Removal settle-polls like
+    /// `setInjectionStrategy` before reporting. Host-only.
+    ///
+    /// - Parameter args: `bundleID` (required); `installed` (bool, required:
+    ///   true = install, false = remove); `dryRun: false` to execute.
+    /// - Returns: Preview JSON (`current`, `requested`, `wouldChange`) or
+    ///   result JSON (`installed`, `changed`, `verified`, plus a `note` when
+    ///   the state did not settle in time).
+    /// - Throws: `ToolRouter.bail` when the executable is missing, `installed`
+    ///   is not a bool, install fails, or the build is unsupported.
     static func setGalgalRuntime(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let exe = AppQueryService.appExecutable(bid) else { throw ToolRouter.bail("no executable for \(bid)") }
@@ -147,9 +214,20 @@ enum AppTools {
         #endif
     }
 
-    /// DYLD introspection/iosFrameworks toggles — headless twin of the Injected
-    /// Libraries groupbox (BypassesPane). Re-signs the binary like the GUI path.
-    /// Destructive (re-signs): dryRun previews by default. Takes effect on next launch.
+    /// Toggles DYLD introspection/iosFrameworks library paths.
+    ///
+    /// Headless twin of the Injected Libraries groupbox (BypassesPane).
+    /// Re-signs the binary like the GUI path. Destructive (re-signs):
+    /// `dryRun` previews by default. Takes effect on next launch (load path
+    /// is baked at exec). Host-only.
+    ///
+    /// - Parameter args: `bundleID` (required); `introspection` and/or
+    ///   `iosFrameworks` (bool, at least one required); `dryRun: false` to
+    ///   execute.
+    /// - Returns: Preview JSON (`current`, `requested`) or result JSON
+    ///   (`current`, `changed`, plus a next-launch `note`).
+    /// - Throws: `ToolRouter.bail` when nothing was requested or the build is
+    ///   unsupported.
     static func setDyldLibraries(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
@@ -189,8 +267,18 @@ enum AppTools {
         #endif
     }
 
-    /// Application Category picker + re-sign — headless twin of the Application Type
-    /// groupbox (BypassesPane). Destructive (re-signs the binary): dryRun previews.
+    /// Sets an app's Application Category and re-signs.
+    ///
+    /// Headless twin of the Application Type groupbox (BypassesPane).
+    /// Destructive (re-signs the binary): `dryRun` previews. Host-only.
+    ///
+    /// - Parameter args: `bundleID` (required); `category` (required: an
+    ///   `LSApplicationCategoryType` raw value); `dryRun: false` to execute.
+    /// - Returns: Preview JSON (`current`, `requested`, `wouldChange`) or
+    ///   result JSON (`category`, `changed`, `resigned`).
+    /// - Throws: `ToolRouter.bail` when the app/executable is missing, the
+    ///   category is unknown (the message lists valid values), re-sign fails,
+    ///   or the build is unsupported.
     static func setAppCategory(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
@@ -221,8 +309,14 @@ enum AppTools {
         #endif
     }
 
-    /// Trash per-app files left behind by uninstalled apps — headless twin of the
-    /// prune-dangling-files setting (UninstallSettings). Destructive: dryRun previews.
+    /// Trashes per-app files left behind by uninstalled apps.
+    ///
+    /// Headless twin of the prune-dangling-files setting
+    /// (UninstallSettings). Destructive: `dryRun` previews.
+    ///
+    /// - Parameter args: `dryRun: false` to execute (no other keys read).
+    /// - Returns: Preview JSON (`wouldTrash`, `bundleIDs`, `count`) or result
+    ///   JSON (`trashed`, `bundleIDs`, `count`).
     static func pruneFiles(_ args: [String: Any]) throws -> String {
         let (files, ids) = Uninstaller.pruneCandidates()
         if ToolRouter.isDryRun(args) {

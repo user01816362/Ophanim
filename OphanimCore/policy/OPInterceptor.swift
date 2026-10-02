@@ -11,6 +11,20 @@ import Foundation
 import JavaScriptCore
 
 /// Mutable description of an in-flight call handed to the interceptor (and to JS scripts).
+///
+/// Guest-only: lives in the injected agent, never in the host app. `init`
+/// defaults keep hook call sites to one line; `stringifiedArgs` is the
+/// search target for `OPMatcher.argContains`.
+///
+/// - Parameter category: Routing bucket for the call.
+/// - Parameter layer: Which instrumentation layer produced it.
+/// - Parameter api: API name.
+/// - Parameter fields: Structured key/values.
+/// - Parameter host: Network host, when known.
+/// - Parameter url: Full URL, when known.
+/// - Parameter path: Filesystem path, when known.
+/// - Parameter requestBody: Outbound payload, when captured.
+/// - Parameter responseBody: Inbound payload, when captured.
 public final class OPCallContext {
     public let category: OPCategory
     public let layer: OPCaptureLayer
@@ -37,6 +51,9 @@ public final class OPCallContext {
 }
 
 /// Outcome of consulting the rules: what to do plus any replacement payload.
+///
+/// Guest-only. `observe` is the shared observe-by-default value: no match in
+/// `decide` means the original call runs untouched.
 public struct OPDecision {
     public var disposition: OPDisposition
     public var matchedRuleID: String?
@@ -55,6 +72,11 @@ public struct OPDecision {
                                            delay: 0, faultErrorCode: nil)
 }
 
+/// The policy engine: match each call against the rules, decide, emit.
+///
+/// Guest-only (built into the injected agent, not the host app). Thread-safe:
+/// `decide()` runs on many threads; JS evaluation serializes on `jsLock` and
+/// per-rule script state resets on every config reload (fresh interceptor).
 public final class OPInterceptor {
     private let rules: [OPRule]
     private let jsContext: JSContext?
@@ -67,6 +89,12 @@ public final class OPInterceptor {
     private static let maxStateKeys = 32
     private static let maxStateValueChars = 256
 
+    /// Builds the engine for one config generation.
+    ///
+    /// Disabled rules are filtered once here (not per call). A `JSContext`
+    /// is stood up only when some rule actually needs scripting.
+    ///
+    /// - Parameter rules: Full rule list; disabled entries are dropped.
     public init(rules: [OPRule]) {
         self.rules = rules.filter { $0.enabled }
         // Only stand up a JS context if some rule actually needs scripting.
@@ -80,7 +108,14 @@ public final class OPInterceptor {
         }
     }
 
-    /// Resolve a decision for a call. First matching rule wins.
+    /// Resolves a decision for a call. First matching rule wins.
+    ///
+    /// Observe-by-default: no match returns `.observe` and the original call
+    /// runs untouched. Stays synchronous — no host round-trip (scripts run
+    /// in-process under `jsLock`).
+    ///
+    /// - Parameter ctx: The in-flight call description.
+    /// - Returns: The disposition plus any replacement payload.
     public func decide(_ ctx: OPCallContext) -> OPDecision {
         for rule in rules where matches(rule.match, ctx) {
             return apply(rule, ctx)
@@ -90,6 +125,11 @@ public final class OPInterceptor {
 
     // MARK: - Matching
 
+    /// Whether every present matcher field agrees with the call (AND).
+    ///
+    /// - Parameter m: Matcher under test.
+    /// - Parameter ctx: The in-flight call description.
+    /// - Returns: True only when all present fields match.
     private func matches(_ m: OPMatcher, _ ctx: OPCallContext) -> Bool {
         if let cats = m.categories, !cats.contains(ctx.category) { return false }
         if let g = m.apiGlob, !OPGlob.match(g, ctx.api) { return false }
@@ -102,6 +142,14 @@ public final class OPInterceptor {
 
     // MARK: - Action application
 
+    /// Converts a matched static rule into a decision.
+    ///
+    /// `.script` rules divert to `runScript`; everything else maps
+    /// one-to-one onto a disposition plus its payload fields.
+    ///
+    /// - Parameter rule: The matched rule.
+    /// - Parameter ctx: The in-flight call description (read by script rules).
+    /// - Returns: The decision for this rule.
     private func apply(_ rule: OPRule, _ ctx: OPCallContext) -> OPDecision {
         let a = rule.action
         switch a.kind {
@@ -142,12 +190,23 @@ public final class OPInterceptor {
         return d
     }
 
-    /// Evaluate a JS rule. The script sees `ctx` and may set `ctx.replacementBody` (base64),
-    /// `ctx.replacementStatus`, `ctx.block = true`, `ctx.returnValue`, per-register
-    /// `ctx.x0`…`ctx.x7` (inline arg edits; arg-only scripts resolve to .argsModified),
-    /// or `ctx.state.*` (per-rule persistent strings, capped — survives across calls
-    /// until the next config reload). Reads: `ctx.method`, `ctx.statusCode` (-1 when
-    /// absent), plus the string fields. decide() stays synchronous: no host round-trip.
+    /// Evaluates a JS rule against a call.
+    ///
+    /// The script sees `ctx` and may set `ctx.replacementBody` (base64),
+    /// `ctx.replacementStatus`, `ctx.block = true`, `ctx.returnValue`,
+    /// per-register `ctx.x0`…`ctx.x7` (inline arg edits; arg-only scripts
+    /// resolve to `.argsModified` — run the original with edited regs — NOT
+    /// `.returnReplaced`, which would skip the original entirely, unless a
+    /// return-style output is also set), or `ctx.state.*` (per-rule
+    /// persistent strings, capped — survives across calls until the next
+    /// config reload). Reads: `ctx.method`, `ctx.statusCode` (-1 when
+    /// absent), plus the string fields. Runs under `jsLock`; a missing
+    /// `JSContext` (no script rules configured) resolves to `.observed`.
+    ///
+    /// - Parameter source: JS rule body.
+    /// - Parameter rule: The matched rule (owns the `ctx.state` slot).
+    /// - Parameter ctx: The in-flight call description.
+    /// - Returns: The script's decision, or `.observed` when it changed nothing.
     private func runScript(_ source: String, _ rule: OPRule, _ ctx: OPCallContext) -> OPDecision {
         guard let js = jsContext else { return decision(.observed, rule) }
         jsLock.lock(); defer { jsLock.unlock() }
@@ -213,6 +272,15 @@ public final class OPInterceptor {
 }
 
 /// Minimal shell-style glob matcher supporting `*` and `?`. Anchored full-string match.
+///
+/// Guest-only copy: `OPConfig.swift` keeps a local duplicate (`OPImageScope`)
+/// because that file also compiles into the host app target (only
+/// `OPConfig` + `OPEvent` are shared) — do not "deduplicate" across the
+/// boundary.
+///
+/// - Parameter pattern: Shell-style pattern (`*` any run, `?` one char), case-insensitive.
+/// - Parameter text: Value to test.
+/// - Returns: True on anchored full-string match; false on invalid regex.
 public enum OPGlob {
     public static func match(_ pattern: String, _ text: String) -> Bool {
         // Translate to NSRegularExpression for a robust full-string match.

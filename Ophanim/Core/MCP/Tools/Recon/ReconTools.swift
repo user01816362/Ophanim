@@ -2,6 +2,9 @@ import Foundation
 
 /// Read-only binary/log recon tools.
 enum ReconTools {
+
+    // MARK: - Binary surface
+
     static func analyzeApp(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         return try ToolRouter.json(ReportBuilder.report(bid))
@@ -56,6 +59,8 @@ enum ReconTools {
     /// Byte-signature scan of an app binary ("1F 20 ?? D5", ?? = wildcard) —
     /// headless twin of the Recon signature scanner. Pure-Swift engine
     /// (ReconView.parsePattern/scan), capped at 500 hits. Read-only.
+    // MARK: - Signature scan
+
     static func scanSignature(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let pattern = args["pattern"] as? String, !pattern.isEmpty else {

@@ -53,11 +53,11 @@ re-check the cited path before reopening.
   (`Galgal/Galgal/Controls/PTFakeTouch/NSObject+Swizzle.m:25-64,248-356`),
   which this repo does not reorganize (see `ARCHITECTURE.md`).
 - Keymap writes → SHIPPED as `set_keymap` (catalog
-  `Ophanim/Core/MCP/MCPServer.swift:850-863`, route
-  `ToolRouter.swift:131`, validated writer `ConfigTools.swift:80-122`:
+  `Ophanim/Core/MCP/MCPServer.swift:1040`, route
+  `ToolRouter.swift:150`, validated writer `ConfigTools.swift:80-122`:
   name gate, enforced bundle binding, backup, atomic replace, dryRun default).
 - Streaming → SHIPPED as `tail_events waitMs` (catalog
-  `MCPServer.swift:259`, long-poll cap 30000 `EventTools.swift:21-26`) plus
-  `subscribe_events`/`unsubscribe_events` (catalog `MCPServer.swift:265-285`,
+  `MCPServer.swift:265`, long-poll cap 30000 `EventTools.swift:21-32`) plus
+  `subscribe_events`/`unsubscribe_events` (catalog `MCPServer.swift:280-292`,
   handlers `EventTools.swift:49-63`, emitter `Transports/EventNotifier.swift`);
   design in ADR-0010.

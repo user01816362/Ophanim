@@ -1,6 +1,27 @@
+# SwiftLint configuration for Ophanim.
+#
+# Policy (verified 2026-10-02 against SwiftLint 0.65.1 `swiftlint rules`):
+# the 2026 recommended set is SwiftLint's DEFAULT-enabled set, which since
+# 0.59 already absorbs ~40 former opt-in rules (closure_spacing,
+# empty_count, explicit_init, joined_default_parameter, modifier_order,
+# redundant_nil_coalescing, sorted_imports, toggle_bool, and the rest show
+# as "enabled in your config" with no opt_in entry). Nothing below
+# re-states defaults. The two explicit entries are:
+#  - force_unwrapping (opt-in kept): intentional in this codebase; every
+#    force-unwrap is a reviewed invariant, not a shortcut.
+#  - non_optional_string_data_conversion disabled: upstream false-positive
+#    workaround, see https://github.com/realm/SwiftLint/issues/5263.
+#
+# Evaluated-and-refused opt-in rules (each either fires on current code or
+# cannot be proven clean without executing SwiftLint, which crashes under
+# this machine's Xcode 27 toolchain — SourceKitten sourcekitdInProc load
+# failure; CI runners do not install SwiftLint at all so the pbxproj phase
+# degrades to "lint skipped"): see AGENTS.md "Gap list" for the per-rule
+# table with firing sites. Do NOT enable a refused rule without fixing its
+# sites first; fixes are semantic edits outside the mechanics boundary.
 opt_in_rules:
   - force_unwrapping
-  
+
 excluded:
   - Carthage
   - Pods

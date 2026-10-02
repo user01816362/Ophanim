@@ -4,22 +4,27 @@ import Foundation
 /// pinned to a version). The stores are synchronous, so handlers call them
 /// directly; only the async fetch and the install settle loop need bridging.
 enum SourceTools {
+
+    // MARK: - Feed registry
+
     static func listSources(_ args: [String: Any]) throws -> String {
         let feeds: [[String: Any]] = AppSourcesStore.shared.sources.map { item in
-            var d: [String: Any] = [
+            var feed: [String: Any] = [
                 "url": item.url.absoluteString,
                 "displayName": item.displayName,
                 "appCount": item.source?.apps.count ?? 0,
             ]
-            if item.isLoading { d["loading"] = true }
-            if let error = item.error { d["error"] = error }
+            if item.isLoading { feed["loading"] = true }
+            if let error = item.error { feed["error"] = error }
             if let news = item.source?.news, !news.isEmpty {
-                d["news"] = news.map { ["title": $0.title, "caption": $0.caption ?? ""] }
+                feed["news"] = news.map { ["title": $0.title, "caption": $0.caption ?? ""] }
             }
-            return d
+            return feed
         }
         return try ToolRouter.json(["count": feeds.count, "sources": feeds])
     }
+
+    // MARK: - Feed writes
 
     static func addSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty else { throw ToolRouter.bail("url is required") }
@@ -51,6 +56,8 @@ enum SourceTools {
         AppSourcesStore.shared.removeSource(target)
         return try ToolRouter.json(["removed": target.url.absoluteString])
     }
+
+    // MARK: - Install and lookup
 
     static func installSourceApp(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -115,6 +122,8 @@ enum SourceTools {
     }
 
     /// Rename a feed's display name. Destructive (mutates subscription): dryRun previews.
+    // MARK: - Feed maintenance
+
     static func renameSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty,
               let name = args["name"] as? String else {
@@ -194,6 +203,8 @@ enum SourceTools {
     /// Headless mirror of the Sources window search (AppSourcesView.filteredApps):
     /// substring match across name, bundleIdentifier, developerName, one row per
     /// app (bundleID-merged). Read-only; the GUI filter never had an MCP twin.
+    // MARK: - Search and settle
+
     static func searchSourceApps(_ args: [String: Any]) throws -> String {
         guard let query = args["query"] as? String, !query.isEmpty else {
             throw ToolRouter.bail("query is required")

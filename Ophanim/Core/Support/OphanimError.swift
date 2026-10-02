@@ -1,3 +1,10 @@
+//
+//  OphanimError.swift
+//  Ophanim
+//
+//  Shared install/launch failure cases surfaced through Log and Toast.
+//
+
 import AudioToolbox
 import Foundation
 import SwiftUI

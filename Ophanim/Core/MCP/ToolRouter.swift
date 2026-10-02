@@ -3,9 +3,12 @@ import Foundation
 /// Single owner for tool arg decode, errors, and JSON output.
 /// Tool family files call these; the router owns the name→handler table.
 enum ToolRouter {
+
+    // MARK: - Decoding, errors, safety contracts
+
     struct ToolError: Error { let message: String }
 
-    static func bail(_ m: String) -> ToolError { ToolError(message: m) }
+    static func bail(_ message: String) -> ToolError { ToolError(message: message) }
 
     /// Decode a JSON-object argument into `T`, throwing a `bail("invalid <label>: …")` on failure.
     static func decode<T: Decodable>(_ obj: Any, as type: T.Type = T.self, label: String) throws -> T {
@@ -42,6 +45,8 @@ enum ToolRouter {
     /// dryRun:false to execute. Omitted dryRun previews; nothing is deleted.
     static func isDryRun(_ args: [String: Any]) -> Bool { (args["dryRun"] as? Bool) ?? true }
 
+    // MARK: - Argument validation
+
     /// Reject unknown argument names, naming the closest match when there is one.
     static func rejectUnknownKeys(_ args: [String: Any], allowed: Set<String>, tool: String) throws {
         let unknown = args.keys.filter { !allowed.contains($0) }.sorted()
@@ -64,8 +69,8 @@ enum ToolRouter {
     }
 
     /// Plain Levenshtein distance. Argument names are short and this runs once per call.
-    private static func editDistance(_ a: String, _ b: String) -> Int {
-        let x = Array(a), y = Array(b)
+    private static func editDistance(_ first: String, _ second: String) -> Int {
+        let x = Array(first), y = Array(second)
         if x.isEmpty { return y.count }
         if y.isEmpty { return x.count }
         var previous = Array(0...y.count)
@@ -80,6 +85,8 @@ enum ToolRouter {
         }
         return previous[y.count]
     }
+
+    // MARK: - Name to handler table
 
     /// Name → handler. Only file that knows tool names besides the catalog.
     nonisolated(unsafe) static let handlers: [String: ([String: Any]) throws -> String] = [

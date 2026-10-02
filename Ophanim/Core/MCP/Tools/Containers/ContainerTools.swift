@@ -3,6 +3,9 @@ import Foundation
 /// Container/log/profile/data tools. Finder reveal has no headless meaning and
 /// stays GUI-only.
 enum ContainerTools {
+
+    // MARK: - Logs
+
     static func getLogPath(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let dirs = ReportBuilder.logDirs(bid)
@@ -46,6 +49,8 @@ enum ContainerTools {
         let bid = try ToolRouter.requireBundleID(args)
         return try ToolRouter.json(ContainerService.containerReport(bid))
     }
+
+    // MARK: - Profiles
 
     static func listProfiles(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -95,6 +100,8 @@ enum ContainerTools {
         try ContainerProfiles.remove(bundleID: bid, name: name)
         return try ToolRouter.json(["bundleID": bid, "removed": name])
     }
+
+    // MARK: - Destructive container reset
 
     static func clearContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -178,6 +185,8 @@ enum ContainerTools {
         return try ToolRouter.json(["bundleID": bid, "scope": scope, "removed": removed,
                              "bytes": bytes + analysisBytes])
     }
+
+    // MARK: - Backup and restore
 
     static func backupContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)

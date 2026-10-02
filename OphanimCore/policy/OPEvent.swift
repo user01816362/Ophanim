@@ -7,7 +7,10 @@
 
 import Foundation
 
-/// Broad category a hooked call belongs to. Used for routing, filtering and rule matching.
+/// Broad category a hooked call belongs to.
+///
+/// Used for routing, filtering and rule matching. Guest-shared (compiles into
+/// host AND guest): keep the dialect old-Swift-safe.
 public enum OPCategory: String, Codable, CaseIterable, Sendable {
     case network
     case keychain
@@ -19,8 +22,11 @@ public enum OPCategory: String, Codable, CaseIterable, Sendable {
     case jailbreak
 }
 
-/// Which instrumentation layer produced a record. Lets an analyst reason about provenance
-/// (e.g. plaintext from the TLS layer vs. a structured URLSession record) and de-duplicate.
+/// Which instrumentation layer produced a record.
+///
+/// Lets an analyst reason about provenance (e.g. plaintext from the TLS layer
+/// vs. a structured URLSession record) and de-duplicate. Guest-shared
+/// (compiles into host AND guest): keep the dialect old-Swift-safe.
 public enum OPCaptureLayer: String, Codable, Sendable {
     case tls            // boringssl SSL_read/SSL_write
     case urlProtocol    // custom NSURLProtocol
@@ -31,6 +37,9 @@ public enum OPCaptureLayer: String, Codable, Sendable {
 }
 
 /// What the interception engine decided to do with a call.
+///
+/// Guest-shared (compiles into host AND guest): keep the dialect
+/// old-Swift-safe.
 public enum OPDisposition: String, Codable, Sendable {
     case observed       // logged, original behavior unchanged
     case argsModified   // input arguments were rewritten
@@ -41,6 +50,25 @@ public enum OPDisposition: String, Codable, Sendable {
 }
 
 /// One structured event. Encodes cleanly to NDJSON and to a flat plain-text line.
+///
+/// Guest-shared (compiles into host AND guest): keep the dialect
+/// old-Swift-safe. Bodies encode READABLY (UTF-8 text stays text, binary
+/// falls back to base64 — see `encode(to:)`), because the default
+/// `JSONEncoder` base64s every `Data` and text bodies used to look
+/// "encrypted" in the log.
+///
+/// - Parameter category: Routing/filtering/rule-matching bucket.
+/// - Parameter layer: Which instrumentation layer produced the record.
+/// - Parameter api: API name, e.g. `SecItemCopyMatching`.
+/// - Parameter summary: Short one-line description.
+/// - Parameter fields: Structured key/values (host, path, status, …).
+/// - Parameter requestBody: Captured payload, subject to the body cap.
+/// - Parameter responseBody: Captured payload, subject to the body cap.
+/// - Parameter disposition: What the engine decided.
+/// - Parameter matchedRuleID: Rule that drove an interception, if any.
+/// - Parameter backtrace: Optional symbolicated frames.
+/// - Parameter timestamp: Defaults to now.
+/// - Parameter thread: Defaults to the current-thread label.
 public struct OPEvent: Codable, Sendable {
     public var timestamp: Date
     public var category: OPCategory
@@ -81,6 +109,9 @@ public struct OPEvent: Codable, Sendable {
         self.backtrace = backtrace
     }
 
+    /// Human-readable label for the calling thread.
+    ///
+    /// - Returns: `main` on the main thread, else the thread name, else the thread pointer.
     public static func currentThreadLabel() -> String {
         if Thread.isMainThread { return "main" }
         let name = Thread.current.name ?? ""
@@ -88,6 +119,12 @@ public struct OPEvent: Codable, Sendable {
     }
 
     /// Flat, grep-friendly single line for the plain-text sink.
+    ///
+    /// Non-`observed` dispositions render as `<disposition>`; fields sort by
+    /// key so lines diff stably.
+    ///
+    /// - Parameter iso: Formatter for the timestamp prefix.
+    /// - Returns: The single log line (no trailing newline).
     public func plainTextLine(iso: ISO8601DateFormatter) -> String {
         var parts = ["[\(iso.string(from: timestamp))]",
                      category.rawValue.uppercased(),
@@ -132,6 +169,14 @@ public struct OPEvent: Codable, Sendable {
         return encoding == "base64" ? Data(base64Encoded: s) : Data(s.utf8)
     }
 
+    /// Encodes the event, keeping text bodies human-readable.
+    ///
+    /// UTF-8-decodable payloads (JSON, form data, HTML…) are written as plain
+    /// text flagged `utf8`; genuinely binary payloads fall back to base64
+    /// flagged `base64` (see the `*BodyEncoding` keys).
+    ///
+    /// - Parameter encoder: Destination encoder.
+    /// - Throws: Any `EncodingError` from the nested container.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(timestamp, forKey: .timestamp)
@@ -148,6 +193,13 @@ public struct OPEvent: Codable, Sendable {
         try c.encodeIfPresent(backtrace, forKey: .backtrace)
     }
 
+    /// Decodes an event written by `encode(to:)`.
+    ///
+    /// Accepts both `utf8` and `base64` body encodings; a missing encoding key
+    /// reads as `utf8` for backward compatibility.
+    ///
+    /// - Parameter decoder: Source decoder.
+    /// - Throws: `DecodingError` on missing/invalid required fields.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         timestamp = try c.decode(Date.self, forKey: .timestamp)

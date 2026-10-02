@@ -2,6 +2,9 @@ import Foundation
 
 /// Event query tools. Filter/cursor/limit logic + event JSON encoding.
 enum EventTools {
+
+    // MARK: - Reads
+
     static func queryEvents(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let category = args["category"] as? String
@@ -46,6 +49,8 @@ enum EventTools {
     /// Best-effort push: register this stdio child for cursor+count notifications
     /// (`notifications/events/added` on stdout). Bodies still come via tail_events.
     /// Refuses outside a stdio child (HTTP stays poll-only).
+    // MARK: - Subscriptions
+
     static func subscribeEvents(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let since = (args["since"] as? Double) ?? Double((args["since"] as? Int) ?? 0)
@@ -66,6 +71,8 @@ enum EventTools {
     /// changes): method + url + req.* headers + decoded body when textual. Picks the
     /// newest URLSession request matching url/host/since; binary bodies are noted,
     /// never dumped. Prove-it: paste the command in Terminal, compare statuses.
+    // MARK: - Export
+
     static func exportCurl(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let since = (args["since"] as? Double) ?? 0

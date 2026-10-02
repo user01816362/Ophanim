@@ -1,8 +1,27 @@
+//
+//  RuleTools.swift
+//  Ophanim
+//
+//  Rule preset + rule-replace tools. Preset dicts + rule merge/replace.
+//
+
 import Foundation
 import JavaScriptCore
 
 /// Rule preset + rule-replace tools. Preset dicts + rule merge/replace.
+///
+/// Hook/rule writers use explicit-true preview like the hook setters
+/// (omitted `dryRun` = apply, the historical contract).
 enum RuleTools {
+
+    // MARK: - Reads
+
+    /// Lists the built-in rule presets.
+    ///
+    /// Read-only. No parameters are read.
+    ///
+    /// - Parameter args: Ignored.
+    /// - Returns: JSON with `presets` (name + description each).
     static func listPresets(_ args: [String: Any]) throws -> String {
         return try ToolRouter.json(["presets": [
             ["name": "block-trackers", "description": "Block network requests to known tracker/analytics/ad hosts"],
@@ -10,6 +29,20 @@ enum RuleTools {
             ["name": "fake-idfa", "description": "Return a fixed fake advertising identifier"]
         ]])
     }
+
+    /// Merges a named preset's rules into an app's rule list.
+    ///
+    /// Merge, not replace: preset rules whose ids already exist are skipped,
+    /// so re-applying a preset is idempotent.
+    ///
+    /// - Parameter args: `bundleID` (required); `preset` (required: one of
+    ///   `block-trackers`, `fake-idfv`, `fake-idfa`); `dryRun: true` reports
+    ///   which ids would merge vs skip without persisting.
+    /// - Returns: Confirmation string with final rule count, or dry-run JSON
+    ///   with `wouldAdd` and `skipped`.
+    /// - Throws: `ToolRouter.bail` when `bundleID`/`preset` is missing or the
+    ///   preset name is unknown.
+    // MARK: - Preset apply
 
     static func applyPreset(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -35,6 +68,18 @@ enum RuleTools {
         return "Applied preset '\(name)' (\(preset.count) rule(s)); \(bid) now has \(finalCount) rule(s)."
     }
 
+    /// Replaces an app's full interception rule list.
+    ///
+    /// Full replace: the given array becomes the rule list (unlike
+    /// `applyPreset`, which merges). Observe-by-default — with no rules every
+    /// hook only logs.
+    ///
+    /// - Parameter args: `bundleID` (required); `rules` ([OPRule] array,
+    ///   required); `dryRun: true` previews the count without persisting.
+    /// - Returns: Confirmation string, or dry-run JSON with `wouldSet`.
+    /// - Throws: `ToolRouter.bail` when `bundleID`/`rules` is missing or undecodable.
+    // MARK: - Writes (explicit-true preview)
+
     static func setRules(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let rulesArg = args["rules"] else { throw ToolRouter.bail("rules array is required") }
@@ -46,12 +91,20 @@ enum RuleTools {
         return "Set \(rules.count) rule(s) for \(bid)."
     }
 
-    /// Syntax-check a JS rule body without writing anything. The source is
-    /// wrapped in an uncalled function so it PARSES but never executes (no
-    /// stub-ctx side effects, no infinite-loop risk from top-level code).
-    /// Scripts using top-level `return` will fail validation — the rule
-    /// contract is ctx mutation (ctx.block/ctx.returnValue/...), matching
-    /// OPInterceptor.runScript, so that rejection is correct. Read-only.
+    /// Syntax-checks a JS rule body without writing anything.
+    ///
+    /// The source is wrapped in an uncalled function so it PARSES but never
+    /// executes (no stub-ctx side effects, no infinite-loop risk from
+    /// top-level code). Scripts using top-level `return` fail validation —
+    /// the rule contract is ctx mutation
+    /// (`ctx.block`/`ctx.returnValue`/…), matching `OPInterceptor.runScript`,
+    /// so that rejection is correct. Read-only.
+    ///
+    /// - Parameter args: `script` (JS source, required, non-empty).
+    /// - Returns: JSON with `valid` plus `error` when invalid.
+    /// - Throws: `ToolRouter.bail` when `script` is missing or empty.
+    // MARK: - Script validation
+
     static func validateRuleScript(_ args: [String: Any]) throws -> String {
         guard let source = args["script"] as? String, !source.isEmpty else {
             throw ToolRouter.bail("script is required")
@@ -68,7 +121,15 @@ enum RuleTools {
         return try ToolRouter.json(["valid": true])
     }
 
-    /// Rule dictionaries for a named preset (decoded into [OPRule] by applyPreset).
+    /// Rule dictionaries for a named preset.
+    ///
+    /// Decoded into `[OPRule]` by `applyPreset`.
+    ///
+    /// - Parameter name: One of `block-trackers`, `fake-idfv`, `fake-idfa`.
+    /// - Returns: Array of rule dictionaries.
+    /// - Throws: `ToolError` for an unknown preset name.
+    // MARK: - Private preset data
+
     private static func presetRules(_ name: String) throws -> [[String: Any]] {
         switch name {
         case "block-trackers":

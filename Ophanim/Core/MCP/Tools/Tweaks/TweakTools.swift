@@ -4,6 +4,9 @@ import Foundation
 /// own statics — the same ones the tweak library pane drives — never a
 /// parallel store layout.
 enum TweakTools {
+
+    // MARK: - Reads
+
     static func listTweaks(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let recursive = (args["recursive"] as? Bool) ?? false
@@ -17,6 +20,8 @@ enum TweakTools {
         let url = ToolRouter.expandedURL(path)
         return try ToolRouter.json(try Macho.inspect(url))
     }
+
+    // MARK: - Mutations
 
     static func addTweak(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)

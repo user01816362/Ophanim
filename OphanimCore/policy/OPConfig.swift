@@ -9,7 +9,10 @@
 
 import Foundation
 
-/// Where records are written. Combinable.
+/// Sink selection: where records are written. Combinable.
+///
+/// - Note: Guest-shared (compiles into host AND guest): keep the dialect
+///   old-Swift-safe (see §4 of `docs/CODING-STANDARDS.md`).
 public struct OPSinkSelection: OptionSet, Codable, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
@@ -19,7 +22,10 @@ public struct OPSinkSelection: OptionSet, Codable, Sendable {
     public static let all: OPSinkSelection = [.ndjson, .plainText, .osLog]
 }
 
-/// Predicate used to match a call against a rule. All present fields must match (AND).
+/// Predicate matching a call against a rule. All present fields must match (AND).
+///
+/// Guest-shared (compiles into host AND guest): keep the dialect
+/// old-Swift-safe. Each glob is a shell-style `*`/`?` full-string match.
 public struct OPMatcher: Codable, Sendable {
     public var categories: [OPCategory]?       // any-of
     public var apiGlob: String?                // glob on the api name, e.g. "SecItem*"
@@ -31,8 +37,11 @@ public struct OPMatcher: Codable, Sendable {
     public init() {}
 }
 
-/// Action a matched rule performs. `script`, when present, is evaluated via JavaScriptCore and
-/// takes precedence over the static fields below it.
+/// Action a matched rule performs.
+///
+/// `script`, when present, is evaluated via JavaScriptCore and takes
+/// precedence over the static fields below it. Guest-shared (compiles into
+/// host AND guest): keep the dialect old-Swift-safe.
 public struct OPAction: Codable, Sendable {
     public enum Kind: String, Codable, Sendable, CaseIterable {
         case observe, modifyArgs, replaceReturn, block, delay, fault, script
@@ -52,6 +61,15 @@ public struct OPAction: Codable, Sendable {
 }
 
 /// A single interception rule.
+///
+/// First matching enabled rule wins (`OPInterceptor.decide`). Longer-lived
+/// than any one call: the engine holds the list for the config generation.
+///
+/// - Parameter id: Stable identifier, also used for per-rule JS `ctx.state`.
+/// - Parameter enabled: Disabled rules are filtered at `OPInterceptor` init.
+/// - Parameter note: Human-readable purpose.
+/// - Parameter match: Predicate — all present fields must match (AND).
+/// - Parameter action: What to do on match.
 public struct OPRule: Codable, Sendable, Identifiable {
     public var id: String
     public var enabled: Bool
@@ -66,9 +84,19 @@ public struct OPRule: Codable, Sendable, Identifiable {
     }
 }
 
-/// A user-specified ObjC boundary hook: swizzle (className, selector) and log the call + its object
-/// args. Lets analysts capture any @objc boundary (e.g. an SDK's response handler) without code
-/// changes. Pure-Swift (non-@objc) methods aren't reachable this way - those need inline hooking.
+/// A user-specified ObjC boundary hook: swizzles (className, selector) and logs the call + its object args.
+///
+/// Lets analysts capture any @objc boundary (e.g. an SDK's response handler)
+/// without code changes. Pure-Swift (non-@objc) methods are not reachable
+/// this way — those need inline hooking.
+///
+/// - Parameter className: ObjC class name.
+/// - Parameter selector: Selector string.
+/// - Parameter args: Number of object args (0–3) to forward + log.
+/// - Parameter classMethod: True = swizzle the class (+) method, false = instance (-).
+/// - Parameter category: Which capture category to log under.
+/// - Parameter api: Display label (defaults to `className.selector`).
+/// - Parameter imageGlob: Only hook when the class's dyld image matches (e.g. `*UIKit*`); nil/empty = match everything.
 public struct OPObjCHook: Codable, Sendable {
     public var className: String
     public var selector: String
@@ -96,9 +124,17 @@ public struct OPObjCHook: Codable, Sendable {
     }
 }
 
-/// A native-Swift vtable hook (Tier 2.5): patch an overridable Swift method's vtable slot to log the
-/// call (and pass through). Reaches non-@objc Swift that ObjC swizzling can't - but only methods
-/// dispatched through the vtable (polymorphic/cross-module; -O may devirtualize concrete calls).
+/// A native-Swift vtable hook (Tier 2.5): patches an overridable Swift method's vtable slot to log the call (and pass through).
+///
+/// Reaches non-@objc Swift that ObjC swizzling cannot — but only methods
+/// dispatched through the vtable (polymorphic/cross-module; `-O` may
+/// devirtualize concrete calls).
+///
+/// - Parameter className: ObjC-runtime class name (the _TtC… form `find_symbols` reports).
+/// - Parameter method: Substring matched against the slot's (mangled) symbol.
+/// - Parameter category: Which capture category to log under.
+/// - Parameter api: Display label.
+/// - Parameter imageGlob: Only hook when the class's dyld image matches (e.g. `*MyApp*`); nil/empty = match everything.
 public struct OPSwiftHook: Codable, Sendable {
     public var className: String    // ObjC-runtime class name (the _TtC… form find_symbols reports)
     public var method: String       // substring matched against the slot's (mangled) symbol
@@ -121,11 +157,18 @@ public struct OPSwiftHook: Codable, Sendable {
     }
 }
 
-/// P6: image scoping for language-boundary hooks. dladdr() the class pointer and
-/// glob-match its dyld image path, so one config can span app + extensions without
-/// cross-talk (e.g. imageGlob "*UIKit*" skips an app class of the same name).
-/// nil/empty glob = match everything (existing behavior, zero cost when unused).
+/// Image scoping for language-boundary hooks (P6).
+///
+/// `dladdr()`s the class pointer and glob-matches its dyld image path, so one
+/// config can span app + extensions without cross-talk (e.g. imageGlob
+/// `*UIKit*` skips an app class of the same name). nil/empty glob = match
+/// everything (existing behavior, zero cost when unused).
 public enum OPImageScope {
+    /// Whether a class's dyld image matches a glob.
+    ///
+    /// - Parameter glob: Shell-style `*`/`?` pattern, case-insensitive; nil/empty matches everything.
+    /// - Parameter cls: Class whose image path is resolved via `dladdr()`.
+    /// - Returns: True on match; false when `dladdr()` fails or the pattern does not match.
     public static func matches(_ glob: String?, class cls: AnyClass) -> Bool {
         guard let g = glob, !g.isEmpty else { return true }
         var info = Dl_info()
@@ -152,9 +195,12 @@ public enum OPImageScope {
     }
 }
 
-/// How an inline hook should render a selected argument/return register: deref it as an ObjC object
-/// (NSData → captured as a body; NSString → a field; any object → its description) or as a C string.
-/// Validated before any deref so a non-object register value falls back to raw hex (never crashes).
+/// How an inline hook renders a selected argument/return register.
+///
+/// Deref it as an ObjC object (NSData → captured as a body; NSString → a
+/// field; any object → its description) or as a C string. Validated before
+/// any deref so a non-object register value falls back to raw hex (never
+/// crashes).
 public enum OPArgRender: String, Codable, Sendable, CaseIterable {
     case nsdata      // [NSData] → ctx.requestBody/responseBody (+ "argN":"<N bytes>")
     case nsstring    // [NSString] → fields["argN"] = value
@@ -162,11 +208,25 @@ public enum OPArgRender: String, Codable, Sendable, CaseIterable {
     case cString     // char* → fields["argN"] = UTF8 string (bounded)
 }
 
-/// A Tier-3 inline (machine-code) hook: patch a function's prologue so calls divert through the
-/// engine (intercept / modify args+return / log). The target is located, in priority order, by:
-/// `address` (absolute hex), `symbol` (dlsym; `followThunk` chases a leading B), `module`+`offset`
-/// (Ghidra static offset + ASLR slide), or `module`+`signature` (wildcard byte pattern "AA BB ?? D1").
-/// arm64 only; gated behind OPConfig.enableInlineHooks (live code patching).
+/// A Tier-3 inline (machine-code) hook: patches a function's prologue so calls divert through the engine (intercept / modify args+return / log).
+///
+/// The target is located, in priority order, by: `address` (absolute hex),
+/// `symbol` (`dlsym`; `followThunk` chases a leading B), `module`+`offset`
+/// (Ghidra static offset + ASLR slide), or `module`+`signature` (wildcard
+/// byte pattern `AA BB ?? D1`). arm64 only; gated behind
+/// `OPConfig.enableInlineHooks` (live code patching).
+///
+/// - Parameter api: Display label for captured events.
+/// - Parameter category: Which capture category to log under.
+/// - Parameter module: Substring of the image's dyld path (default: main executable).
+/// - Parameter symbol: Symbol name resolved via `dlsym`.
+/// - Parameter address: Absolute runtime address, hex (`0x…`).
+/// - Parameter offset: Static offset within `module` (hex or decimal).
+/// - Parameter signature: Byte pattern, e.g. `1F 20 03 D5 ?? ?? ?? 94`.
+/// - Parameter followThunk: Follow a leading unconditional B to the real body.
+/// - Parameter captureReturn: Also run the original and log/modify its return value (implied when `renderReturn` is set).
+/// - Parameter renderArgs: Deref renderers per arg register, e.g. `{"x2":"nsstring"}`.
+/// - Parameter renderReturn: Renderer for the return value.
 public struct OPInlineHook: Codable, Sendable {
     public var api: String              // display label for captured events
     public var category: OPCategory
@@ -207,14 +267,21 @@ public struct OPInlineHook: Codable, Sendable {
     }
 }
 
-/// How the engine gets into the hosted process. Embedded ships inside Galgal (always present,
-/// dormant until enabled). Sibling injects a standalone agent dylib via a 2nd LC_LOAD_DYLIB.
+/// How the engine gets into the hosted process.
+///
+/// Embedded ships inside Galgal (always present, dormant until enabled).
+/// Sibling injects a standalone agent dylib via a 2nd LC_LOAD_DYLIB. This is
+/// an install-time concern; the default is embedded.
 public enum OPInjectionStrategy: String, Codable, Sendable, CaseIterable {
     case embedded
     case sibling
 }
 
 /// Top-level per-app config. Observe-by-default: with no rules, every hook only logs.
+///
+/// Guest-shared (compiles into host AND guest): keep the dialect
+/// old-Swift-safe. Decoding is lenient — adding fields later never
+/// invalidates an existing settings plist.
 public struct OPConfig: Codable, Sendable {
     public var enabled: Bool
     public var injectionStrategy: OPInjectionStrategy   // install-time concern; default embedded
@@ -297,15 +364,24 @@ public struct OPConfig: Codable, Sendable {
         inspectDisableRedaction = try c.decodeIfPresent(Bool.self, forKey: .inspectDisableRedaction) ?? d.inspectDisableRedaction
     }
 
+    /// Whether a capture category is currently active.
+    ///
+    /// - Parameter category: Category to test.
+    /// - Returns: True only when instrumentation is enabled AND the category is selected.
     public func isActive(_ category: OPCategory) -> Bool {
         enabled && categories.contains(category)
     }
 }
 
-/// Resolves and loads the per-app OPConfig. The agent re-derives the plist path purely from the
-/// process identity, so it works in both the embedded-runtime and sibling-dylib injection modes.
+/// Resolves and loads the per-app OPConfig.
+///
+/// The agent re-derives the plist path purely from the process identity, so it
+/// works in both the embedded-runtime and sibling-dylib injection modes.
 public enum OPConfigLoader {
     /// Container "App Settings" plist the GUI writes, keyed by the *host* app's bundle id.
+    ///
+    /// - Parameter hostBundleID: Defaults to the current process's bundle ID.
+    /// - Returns: URL of the settings plist for that app.
     public static func defaultURL(hostBundleID: String = Bundle.main.bundleIdentifier ?? "") -> URL {
         // homeDirectoryForCurrentUser is unavailable on iOS/Catalyst; derive the real user home
         // the same way the runtime reads its settings plist.
@@ -315,6 +391,13 @@ public enum OPConfigLoader {
             .appendingPathExtension("plist")
     }
 
+    /// Loads the config, defaulting to disabled when nothing is stored.
+    ///
+    /// Lenient: a missing file or an envelope without an `ophanim` key yields
+    /// a default `OPConfig`, never a throw.
+    ///
+    /// - Parameter url: Settings plist URL. Defaults to `defaultURL()`.
+    /// - Returns: The stored config, or a default when absent/undecodable.
     public static func load(from url: URL = OPConfigLoader.defaultURL()) -> OPConfig {
         guard let data = try? Data(contentsOf: url) else { return OPConfig() }
         // The settings plist embeds the Ophanim config under a known key; decode leniently.
@@ -325,40 +408,63 @@ public enum OPConfigLoader {
     }
 }
 
-/// The GUI's settings model conforms to this shape (only the field we care about is decoded).
+/// The GUI's settings-model envelope.
+///
+/// Only the `ophanim` field is decoded; everything else in the plist is
+/// ignored, which is what keeps old/new readers compatible.
 public struct OPConfigEnvelope: Codable, Sendable {
     public var ophanim: OPConfig?
 }
 
 /// Path helpers that work identically on macOS (GUI) and iOS/Mac Catalyst (in-process agent).
 public enum OPPaths {
-    /// The real user home. `FileManager.homeDirectoryForCurrentUser` is unavailable on iOS, and a
-    /// sandboxed Catalyst app's `NSHomeDirectory()` points at its container - so derive it from the
-    /// login name, matching how the runtime locates its settings plist.
+    /// The real user home.
+    ///
+    /// `FileManager.homeDirectoryForCurrentUser` is unavailable on iOS, and a
+    /// sandboxed Catalyst app's `NSHomeDirectory()` points at its container —
+    /// so derive it from the login name, matching how the runtime locates its
+    /// settings plist.
+    ///
+    /// - Returns: `/Users/<login>` as a file URL.
     public static var userHome: URL {
         URL(fileURLWithPath: "/Users/\(NSUserName())")
     }
 
-    /// Ophanim's own app-container root. The hosted app's sandbox profile grants read-write here (the
-    /// agent already loads its settings plist from this tree), and unlike `~/Library/Logs/Ophanim` it
-    /// needs no extra sbpl exception.
+    /// Ophanim's own app-container root.
+    ///
+    /// The hosted app's sandbox profile grants read-write here (the agent
+    /// already loads its settings plist from this tree), and unlike
+    /// `~/Library/Logs/Ophanim` it needs no extra sbpl exception.
+    ///
+    /// - Returns: `~/Library/Containers/be.ophanim.Ophanim` as a file URL.
     public static var ophanimContainer: URL {
         userHome.appendingPathComponent("Library/Containers/be.ophanim.Ophanim")
     }
 
-    /// Canonical capture-log directory for a hosted app, keyed by its bundle id, under Ophanim's
-    /// container. Both the in-app agent (writer) and the GUI/MCP (readers) resolve logs through here
-    /// so the location does NOT depend on how macOS names the app's *data* container - that name is a
-    /// random UUID for any app lacking an `application-identifier` entitlement (e.g. an ad-hoc
-    /// re-signed app), which is what made capture readback silently return nothing.
+    /// Canonical capture-log directory for a hosted app, keyed by its bundle id.
+    ///
+    /// Under Ophanim's container. Both the in-app agent (writer) and the
+    /// GUI/MCP (readers) resolve logs through here so the location does NOT
+    /// depend on how macOS names the app's *data* container — that name is a
+    /// random UUID for any app lacking an `application-identifier` entitlement
+    /// (e.g. an ad-hoc re-signed app), which is what made capture readback
+    /// silently return nothing.
+    ///
+    /// - Parameter bundleID: Host app bundle ID (`unknown` when empty).
+    /// - Returns: The log directory URL.
     public static func logDirectory(forBundleID bundleID: String) -> URL {
         ophanimContainer
             .appendingPathComponent("Logs")
             .appendingPathComponent(bundleID.isEmpty ? "unknown" : bundleID)
     }
 
-    /// Pre-fix log location: the hosted app's own data container. Only correct for apps whose data
-    /// container is bundle-id-named, but still read so logs captured before the fix stay visible.
+    /// Pre-fix log location: the hosted app's own data container.
+    ///
+    /// Only correct for apps whose data container is bundle-id-named, but
+    /// still read so logs captured before the fix stay visible.
+    ///
+    /// - Parameter bundleID: Host app bundle ID.
+    /// - Returns: The legacy log directory URL.
     public static func legacyLogDirectory(forBundleID bundleID: String) -> URL {
         userHome.appendingPathComponent("Library/Containers/\(bundleID)/Data/Documents/Ophanim")
     }
