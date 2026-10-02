@@ -34,16 +34,30 @@ struct GraphicsView: View {
                     Text("settings.picker.iosDevice")
                     Spacer()
                     Picker("", selection: $settings.settings.iosDeviceModel) {
-                        Text("iPad Pro (12.9-inch) (1st gen) | A9X | 4GB").tag("iPad6,7")
-                        Text("iPad Pro (12.9-inch) (3rd gen) | A12X | 4GB").tag("iPad8,6")
-                        Text("iPad Pro (12.9-inch) (5th gen) | M1 | 8GB").tag("iPad13,8")
-                        Text("iPad Pro (12.9-inch) (6th gen) | M2 | 8GB").tag("iPad14,5")
-                        Text("iPad Pro (13-inch) (7th gen) | M4 | 8GB").tag("iPad16,6")
+                        // -- iPad Pro (M1-M5; RAM = highest tier per model) --
+                        Text("iPad Pro 12.9-inch (5th generation) | M1 | 16GB").tag("iPad13,8")
+                        Text("iPad Pro 12.9-inch (6th generation) | M2 | 16GB").tag("iPad14,5")
+                        Text("iPad Pro 13-inch (M4) | M4 | 16GB").tag("iPad16,5")
+                        Text("iPad Pro 13-inch (M5) | M5 | 12GB").tag("iPad17,3")
                         Divider()
-                        Text("iPhone 13 Pro Max | A15 | 6GB").tag("iPhone14,3")
-                        Text("iPhone 14 Pro Max | A16 | 6GB").tag("iPhone15,3")
-                        Text("iPhone 15 Pro Max | A17 Pro | 8GB").tag("iPhone16,2")
+                        // -- iPhone 16 series (all 8GB) --
+                        Text("iPhone 16 Pro | A18 Pro | 8GB").tag("iPhone17,1")
                         Text("iPhone 16 Pro Max | A18 Pro | 8GB").tag("iPhone17,2")
+                        Text("iPhone 16 | A18 | 8GB").tag("iPhone17,3")
+                        Text("iPhone 16 Plus | A18 | 8GB").tag("iPhone17,4")
+                        Text("iPhone 16e | A18 | 8GB").tag("iPhone17,5")
+                        Divider()
+                        // -- iPhone 17 series --
+                        Text("iPhone 17 Pro | A19 Pro | 12GB").tag("iPhone18,1")
+                        Text("iPhone 17 Pro Max | A19 Pro | 12GB").tag("iPhone18,2")
+                        Text("iPhone 17 | A19 | 8GB").tag("iPhone18,3")
+                        Text("iPhone Air | A19 Pro | 12GB").tag("iPhone18,4")
+                        Text("iPhone 17e | A19 | 8GB").tag("iPhone18,5")
+                        Divider()
+                        // -- iPhone 18 series (identifiers verified; RAM leak-grade) --
+                        Text("iPhone 18 Pro | A20 Pro | 12GB").tag("iPhone19,2")
+                        Text("iPhone 18 Pro Max | A20 Pro | 12GB").tag("iPhone19,3")
+                        Text("iPhone Duo | A20 Pro | 12GB").tag("iPhone19,4")
                     }
                     .frame(width: 250)
                     .help("settings.picker.iosDevice.help")
