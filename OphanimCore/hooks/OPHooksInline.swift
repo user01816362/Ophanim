@@ -64,19 +64,33 @@ enum OPInlineHooks {
         let cfg = OPAgent.shared.config
         guard cfg.enableInlineHooks else { return }
 
+        // Aggregate failure counts (P4) — see OPHooksSwift.install. Config hooks
+        // only; the harness self-test below keeps its own per-hook line.
+        var failures: [String: Int] = [:]
         for hook in cfg.inlineHooks where OPAgent.shared.isActive(hook.category) {
             let k = key(hook)
             if doneKeys.contains(k) { continue }          // already installed or hard-failed: don't reattempt
             let addr = resolve(hook)
             if addr == 0 {
                 // Transient (symbol/module may load later): retry on a future reload, but log once.
-                if unresolvedLogged.insert(k).inserted { logInstall(hook.api, 0, "unresolved") }
+                if unresolvedLogged.insert(k).inserted {
+                    logInstall(hook.api, 0, "unresolved")
+                    failures["unresolved", default: 0] += 1
+                }
                 continue
             }
             let id = register(api: hook.api, category: hook.category, captureReturn: hook.captureReturn,
                               renderArgs: parseRenderArgs(hook.renderArgs), renderReturn: hook.renderReturn)
-            logInstall(hook.api, addr, statusString(op_inline_install(addr, id)))
+            let status = statusString(op_inline_install(addr, id))
+            logInstall(hook.api, addr, status)
+            if status != "ok", !status.hasPrefix("already") { failures[status, default: 0] += 1 }
             doneKeys.insert(k)                            // resolved → installed or hard-failed; settle it
+        }
+        if !failures.isEmpty {
+            OPAgent.shared.observe(OPEvent(category: .process, layer: .interpose,
+                api: "ophanim.inlineHook.installSummary",
+                summary: "\(failures.values.reduce(0, +)) inline hook(s) failed to install",
+                fields: Dictionary(uniqueKeysWithValues: failures.map { ($0.key, String($0.value)) })))
         }
 
         // self-test (harness only): follow the @_cdecl thunk to the real body and hook it (captureReturn
@@ -189,7 +203,8 @@ enum OPInlineHooks {
     }
 
     /// Called from the shared entry thunk (via op_inline_dispatch). Returns OP_INLINE_RESUME(0) /
-    /// OP_INLINE_REPLACE(1). Observe-only for now (Phase 3 maps OPDecision onto edits/replace).
+    /// OP_INLINE_REPLACE(1). modifyArgs edits land in x0–x7 before RESUME; REPLACE returns
+    /// to the caller with x0 set, skipping the original entirely.
     static func dispatch(_ hookID: UInt32, _ ctx: UnsafeMutablePointer<OPCpuContext>) -> Int32 {
         guard let rec = table[hookID] else { return Int32(OP_INLINE_RESUME) }
         // x[31] is the first field of OPCpuContext, so the struct base aliases the GP register file.
@@ -209,8 +224,22 @@ enum OPInlineHooks {
             // original (with any handler-edited arg registers); REPLACE returns to the caller with
             // x0 set, skipping the original entirely.
             switch decision.disposition {
-            case .observed, .argsModified:
+            case .observed:
                 // run the original; if the hook wants its return value, route through the leave path
+                result = rec.captureReturn ? Int32(OP_INLINE_RESUME_LEAVE) : Int32(OP_INLINE_RESUME)
+            case .argsModified:
+                // P2: entry-arg edits are honored on the RESUME path (previously dropped).
+                // Explicit per-register rewrites first; else the first up-to-8 body bytes
+                // load into x0 (documented modifyArgs contract for inline hooks).
+                // Malformed keys/values are ignored fail-open — never a crash.
+                if let edits = decision.cannedArgs {
+                    for (k, v) in edits {
+                        if k.hasPrefix("x"), let i = Int(k.dropFirst()), (0...7).contains(i),
+                           let n = parseReturn(v) { regs[i] = n }
+                    }
+                } else if let body = decision.replacementBody, !body.isEmpty {
+                    regs[0] = body.prefix(8).reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
+                }
                 result = rec.captureReturn ? Int32(OP_INLINE_RESUME_LEAVE) : Int32(OP_INLINE_RESUME)
             case .blocked:
                 regs[0] = 0

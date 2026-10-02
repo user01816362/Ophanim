@@ -33,6 +33,7 @@
 #include <mach/machine.h>
 #include <objc/runtime.h>
 #include <stdlib.h>
+#include <stdatomic.h>           // P3 image-retry flag (callback runs under the dyld lock)
 
 #ifndef CPU_SUBTYPE_ARM64E
 #define CPU_SUBTYPE_ARM64E 2
@@ -428,6 +429,30 @@ op_inline_status_t op_inline_uninstall(uintptr_t target) {
     }
     pthread_mutex_unlock(&g_lock);
     return rc;
+}
+
+// ---- P3: deferred user-hook resolution --------------------------------------------------------
+// The callback runs on the loading thread under the dyld loader lock: it must not allocate,
+// lock, or touch ObjC/dispatch — a single atomic store is the whole body. Arming fires the
+// callback once per already-loaded image (per the <mach-o/dyld.h> contract), so the armer
+// drains the burst it causes; only genuinely new images trip the flag afterwards.
+static atomic_bool g_image_retry_pending = false;
+static bool g_image_retry_armed = false;   // set only on the main thread (arm path)
+
+static void on_image_add(const struct mach_header *mh, intptr_t vmaddr_slide) {
+    (void)mh; (void)vmaddr_slide;
+    atomic_store(&g_image_retry_pending, true);
+}
+
+void op_image_retry_arm(void) {
+    if (g_image_retry_armed) { return; }
+    g_image_retry_armed = true;
+    _dyld_register_func_for_add_image(&on_image_add);
+    (void)op_image_retry_pending();        // drain the arm-time burst for existing images
+}
+
+bool op_image_retry_pending(void) {
+    return atomic_exchange(&g_image_retry_pending, false);
 }
 
 // ---- resolution helpers ------------------------------------------------------------------------

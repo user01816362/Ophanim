@@ -58,6 +58,15 @@ op_inline_status_t op_inline_install(uintptr_t target, uint32_t hook_id);
 /// quarantined, not unmapped (other threads may still be mid-trampoline).
 op_inline_status_t op_inline_uninstall(uintptr_t target);
 
+/// P3: deferred user-hook resolution. `op_image_retry_arm` registers a dyld image-add
+/// callback (once, idempotent); the callback only sets an atomic flag — safe under the
+/// dyld loader lock (no allocation, no locks, no ObjC/dispatch). The agent's config poll
+/// drains it via `op_image_retry_pending` (true once per load burst) and re-runs the
+/// idempotent user-hook install on the main thread, so hooks targeting late-loaded
+/// frameworks resolve without waiting for a config edit. No new threads, no new deps.
+void op_image_retry_arm(void);
+bool op_image_retry_pending(void);
+
 /// The dispatcher - implemented in Swift via @_cdecl("op_inline_dispatch"). Called from the shared
 /// entry thunk with the hook id and a pointer to the saved CPU context. Returns RESUME / REPLACE /
 /// RESUME_LEAVE.

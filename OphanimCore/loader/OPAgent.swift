@@ -163,6 +163,14 @@ public final class OPAgent: @unchecked Sendable {
             if m > 0, m != self.lastConfigMTime {
                 self.lastConfigMTime = m
                 self.reload()
+            } else if op_image_retry_pending() {
+                // P3: a new dyld image loaded since the last tick — re-run the idempotent
+                // user-hook install on main (same as reload, minus the config re-read:
+                // the config didn't change, only the process's images did). Unresolved
+                // inline/ObjC/Swift hooks targeting the new image now resolve.
+                DispatchQueue.main.async {
+                    OPBootstrapCore.installUserHooks()
+                }
             }
             self.scheduleConfigPoll()
         }

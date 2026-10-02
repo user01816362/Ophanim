@@ -333,7 +333,9 @@ final class MCPServer {
                 + "match:{categories?,apiGlob?,hostGlob?,urlGlob?,pathGlob?,argContains?}, "
                 + "action:{kind, ...}} where kind ∈ observe|block|delay|fault|modifyArgs|replaceReturn|script. "
                 + "For script rules set action.script to JS that reads/sets ctx (ctx.block=true, "
-                + "ctx.returnValue, ctx.replacementBody[base64], ctx.replacementStatus). Takes effect live on a running app.",
+                + "ctx.returnValue, ctx.replacementBody[base64], ctx.replacementStatus, ctx.x0-x7 inline arg edits, "
+                + "ctx.state.* per-rule persistent strings; reads ctx.method/ctx.statusCode). modifyArgs also accepts "
+                + "cannedArgs {x0:..} for inline register rewrites. Takes effect live on a running app.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -412,7 +414,7 @@ final class MCPServer {
                 + "and only objc_msgSend-dispatched calls are intercepted (runtime/cross-module/dynamic "
                 + "invocations) - direct Swift calls and pure-Swift (non-@objc) methods aren't reachable. "
                 + "Each hook = {className, selector, "
-                + "args(0-3), classMethod(bool), category, api?}.",
+                + "args(0-3), classMethod(bool), category, api?, imageGlob? (dyld image filter, e.g. '*UIKit*')}.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -433,7 +435,8 @@ final class MCPServer {
                 + "dispatch needs inline hooking. arm64 only; observe-only (void methods). Use find_symbols "
                 + "to locate the runtime class name (_TtC… form) and the mangled method symbol. "
                 + "Each hook = {className, method (substring matched against the slot's mangled symbol), "
-                + "category, api?}.",
+                + "category, api?, imageGlob? (dyld image filter)}. "
+                + "Install failures aggregate in ophanim.swiftHook.installSummary events.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -459,7 +462,8 @@ final class MCPServer {
                 + "renderer, e.g. {\"x2\":\"nsstring\",\"x3\":\"nsdata\"}, so a register holding an NSData is "
                 + "captured as a body (and NSString as a field) instead of a raw pointer "
                 + "(nsdata|nsstring|objcDesc|cString; safe-deref, falls back to hex). renderReturn does the "
-                + "same for the return value (implies captureReturn).",
+                + "same for the return value (implies captureReturn). A modifyArgs rule additionally "
+                + "rewrites x0-x7 on entry via action.cannedArgs (or first body bytes into x0).",
             "inputSchema": [
                 "type": "object",
                 "properties": [

@@ -67,6 +67,10 @@ enum OPSwiftHooks {
     static func install() {
         let hooks = OPAgent.shared.config.swiftHooks
         guard !hooks.isEmpty else { return }
+        // Aggregate failure counts (P4): per-hook lines already exist, but an
+        // agent polling for "did my hooks land?" needs one roll-up, not N lines.
+        // Emitted only when something actually failed — silent on clean runs.
+        var failures: [String: Int] = [:]
         for hook in hooks where OPAgent.shared.isActive(hook.category) {
             let result = patch(hook)
             // Re-run on every live-reload to pick up newly added hooks; don't re-log existing ones.
@@ -74,6 +78,13 @@ enum OPSwiftHooks {
             OPAgent.shared.observe(OPEvent(category: hook.category, layer: .objc,
                 api: "ophanim.swiftHook.install",
                 summary: "\(hook.className) \(hook.method) → \(result)", fields: ["result": result]))
+            if !result.hasPrefix("ok") { failures[result, default: 0] += 1 }
+        }
+        if !failures.isEmpty {
+            OPAgent.shared.observe(OPEvent(category: .process, layer: .objc,
+                api: "ophanim.swiftHook.installSummary",
+                summary: "\(failures.values.reduce(0, +)) Swift hook(s) failed to install",
+                fields: Dictionary(uniqueKeysWithValues: failures.map { ($0.key, String($0.value)) })))
         }
     }
 
@@ -82,6 +93,8 @@ enum OPSwiftHooks {
         if patched.contains(key) { return "already-installed" }
         guard used < poolSize else { return "pool-full" }
         guard let cls = NSClassFromString(hook.className) else { return "class-not-found" }
+        // P6: image scoping — skip classes from non-matching images (fail-open, counted).
+        guard OPImageScope.matches(hook.imageGlob, class: cls) else { return "image-mismatch" }
         let meta = unsafeBitCast(cls, to: UnsafeMutableRawPointer.self)
 
         // Confirm it's a Swift class (data field at +32 carries the swift-class bit).

@@ -44,12 +44,14 @@ public struct OPDecision {
     public var replacementHeaders: [String: String]?
     public var replacementStatus: Int?
     public var cannedReturnValue: String?
+    public var cannedArgs: [String: String]?   // inline RESUME-path register rewrites (x0–x7)
     public var delay: TimeInterval
     public var faultErrorCode: Int?
 
     public static let observe = OPDecision(disposition: .observed, matchedRuleID: nil,
                                            replacementBody: nil, replacementHeaders: nil,
                                            replacementStatus: nil, cannedReturnValue: nil,
+                                           cannedArgs: nil,
                                            delay: 0, faultErrorCode: nil)
 }
 
@@ -57,6 +59,13 @@ public final class OPInterceptor {
     private let rules: [OPRule]
     private let jsContext: JSContext?
     private let jsLock = NSLock()   // JSContext is not thread-safe; decide() runs on many threads
+    /// Per-rule persistent script state (P1): rule id → string dict. Touched only
+    /// inside runScript (under jsLock). Fresh on every config reload (the agent
+    /// rebuilds the interceptor per load), capped per rule so a runaway script
+    /// can't grow memory: 32 keys, 256 chars per value, deterministic keep-first.
+    private var ruleState: [String: [String: String]] = [:]
+    private static let maxStateKeys = 32
+    private static let maxStateValueChars = 256
 
     public init(rules: [OPRule]) {
         self.rules = rules.filter { $0.enabled }
@@ -112,6 +121,7 @@ public final class OPInterceptor {
             var d = decision(.argsModified, rule)
             d.replacementBody = a.replacementBodyBase64.flatMap { Data(base64Encoded: $0) }
             d.replacementHeaders = a.replacementHeaders
+            d.cannedArgs = a.cannedArgs
             return d
         case .replaceReturn:
             var d = decision(.returnReplaced, rule)
@@ -133,7 +143,11 @@ public final class OPInterceptor {
     }
 
     /// Evaluate a JS rule. The script sees `ctx` and may set `ctx.replacementBody` (base64),
-    /// `ctx.replacementStatus`, `ctx.block = true`, or `ctx.returnValue`.
+    /// `ctx.replacementStatus`, `ctx.block = true`, `ctx.returnValue`, per-register
+    /// `ctx.x0`…`ctx.x7` (inline arg edits; arg-only scripts resolve to .argsModified),
+    /// or `ctx.state.*` (per-rule persistent strings, capped — survives across calls
+    /// until the next config reload). Reads: `ctx.method`, `ctx.statusCode` (-1 when
+    /// absent), plus the string fields. decide() stays synchronous: no host round-trip.
     private func runScript(_ source: String, _ rule: OPRule, _ ctx: OPCallContext) -> OPDecision {
         guard let js = jsContext else { return decision(.observed, rule) }
         jsLock.lock(); defer { jsLock.unlock() }
@@ -143,9 +157,12 @@ public final class OPInterceptor {
             "host": ctx.host as Any,
             "url": ctx.url as Any,
             "path": ctx.path as Any,
+            "method": ctx.fields["method"] ?? "",
+            "statusCode": Int(ctx.fields["status"] ?? "") ?? -1,
             "requestBodyBase64": ctx.requestBody?.base64EncodedString() as Any,
             "responseBodyBase64": ctx.responseBody?.base64EncodedString() as Any,
             "fields": ctx.fields,
+            "state": ruleState[rule.id] ?? [:],
             "block": false
         ]
         js.setObject(bridge, forKeyedSubscript: "ctx" as NSString)
@@ -166,6 +183,30 @@ public final class OPInterceptor {
         }
         if let rv = out.objectForKeyedSubscript("returnValue")?.toString(), rv != "undefined", !rv.isEmpty {
             d.cannedReturnValue = rv; changed = true
+        }
+        // Per-register arg edits (x0–x7). Arg-only scripts resolve to .argsModified
+        // (run the original with edited regs), NOT .returnReplaced (which would
+        // skip the original entirely) — unless a return-style output is also set.
+        var edits: [String: String] = [:]
+        for i in 0...7 {
+            if let s = out.objectForKeyedSubscript("x\(i)")?.toString(),
+               !s.isEmpty, s != "undefined" { edits["x\(i)"] = s }
+        }
+        if !edits.isEmpty {
+            d.cannedArgs = edits; changed = true
+            if d.replacementBody == nil, d.replacementStatus == nil, d.cannedReturnValue == nil {
+                d.disposition = .argsModified
+            }
+        }
+        // Persist script state (P1): stringify, cap keys + value length, keep-first.
+        // Runs under jsLock; the whole map resets on config reload (fresh interceptor).
+        if let dict = out.objectForKeyedSubscript("state")?.toDictionary() as? [String: Any] {
+            var kept: [String: String] = [:]
+            for k in dict.keys.sorted() {
+                guard kept.count < Self.maxStateKeys else { break }
+                kept[k] = String(describing: dict[k] ?? "").prefix(Self.maxStateValueChars).description
+            }
+            ruleState[rule.id] = kept
         }
         return changed ? d : decision(.observed, rule)
     }

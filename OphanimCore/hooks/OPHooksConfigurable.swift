@@ -22,6 +22,8 @@ enum OPConfigurableHooks {
     static func install() {
         let hooks = OPAgent.shared.config.objcHooks
         guard !hooks.isEmpty else { return }
+        // Aggregate failure counts (P4) — see OPHooksSwift.install.
+        var failures: [String: Int] = [:]
         for h in hooks where OPAgent.shared.isActive(h.category) {
             let result = swizzle(h)
             // install() is re-run on every config live-reload to pick up newly added hooks; don't
@@ -30,6 +32,13 @@ enum OPConfigurableHooks {
             OPAgent.shared.observe(OPEvent(category: h.category, layer: .objc,
                 api: "ophanim.objcHook.install",
                 summary: "\(h.className).\(h.selector) → \(result)", fields: ["result": result]))
+            if result != "ok" { failures[result, default: 0] += 1 }
+        }
+        if !failures.isEmpty {
+            OPAgent.shared.observe(OPEvent(category: .process, layer: .objc,
+                api: "ophanim.objcHook.installSummary",
+                summary: "\(failures.values.reduce(0, +)) ObjC hook(s) failed to install",
+                fields: Dictionary(uniqueKeysWithValues: failures.map { ($0.key, String($0.value)) })))
         }
     }
 
@@ -38,6 +47,8 @@ enum OPConfigurableHooks {
         let key = "\(h.classMethod ? "+" : "-")[\(h.className) \(h.selector)]"
         if installed.contains(key) { return "already-installed" }
         guard let base = NSClassFromString(h.className) else { return "class-not-found" }
+        // P6: image scoping — skip classes from non-matching images (fail-open, counted).
+        guard OPImageScope.matches(h.imageGlob, class: base) else { return "image-mismatch" }
         let cls: AnyClass = h.classMethod ? (object_getClass(base) ?? base) : base
         let sel = NSSelectorFromString(h.selector)
         guard let m = class_getInstanceMethod(cls, sel) else { return "method-not-found" }

@@ -44,6 +44,7 @@ public struct OPAction: Codable, Sendable {
     public var replacementHeaders: [String: String]?
     public var replacementStatus: Int?         // network: HTTP status
     public var cannedReturnValue: String?      // device/keychain: stringified return
+    public var cannedArgs: [String: String]?   // inline: {"x0":"0x…"} register rewrites (modifyArgs)
     public var delayMilliseconds: Int?
     public var faultErrorCode: Int?
 
@@ -75,11 +76,13 @@ public struct OPObjCHook: Codable, Sendable {
     public var classMethod: Bool    // true = swizzle the class (+) method, false = instance (-)
     public var category: OPCategory // which capture category to log under
     public var api: String?         // display label (defaults to "className.selector")
+    public var imageGlob: String?   // P6: only hook when the class's dyld image matches (e.g. "*UIKit*")
 
     public init(className: String, selector: String, args: Int = 1, classMethod: Bool = false,
-                category: OPCategory = .process, api: String? = nil) {
+                category: OPCategory = .process, api: String? = nil, imageGlob: String? = nil) {
         self.className = className; self.selector = selector; self.args = args
         self.classMethod = classMethod; self.category = category; self.api = api
+        self.imageGlob = imageGlob
     }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
@@ -89,6 +92,7 @@ public struct OPObjCHook: Codable, Sendable {
         classMethod = try c.decodeIfPresent(Bool.self, forKey: .classMethod) ?? false
         category = try c.decodeIfPresent(OPCategory.self, forKey: .category) ?? .process
         api = try c.decodeIfPresent(String.self, forKey: .api)
+        imageGlob = try c.decodeIfPresent(String.self, forKey: .imageGlob)
     }
 }
 
@@ -100,9 +104,12 @@ public struct OPSwiftHook: Codable, Sendable {
     public var method: String       // substring matched against the slot's (mangled) symbol
     public var category: OPCategory
     public var api: String?
+    public var imageGlob: String?   // P6: only hook when the class's dyld image matches (e.g. "*MyApp*")
 
-    public init(className: String, method: String, category: OPCategory = .process, api: String? = nil) {
+    public init(className: String, method: String, category: OPCategory = .process, api: String? = nil,
+                imageGlob: String? = nil) {
         self.className = className; self.method = method; self.category = category; self.api = api
+        self.imageGlob = imageGlob
     }
     public init(from d: Decoder) throws {
         let c = try d.container(keyedBy: CodingKeys.self)
@@ -110,6 +117,21 @@ public struct OPSwiftHook: Codable, Sendable {
         method = try c.decode(String.self, forKey: .method)
         category = try c.decodeIfPresent(OPCategory.self, forKey: .category) ?? .process
         api = try c.decodeIfPresent(String.self, forKey: .api)
+        imageGlob = try c.decodeIfPresent(String.self, forKey: .imageGlob)
+    }
+}
+
+/// P6: image scoping for language-boundary hooks. dladdr() the class pointer and
+/// glob-match its dyld image path, so one config can span app + extensions without
+/// cross-talk (e.g. imageGlob "*UIKit*" skips an app class of the same name).
+/// nil/empty glob = match everything (existing behavior, zero cost when unused).
+public enum OPImageScope {
+    public static func matches(_ glob: String?, class cls: AnyClass) -> Bool {
+        guard let g = glob, !g.isEmpty else { return true }
+        var info = Dl_info()
+        guard dladdr(unsafeBitCast(cls, to: UnsafeRawPointer.self), &info) != 0,
+              let fname = info.dli_fname else { return false }
+        return OPGlob.match(g, String(cString: fname))
     }
 }
 

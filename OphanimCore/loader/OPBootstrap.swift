@@ -59,6 +59,9 @@ enum OPBootstrapCore {
         // Start the capture-ring consumer thread (safe context, post-launch). The low-level C
         // interposes (process/fs/…) enqueue into the ring; this drains them into OPEvents.
         op_ring_start()
+        // P3: arm the dyld image-add retry flag (safe here: main thread, post-launch — never
+        // in a constructor). Late-loaded frameworks trip the flag; the config poll drains it.
+        op_image_retry_arm()
         OPNetworkHooks.install()
         OPDeviceHooks.install()
         OPLaunchHooks.install()
