@@ -123,6 +123,12 @@ struct InstrumentationView: View {
                                   + "re-boot the guest pump.")
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
+                        Toggle("Disable redaction", isOn: bind(\.inspectDisableRedaction))
+                            .toggleStyle(.switch)
+                            .disabled(!enabled || !settings.settings.ophanim.agentMode)
+                            .help("Hand capture to the operator raw, including passwords and codes. "
+                                  + "Off by default (secure text is masked). Applies on next read; "
+                                  + "stored snapshots keep the state they were captured in.")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
