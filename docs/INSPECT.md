@@ -32,7 +32,7 @@ separately — the flag is `inspectDisableRedaction` (default redact).
   silent), each naming its own fix.
 - Host (app target): `Ophanim/Core/MCP/Services/InspectService.swift` (`InspectControl`:
   60 s bounded wait, stale-command withdrawal on timeout) and
-  `Ophanim/Core/MCP/Tools/InspectTools.swift` (17-tool catalog + routing).
+  `Ophanim/Core/MCP/Tools/Inspect/InspectTools.swift` (17-tool catalog + routing).
 
 ## Commands
 

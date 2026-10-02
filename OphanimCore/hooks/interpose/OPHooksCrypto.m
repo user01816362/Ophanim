@@ -10,9 +10,9 @@
 
 #import <Foundation/Foundation.h>
 #import <CommonCrypto/CommonCrypto.h>
-#import "../ring/OPRing.h"
+#import "../../ring/OPRing.h"
 
-#import "../compat/OPInterpose.h"
+#import "../../compat/OPInterpose.h"
 
 static CCCryptorStatus op_CCCrypt(CCOperation op, CCAlgorithm alg, CCOptions options,
                                   const void *key, size_t keyLength, const void *iv,

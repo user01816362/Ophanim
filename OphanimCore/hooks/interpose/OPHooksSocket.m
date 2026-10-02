@@ -13,9 +13,9 @@
 #import <netinet/in.h>
 #import <arpa/inet.h>
 #import <netdb.h>
-#import "../ring/OPRing.h"
+#import "../../ring/OPRing.h"
 
-#import "../compat/OPInterpose.h"
+#import "../../compat/OPInterpose.h"
 
 static int op_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     if (op_ring_started() && addr) {   // dormant image (sibling Galgal): transparent thunk, no formatting

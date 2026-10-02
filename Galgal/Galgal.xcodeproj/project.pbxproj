@@ -141,28 +141,28 @@
 		4790996ABFE70CFE /* OPObserve.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPObserve.swift; path = ../OphanimCore/bridge/OPObserve.swift; sourceTree = "<group>"; };
 		C05F943D57CB27AC /* OPCallerAttribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCallerAttribution.swift; path = ../OphanimCore/bridge/OPCallerAttribution.swift; sourceTree = "<group>"; };
 		FACE00000000000000000112 /* OPReentry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPReentry.swift; path = ../OphanimCore/bridge/OPReentry.swift; sourceTree = "<group>"; };
-		FACE00000000000000000111 /* OPHooksSocket.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksSocket.m; path = ../OphanimCore/hooks/OPHooksSocket.m; sourceTree = "<group>"; };
+		FACE00000000000000000111 /* OPHooksSocket.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksSocket.m; path = ../OphanimCore/hooks/interpose/OPHooksSocket.m; sourceTree = "<group>"; };
 		FACE00000000000000000110 /* OPSocketBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPSocketBridge.swift; path = ../OphanimCore/bridge/OPSocketBridge.swift; sourceTree = "<group>"; };
-		FACE0000000000000000010F /* OPHooksCrypto.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksCrypto.m; path = ../OphanimCore/hooks/OPHooksCrypto.m; sourceTree = "<group>"; };
+		FACE0000000000000000010F /* OPHooksCrypto.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksCrypto.m; path = ../OphanimCore/hooks/interpose/OPHooksCrypto.m; sourceTree = "<group>"; };
 		FACE0000000000000000010E /* OPCryptoBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCryptoBridge.swift; path = ../OphanimCore/bridge/OPCryptoBridge.swift; sourceTree = "<group>"; };
 		FACE0000000000000000010D /* OPFSBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPFSBridge.swift; path = ../OphanimCore/bridge/OPFSBridge.swift; sourceTree = "<group>"; };
 		FACE0000000000000000010C /* OPKeychainBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPKeychainBridge.swift; path = ../OphanimCore/bridge/OPKeychainBridge.swift; sourceTree = "<group>"; };
-		FACE0000000000000000010B /* OPHooksProcess.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksProcess.m; path = ../OphanimCore/hooks/OPHooksProcess.m; sourceTree = "<group>"; };
+		FACE0000000000000000010B /* OPHooksProcess.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksProcess.m; path = ../OphanimCore/hooks/interpose/OPHooksProcess.m; sourceTree = "<group>"; };
 		FACE0000000000000000010A /* OPProcessBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPProcessBridge.swift; path = ../OphanimCore/bridge/OPProcessBridge.swift; sourceTree = "<group>"; };
-		FACE00000000000000000109 /* OPHooksTLS.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksTLS.m; path = ../OphanimCore/hooks/OPHooksTLS.m; sourceTree = "<group>"; };
+		FACE00000000000000000109 /* OPHooksTLS.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksTLS.m; path = ../OphanimCore/hooks/interpose/OPHooksTLS.m; sourceTree = "<group>"; };
 		FACE00000000000000000113 /* OPRing.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPRing.m; path = ../OphanimCore/ring/OPRing.m; sourceTree = "<group>"; };
-		FACE00000000000000000116 /* OPHooksPinning.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksPinning.m; path = ../OphanimCore/hooks/OPHooksPinning.m; sourceTree = "<group>"; };
+		FACE00000000000000000116 /* OPHooksPinning.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHooksPinning.m; path = ../OphanimCore/hooks/interpose/OPHooksPinning.m; sourceTree = "<group>"; };
 		FACE00000000000000000115 /* OPRing.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OPRing.h; path = ../OphanimCore/ring/OPRing.h; sourceTree = "<group>"; };
 		FACE00000000000000000114 /* OPRingBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPRingBridge.swift; path = ../OphanimCore/ring/OPRingBridge.swift; sourceTree = "<group>"; };
-		FACE00000000000000000118 /* OPHooksConfigurable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksConfigurable.swift; path = ../OphanimCore/hooks/OPHooksConfigurable.swift; sourceTree = "<group>"; };
-		FACE00000000000000000119 /* OPHooksSwift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksSwift.swift; path = ../OphanimCore/hooks/OPHooksSwift.swift; sourceTree = "<group>"; };
-		FACE00000000000000000120 /* OPHooksFilesystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksFilesystem.swift; path = ../OphanimCore/hooks/OPHooksFilesystem.swift; sourceTree = "<group>"; };
+		FACE00000000000000000118 /* OPHooksConfigurable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksConfigurable.swift; path = ../OphanimCore/hooks/boundary/OPHooksConfigurable.swift; sourceTree = "<group>"; };
+		FACE00000000000000000119 /* OPHooksSwift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksSwift.swift; path = ../OphanimCore/hooks/boundary/OPHooksSwift.swift; sourceTree = "<group>"; };
+		FACE00000000000000000120 /* OPHooksFilesystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksFilesystem.swift; path = ../OphanimCore/hooks/capture/OPHooksFilesystem.swift; sourceTree = "<group>"; };
 		FACE00000000000000000121 /* OPInline.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = OPInline.c; path = ../OphanimCore/hooks/OPInline.c; sourceTree = "<group>"; };
 		FACE00000000000000000122 /* OPInlineAsm.s */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.asm; name = OPInlineAsm.s; path = ../OphanimCore/hooks/OPInlineAsm.s; sourceTree = "<group>"; };
-		FACE00000000000000000123 /* OPHooksInline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksInline.swift; path = ../OphanimCore/hooks/OPHooksInline.swift; sourceTree = "<group>"; };
+		FACE00000000000000000123 /* OPHooksInline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksInline.swift; path = ../OphanimCore/hooks/inline/OPHooksInline.swift; sourceTree = "<group>"; };
 		FACE00000000000000000124 /* OPInline.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OPInline.h; path = ../OphanimCore/hooks/OPInline.h; sourceTree = "<group>"; };
 		FACE00000000000000000108 /* OPTLSBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPTLSBridge.swift; path = ../OphanimCore/bridge/OPTLSBridge.swift; sourceTree = "<group>"; };
-		FACE00000000000000000107 /* OPHooksNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksNetwork.swift; path = ../OphanimCore/hooks/OPHooksNetwork.swift; sourceTree = "<group>"; };
+		FACE00000000000000000107 /* OPHooksNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksNetwork.swift; path = ../OphanimCore/hooks/capture/OPHooksNetwork.swift; sourceTree = "<group>"; };
 		FACE00000000000000000100 /* OPEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPEvent.swift; path = ../OphanimCore/policy/OPEvent.swift; sourceTree = "<group>"; };
 		FACE00000000000000000101 /* OPConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPConfig.swift; path = ../OphanimCore/policy/OPConfig.swift; sourceTree = "<group>"; };
 		FACE00000000000000000102 /* OPLogSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPLogSink.swift; path = ../OphanimCore/loader/OPLogSink.swift; sourceTree = "<group>"; };
@@ -171,7 +171,7 @@
 		FACE00000000000000000105 /* OPBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPBootstrap.swift; path = ../OphanimCore/loader/OPBootstrap.swift; sourceTree = "<group>"; };
 		246450A5E588E56D /* InspectRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = InspectRuntime.h; path = Inspect/InspectRuntime.h; sourceTree = "<group>"; };
 		B0D516A22B7E5011 /* InspectRuntime.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = InspectRuntime.m; path = Inspect/InspectRuntime.m; sourceTree = "<group>"; };
-		FACE00000000000000000106 /* OPHooksDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksDevice.swift; path = ../OphanimCore/hooks/OPHooksDevice.swift; sourceTree = "<group>"; };
+		FACE00000000000000000106 /* OPHooksDevice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPHooksDevice.swift; path = ../OphanimCore/hooks/capture/OPHooksDevice.swift; sourceTree = "<group>"; };
 		FACE00000000000000000301 /* OPCrashTrap.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPCrashTrap.m; path = ../OphanimCore/crash/OPCrashTrap.m; sourceTree = "<group>"; };
 		FACE00000000000000000305 /* OPCrashTrap.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = OPCrashTrap.h; path = ../OphanimCore/crash/OPCrashTrap.h; sourceTree = "<group>"; };
 		FACE00000000000000000303 /* OPHookGuard.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = OPHookGuard.m; path = ../OphanimCore/crash/OPHookGuard.m; sourceTree = "<group>"; };
@@ -292,41 +292,73 @@
 				4790996ABFE70CFE /* OPObserve.swift */,
 				C05F943D57CB27AC /* OPCallerAttribution.swift */,
 				FACE00000000000000000112 /* OPReentry.swift */,
-				FACE00000000000000000111 /* OPHooksSocket.m */,
 				FACE00000000000000000110 /* OPSocketBridge.swift */,
-				FACE0000000000000000010F /* OPHooksCrypto.m */,
 				FACE0000000000000000010E /* OPCryptoBridge.swift */,
 				FACE0000000000000000010D /* OPFSBridge.swift */,
 				FACE0000000000000000010C /* OPKeychainBridge.swift */,
-				FACE0000000000000000010B /* OPHooksProcess.m */,
 				FACE0000000000000000010A /* OPProcessBridge.swift */,
-				FACE00000000000000000109 /* OPHooksTLS.m */,
 				FACE00000000000000000113 /* OPRing.m */,
-				FACE00000000000000000116 /* OPHooksPinning.m */,
 				FACE00000000000000000115 /* OPRing.h */,
 				FACE00000000000000000114 /* OPRingBridge.swift */,
-				FACE00000000000000000118 /* OPHooksConfigurable.swift */,
-				FACE00000000000000000119 /* OPHooksSwift.swift */,
-				FACE00000000000000000120 /* OPHooksFilesystem.swift */,
 				FACE00000000000000000121 /* OPInline.c */,
 				FACE00000000000000000122 /* OPInlineAsm.s */,
-				FACE00000000000000000123 /* OPHooksInline.swift */,
 				FACE00000000000000000124 /* OPInline.h */,
 				FACE00000000000000000108 /* OPTLSBridge.swift */,
-				FACE00000000000000000107 /* OPHooksNetwork.swift */,
 				FACE00000000000000000100 /* OPEvent.swift */,
 				FACE00000000000000000101 /* OPConfig.swift */,
 				FACE00000000000000000102 /* OPLogSink.swift */,
 				FACE00000000000000000103 /* OPInterceptor.swift */,
 				FACE00000000000000000104 /* OPAgent.swift */,
 				FACE00000000000000000105 /* OPBootstrap.swift */,
-				FACE00000000000000000106 /* OPHooksDevice.swift */,
 				FACE00000000000000000301 /* OPCrashTrap.m */,
 				FACE00000000000000000305 /* OPCrashTrap.h */,
 				FACE00000000000000000303 /* OPHookGuard.m */,
 				FACE00000000000000000306 /* OPHookGuard.h */,
+				FACE00000000000000000302 /* capture */,
+				FACE00000000000000000304 /* boundary */,
+				FACE00000000000000000307 /* interpose */,
+				FACE00000000000000000308 /* inline */,
 			);
 			name = OphanimCore;
+			sourceTree = "<group>";
+		};
+		FACE00000000000000000302 /* capture */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000107 /* OPHooksNetwork.swift */,
+				FACE00000000000000000106 /* OPHooksDevice.swift */,
+				FACE00000000000000000120 /* OPHooksFilesystem.swift */,
+			);
+			name = capture;
+			sourceTree = "<group>";
+		};
+		FACE00000000000000000304 /* boundary */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000118 /* OPHooksConfigurable.swift */,
+				FACE00000000000000000119 /* OPHooksSwift.swift */,
+			);
+			name = boundary;
+			sourceTree = "<group>";
+		};
+		FACE00000000000000000307 /* interpose */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000111 /* OPHooksSocket.m */,
+				FACE0000000000000000010F /* OPHooksCrypto.m */,
+				FACE0000000000000000010B /* OPHooksProcess.m */,
+				FACE00000000000000000109 /* OPHooksTLS.m */,
+				FACE00000000000000000116 /* OPHooksPinning.m */,
+			);
+			name = interpose;
+			sourceTree = "<group>";
+		};
+		FACE00000000000000000308 /* inline */ = {
+			isa = PBXGroup;
+			children = (
+				FACE00000000000000000123 /* OPHooksInline.swift */,
+			);
+			name = inline;
 			sourceTree = "<group>";
 		};
 		6E76639928D0FA6F00DE4AF9 /* GalgalInterface */ = {

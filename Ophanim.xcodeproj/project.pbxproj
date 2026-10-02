@@ -154,7 +154,7 @@
 		643346C5B61688F3 /* OPCrashWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashWriter.swift; path = OphanimCore/crash/OPCrashWriter.swift; sourceTree = SOURCE_ROOT; };
 		8FAB8F28C1229B11 /* OPCrashRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPCrashRecord.swift; path = OphanimCore/crash/OPCrashRecord.swift; sourceTree = SOURCE_ROOT; };
 		B551BAF6C559FDE3 /* AppSettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSettingsWindow.swift; path = Ophanim/Features/AppSettings/AppSettingsWindow.swift; sourceTree = SOURCE_ROOT; };
-		F9C632249BBFC8BD /* InspectTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectTools.swift; path = Ophanim/Core/MCP/Tools/InspectTools.swift; sourceTree = SOURCE_ROOT; };
+		F9C632249BBFC8BD /* InspectTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectTools.swift; path = Ophanim/Core/MCP/Tools/Inspect/InspectTools.swift; sourceTree = SOURCE_ROOT; };
 		4E17E960CFFEACBF /* OPAppLiveness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OPAppLiveness.swift; path = Ophanim/Core/Services/OPAppLiveness.swift; sourceTree = SOURCE_ROOT; };
 		152221A2059674F5 /* SnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SnapshotStore.swift; path = Ophanim/Core/Services/SnapshotStore.swift; sourceTree = SOURCE_ROOT; };
 		2E3D0C3B16EA77D0 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = BookmarkStore.swift; path = Ophanim/Core/Services/BookmarkStore.swift; sourceTree = SOURCE_ROOT; };
@@ -162,15 +162,15 @@
 		EC90C27EE3F316C0 /* InspectGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectGate.swift; path = Ophanim/Core/MCP/InspectGate.swift; sourceTree = SOURCE_ROOT; };
 		7129536E6D2311B4 /* InspectRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = InspectRequest.swift; path = Galgal/Galgal/Inspect/InspectRequest.swift; sourceTree = SOURCE_ROOT; };
 		5BF36BBEDA431028 /* MCPTimeouts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MCPTimeouts.swift; path = Ophanim/Core/MCP/MCPTimeouts.swift; sourceTree = SOURCE_ROOT; };
-		2D73451F9FFF0D2B /* TweakTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakTools.swift; path = Ophanim/Core/MCP/Tools/TweakTools.swift; sourceTree = SOURCE_ROOT; };
-		DF53023CB47A543F /* ContainerTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerTools.swift; path = Ophanim/Core/MCP/Tools/ContainerTools.swift; sourceTree = SOURCE_ROOT; };
+		2D73451F9FFF0D2B /* TweakTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakTools.swift; path = Ophanim/Core/MCP/Tools/Tweaks/TweakTools.swift; sourceTree = SOURCE_ROOT; };
+		DF53023CB47A543F /* ContainerTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerTools.swift; path = Ophanim/Core/MCP/Tools/Containers/ContainerTools.swift; sourceTree = SOURCE_ROOT; };
 		1E4ADF9344E6F37E /* TweakStoreService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakStoreService.swift; path = Ophanim/Core/MCP/Services/TweakStoreService.swift; sourceTree = SOURCE_ROOT; };
 		1709F3002601F328 /* ContainerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerService.swift; path = Ophanim/Core/MCP/Services/ContainerService.swift; sourceTree = SOURCE_ROOT; };
 		C8B04E7B3498E422 /* SourceInstalls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceInstalls.swift; path = Ophanim/Features/Sources/SourceInstalls.swift; sourceTree = SOURCE_ROOT; };
 		B48C799E7018F704 /* AppSources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSources.swift; path = Ophanim/Features/Sources/AppSources.swift; sourceTree = SOURCE_ROOT; };
 		E51CC374D4283408 /* IPAValidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = IPAValidate.swift; path = Ophanim/Features/Sources/IPAValidate.swift; sourceTree = SOURCE_ROOT; };
 		3FD95F49140C6F71 /* AppSourcesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppSourcesView.swift; path = Ophanim/Features/Sources/AppSourcesView.swift; sourceTree = SOURCE_ROOT; };
-		3DF59B7004FB0A44 /* SourceTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceTools.swift; path = Ophanim/Core/MCP/Tools/SourceTools.swift; sourceTree = SOURCE_ROOT; };
+		3DF59B7004FB0A44 /* SourceTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SourceTools.swift; path = Ophanim/Core/MCP/Tools/Sources/SourceTools.swift; sourceTree = SOURCE_ROOT; };
 		01F370A4547DBF7E /* ContainerPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ContainerPane.swift; path = Ophanim/Features/AppSettings/ContainerPane.swift; sourceTree = SOURCE_ROOT; };
 		AD096AB0B5DDCBB4 /* TweakLibraryPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakLibraryPane.swift; path = Ophanim/Features/AppSettings/TweakLibraryPane.swift; sourceTree = SOURCE_ROOT; };
 		B45A4B3DDF464D98 /* TweakLibraryVM.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TweakLibraryVM.swift; path = Ophanim/Core/ViewModel/TweakLibraryVM.swift; sourceTree = SOURCE_ROOT; };
@@ -186,12 +186,12 @@
 		8C99F8F38CB1F9F5 /* HostedApp+Tools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "HostedApp+Tools.swift"; path = "Ophanim/Core/Model/HostedApp+Tools.swift"; sourceTree = SOURCE_ROOT; };
 		BCBD33DB5B867DF1 /* HostedApp+Files.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "HostedApp+Files.swift"; path = "Ophanim/Core/Model/HostedApp+Files.swift"; sourceTree = SOURCE_ROOT; };
 		900502EE8C0E1C7C /* ToolRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ToolRouter.swift; path = Ophanim/Core/MCP/ToolRouter.swift; sourceTree = SOURCE_ROOT; };
-		220847F9046C01C1 /* AppTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppTools.swift; path = Ophanim/Core/MCP/Tools/AppTools.swift; sourceTree = SOURCE_ROOT; };
-		3765949B44E0A21E /* EventTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventTools.swift; path = Ophanim/Core/MCP/Tools/EventTools.swift; sourceTree = SOURCE_ROOT; };
-		056DEEFFE3AD0AF6 /* ReconTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconTools.swift; path = Ophanim/Core/MCP/Tools/ReconTools.swift; sourceTree = SOURCE_ROOT; };
-		8AC7C7D95F6CB3C2 /* HookTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HookTools.swift; path = Ophanim/Core/MCP/Tools/HookTools.swift; sourceTree = SOURCE_ROOT; };
-		4348A085B12A9469 /* RuleTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RuleTools.swift; path = Ophanim/Core/MCP/Tools/RuleTools.swift; sourceTree = SOURCE_ROOT; };
-		86C5858FBCEEE0E6 /* ConfigTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConfigTools.swift; path = Ophanim/Core/MCP/Tools/ConfigTools.swift; sourceTree = SOURCE_ROOT; };
+		220847F9046C01C1 /* AppTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppTools.swift; path = Ophanim/Core/MCP/Tools/Apps/AppTools.swift; sourceTree = SOURCE_ROOT; };
+		3765949B44E0A21E /* EventTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventTools.swift; path = Ophanim/Core/MCP/Tools/Events/EventTools.swift; sourceTree = SOURCE_ROOT; };
+		056DEEFFE3AD0AF6 /* ReconTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconTools.swift; path = Ophanim/Core/MCP/Tools/Recon/ReconTools.swift; sourceTree = SOURCE_ROOT; };
+		8AC7C7D95F6CB3C2 /* HookTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HookTools.swift; path = Ophanim/Core/MCP/Tools/Hooks/HookTools.swift; sourceTree = SOURCE_ROOT; };
+		4348A085B12A9469 /* RuleTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RuleTools.swift; path = Ophanim/Core/MCP/Tools/Hooks/RuleTools.swift; sourceTree = SOURCE_ROOT; };
+		86C5858FBCEEE0E6 /* ConfigTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConfigTools.swift; path = Ophanim/Core/MCP/Tools/Config/ConfigTools.swift; sourceTree = SOURCE_ROOT; };
 		5AED5DF901EE05DC /* StdioTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = StdioTransport.swift; path = Ophanim/Core/MCP/Transports/StdioTransport.swift; sourceTree = SOURCE_ROOT; };
 		9E70BEBCBB434C08 /* HTTPTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HTTPTransport.swift; path = Ophanim/Core/MCP/Transports/HTTPTransport.swift; sourceTree = SOURCE_ROOT; };
 		1E79EE123C632373 /* AppQueryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppQueryService.swift; path = Ophanim/Core/MCP/Services/AppQueryService.swift; sourceTree = SOURCE_ROOT; };
@@ -619,18 +619,90 @@
 		F207D73F32CDDBF9 /* MCP/Tools */ = {
 			isa = PBXGroup;
 			children = (
-				F9C632249BBFC8BD /* InspectTools.swift */,
-				2D73451F9FFF0D2B /* TweakTools.swift */,
-				DF53023CB47A543F /* ContainerTools.swift */,
-				3DF59B7004FB0A44 /* SourceTools.swift */,
-				220847F9046C01C1 /* AppTools.swift */,
-				3765949B44E0A21E /* EventTools.swift */,
-				056DEEFFE3AD0AF6 /* ReconTools.swift */,
-				8AC7C7D95F6CB3C2 /* HookTools.swift */,
-				4348A085B12A9469 /* RuleTools.swift */,
-				86C5858FBCEEE0E6 /* ConfigTools.swift */,
+				7001A1159001CAFE /* Apps */,
+				7001A1159002CAFE /* Config */,
+				7001A1159003CAFE /* Hooks */,
+				7001A1159004CAFE /* Tweaks */,
+				7001A1159005CAFE /* Containers */,
+				7001A1159006CAFE /* Sources */,
+				7001A1159007CAFE /* Events */,
+				7001A1159008CAFE /* Recon */,
+				7001A1159009CAFE /* Inspect */,
 			);
 			name = Tools;
+			sourceTree = "<group>";
+		};
+		7001A1159001CAFE /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				220847F9046C01C1 /* AppTools.swift */,
+			);
+			name = Apps;
+			sourceTree = "<group>";
+		};
+		7001A1159002CAFE /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				86C5858FBCEEE0E6 /* ConfigTools.swift */,
+			);
+			name = Config;
+			sourceTree = "<group>";
+		};
+		7001A1159003CAFE /* Hooks */ = {
+			isa = PBXGroup;
+			children = (
+				8AC7C7D95F6CB3C2 /* HookTools.swift */,
+				4348A085B12A9469 /* RuleTools.swift */,
+			);
+			name = Hooks;
+			sourceTree = "<group>";
+		};
+		7001A1159004CAFE /* Tweaks */ = {
+			isa = PBXGroup;
+			children = (
+				2D73451F9FFF0D2B /* TweakTools.swift */,
+			);
+			name = Tweaks;
+			sourceTree = "<group>";
+		};
+		7001A1159005CAFE /* Containers */ = {
+			isa = PBXGroup;
+			children = (
+				DF53023CB47A543F /* ContainerTools.swift */,
+			);
+			name = Containers;
+			sourceTree = "<group>";
+		};
+		7001A1159006CAFE /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				3DF59B7004FB0A44 /* SourceTools.swift */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		7001A1159007CAFE /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				3765949B44E0A21E /* EventTools.swift */,
+			);
+			name = Events;
+			sourceTree = "<group>";
+		};
+		7001A1159008CAFE /* Recon */ = {
+			isa = PBXGroup;
+			children = (
+				056DEEFFE3AD0AF6 /* ReconTools.swift */,
+			);
+			name = Recon;
+			sourceTree = "<group>";
+		};
+		7001A1159009CAFE /* Inspect */ = {
+			isa = PBXGroup;
+			children = (
+				F9C632249BBFC8BD /* InspectTools.swift */,
+			);
+			name = Inspect;
 			sourceTree = "<group>";
 		};
 		1892FDC0292E78C6 /* MCP/Transports */ = {

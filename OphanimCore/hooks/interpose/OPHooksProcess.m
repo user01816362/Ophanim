@@ -17,9 +17,9 @@
 #import <dlfcn.h>
 #import <spawn.h>
 #import <unistd.h>
-#import "../ring/OPRing.h"
+#import "../../ring/OPRing.h"
 
-#import "../compat/OPInterpose.h"
+#import "../../compat/OPInterpose.h"
 
 static void *op_dlopen(const char *path, int mode) {
     if (op_ring_started()) {   // dormant image (sibling Galgal): transparent thunk

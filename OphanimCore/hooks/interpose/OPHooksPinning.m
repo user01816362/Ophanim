@@ -22,13 +22,13 @@
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 #import <stdatomic.h>
-#import "../ring/OPRing.h"
+#import "../../ring/OPRing.h"
 
 // SecTrustEvaluate is deprecated in favor of SecTrustEvaluateWithError, but apps still call it,
 // so we must interpose it too. Silence the deprecation diagnostic for this file.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-#import "../compat/OPInterpose.h"
+#import "../../compat/OPInterpose.h"
 
 static atomic_bool g_bypass_pinning = false;
 

@@ -20,12 +20,12 @@
 
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
-#import "../ring/OPRing.h"
+#import "../../ring/OPRing.h"
 
 // Secure Transport (SSLRead/SSLWrite/SSLContextRef) is deprecated but still widely linked; silence.
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
-#import "../compat/OPInterpose.h"
+#import "../../compat/OPInterpose.h"
 
 // --- boringssl (weak; in-cache, rarely interposable) ---
 extern int SSL_read(void *ssl, void *buf, int num) __attribute__((weak_import));
