@@ -95,6 +95,25 @@ enum InspectTools {
                                           "windows": treeParams.rootId == nil ? (tree.children).count : 1]
             if let rootId = treeParams.rootId { summary["rootId"] = rootId }
             if let by = rsp.truncatedBy, !by.isEmpty { summary["truncatedBy"] = by }
+            // Flat actionable-node list for text-only bridges: the full tree ships as
+            // a text block (nesting blows past client object-depth limits), but agents
+            // also need structured ids to tap/set_text. Walk flat — no nesting — keep
+            // buttons, textfields, and labeled nodes, capped so the summary stays small.
+            var flat: [[String: Any]] = []
+            func collect(_ n: InspectNode) {
+                let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
+                if n.role == "button" || n.role == "textfield" || labeled {
+                    var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
+                                            "enabled": n.enabled]
+                    if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
+                    if let l = n.axLabel, !l.isEmpty { d["label"] = l }
+                    if flat.count < 100 { flat.append(d) }
+                }
+                for c in n.children { collect(c) }
+            }
+            collect(tree)
+            summary["nodes"] = flat
+            summary["nodeCount"] = flat.count
             return MCPServer.result(id, [
                 "resultType": "complete",
                 "content": [["type": "text", "text": text]],
