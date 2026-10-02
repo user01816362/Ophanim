@@ -189,6 +189,12 @@ pairs, marks budget-cut or redaction-mismatched pairs `partial`;
 (default none — each leg costs a full tree transaction;
 `InspectService.swift:137-155`).
 
+`uitree_read` summaries carry flat `nodes[]` (id/class/role/text/label/
+enabled, buttons + text inputs + labeled nodes, capped 100, zero nesting):
+the discovery list for `tap_element`/`set_text` by id when the tree text
+block is unavailable — proven live driving a full chat turn (read nodes,
+tap field, `set_text`, tap Send) with no coordinates.
+
 Framework coverage for text entry (`set_text` writes `UITextField`/
 `UITextView` directly — no tapping, no keyboard): UIKit and SwiftUI
 (hosts the same two classes) fully covered; **React Native covered** —
