@@ -250,24 +250,29 @@ class Uninstaller {
         }
     }
 
+    /// Pure candidate computation for pruneFiles (no deletion, no cache rewrite),
+    /// so MCP dryRun can preview exactly what a prune would trash.
+    static func pruneCandidates() -> (files: [URL], ids: [String]) {
+        let bundleIds = AppsVM.shared.apps.map { $0.info.bundleIdentifier }
+        let dangling = ((try? HostedApp.bundleIDCache.filter { !bundleIds.contains($0) }) ?? [])
+        var files: [URL] = []
+        for url in pruneURLs + cacheURLs {
+            url.enumerateContents(options: [.skipsSubdirectoryDescendants]) { file, _ in
+                let bid = file.deletingPathExtension().lastPathComponent
+                if dangling.contains(bid) { files.append(file) }
+            }
+        }
+        return (files, files.map { $0.deletingPathExtension().lastPathComponent })
+    }
+
     static func pruneFiles() {
         do {
-            let bundleIds = AppsVM.shared.apps.map { $0.info.bundleIdentifier }
-            let danglingItems = try HostedApp.bundleIDCache.filter { !bundleIds.contains($0) }
-
-            var fullPruneURLs = pruneURLs
-            fullPruneURLs.append(contentsOf: cacheURLs)
-
+            let (files, _) = pruneCandidates()
             var prunedIds: [String] = []
 
-            for url in fullPruneURLs {
-                url.enumerateContents(options: [.skipsSubdirectoryDescendants]) { file, _ in
-                    let bundleId = file.deletingPathExtension().lastPathComponent
-                    if danglingItems.contains(bundleId) {
-                        try FileManager.default.trashItem(at: file, resultingItemURL: nil)
-                        prunedIds.append(bundleId)
-                    }
-                }
+            for file in files {
+                try FileManager.default.trashItem(at: file, resultingItemURL: nil)
+                prunedIds.append(file.deletingPathExtension().lastPathComponent)
             }
 
             try "\(HostedApp.bundleIDCache.filter({ !Set(prunedIds).contains($0) }).joined(separator: "\n"))\n"

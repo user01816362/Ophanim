@@ -17,7 +17,8 @@ enum SettingsStore {
         "displayRotation", "windowWidth", "windowHeight", "customScaler", "resolution",
         "aspectRatio", "windowFixMethod",
         "resizableAspectRatioType", "resizableAspectRatioWidth", "resizableAspectRatioHeight",
-        "customTweakFolder", "agentMode", "inspectDisableRedaction", "clearLogsOnLaunch"
+        "customTweakFolder", "agentMode", "inspectDisableRedaction", "clearLogsOnLaunch",
+        "openWithLLDB", "openLLDBWithTerminal",
     ]
     /// Decode the per-app AppSettingsData from its plist (the encoded settings model).
     static func appSettings(_ bundleID: String) -> AppSettingsData? {
@@ -112,6 +113,11 @@ enum SettingsStore {
         if let on = args["agentMode"] as? Bool { s.ophanim.agentMode = on }
         if let on = args["inspectDisableRedaction"] as? Bool { s.ophanim.inspectDisableRedaction = on }
         if let on = args["clearLogsOnLaunch"] as? Bool { s.clearLogsOnLaunch = on }
+        // Debugger launch: the Debugger groupbox in InstrumentationSettings writes
+        // these per-app fields and HostedApp reads them at launch — previously
+        // GUI-only, unreachable headless.
+        if let on = args["openWithLLDB"] as? Bool { s.openWithLLDB = on }
+        if let on = args["openLLDBWithTerminal"] as? Bool { s.openLLDBWithTerminal = on }
         if let folder = args["customTweakFolder"] as? String {
             if folder.isEmpty {
                 s.customTweakFolder = nil

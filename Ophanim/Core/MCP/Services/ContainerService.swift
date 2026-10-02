@@ -33,6 +33,11 @@ enum ContainerService {
         report["containerPath"] = real.path
         report["containerExists"] = FileManager.default.fileExists(atPath: real.path)
         if let size = Self.directorySize(real) { report["bytes"] = size }
+        // Same prefs plist the Container pane shows (AppContainer.userPrefsUrl)
+        // and the library menu deletes — agents shouldn't have to rebuild the path.
+        let prefs = AppContainer(bundleId: bundleID).userPrefsUrl
+        report["preferencesPath"] = prefs.path
+        report["preferencesExists"] = FileManager.default.fileExists(atPath: prefs.path)
         report["profiles"] = ContainerProfiles.profiles(bundleID: bundleID)
         report["activeProfile"] = ContainerProfiles.activeName(bundleID: bundleID)
         return report

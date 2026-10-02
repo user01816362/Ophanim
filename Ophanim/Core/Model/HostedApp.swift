@@ -122,8 +122,8 @@ class HostedApp: BaseApp, @unchecked Sendable {
                 // Clear any debug-related env vars that could affect the launched app
                 self.clearDebugAffectingEnvironment()
 
-                if settings.openWithLLDB {
-                    try Shell.lldb(executable, withTerminalWindow: settings.openLLDBWithTerminal)
+                if settings.settings.openWithLLDB {
+                    try Shell.lldb(executable, withTerminalWindow: settings.settings.openLLDBWithTerminal)
                 } else {
                     runAppExec() // Splitting to reduce complexity
                 }

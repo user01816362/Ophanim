@@ -120,4 +120,83 @@ enum ConfigTools {
         }
         return try ToolRouter.json(payload)
     }
+
+    /// Reset an app's settings to defaults — headless twin of the settings-window
+    /// reset button (AppSettings.reset). Destructive: dryRun previews by default.
+    /// The bundle binding is preserved (GUI drops it; the store backfills it).
+    static func resetSettings(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard SettingsStore.appSettings(bid) != nil else {
+            throw ToolRouter.bail("no settings found for \(bid)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "wouldReset": true])
+        }
+        try SettingsStore.updateSettings(bid) {
+            $0 = AppSettingsData()
+            $0.bundleIdentifier = bid
+        }
+        return try ToolRouter.json(["bundleID": bid, "reset": true])
+    }
+
+    /// List an app's keymap files — headless twin of the keymap library rows
+    /// (KeymapView). Read-only.
+    static func listKeymaps(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
+        let app = HostedApp(appUrl: url)
+        let dir = Keymapping.keymappingDir.appendingPathComponent(bid)
+        let def = app.keymapping.keymapConfig.defaultKm.deletingPathExtension().lastPathComponent
+        var maps: [[String: Any]] = []
+        if let entries = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.fileSizeKey]) {
+            for f in entries where f.pathExtension == "plist" && f.lastPathComponent != ".config.plist" {
+                let size = (try? f.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+                let name = f.deletingPathExtension().lastPathComponent
+                maps.append(["name": name, "bytes": size ?? 0, "default": name == def])
+            }
+        }
+        maps.sort { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }
+        return try ToolRouter.json(["bundleID": bid, "keymaps": maps, "count": maps.count])
+    }
+
+    /// Rename a keymap file (updates the order list too). Destructive: dryRun previews.
+    static func renameKeymap(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let from = args["name"] as? String, !from.isEmpty,
+              let to = args["newName"] as? String, !to.isEmpty else {
+            throw ToolRouter.bail("name and newName are required")
+        }
+        guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "from": from, "to": to])
+        }
+        let app = HostedApp(appUrl: url)
+        guard app.keymapping.renameKeymap(prevName: from, newName: to) else {
+            throw ToolRouter.bail("rename failed for '\(from)' - see the Ophanim log")
+        }
+        return try ToolRouter.json(["bundleID": bid, "from": from, "to": to, "renamed": true])
+    }
+
+    /// Delete a keymap file (trash). Refuses the default keymap like the GUI
+    /// context menu does. Destructive: dryRun previews.
+    static func deleteKeymap(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let name = args["name"] as? String, !name.isEmpty else {
+            throw ToolRouter.bail("name is required")
+        }
+        guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
+        let app = HostedApp(appUrl: url)
+        let def = app.keymapping.keymapConfig.defaultKm.deletingPathExtension().lastPathComponent
+        if name == def {
+            throw ToolRouter.bail("'\(name)' is the default keymap - pick another default first")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "name": name])
+        }
+        guard app.keymapping.deleteKeymap(name: name) else {
+            throw ToolRouter.bail("delete failed for '\(name)' - see the Ophanim log")
+        }
+        return try ToolRouter.json(["bundleID": bid, "name": name, "deleted": true])
+    }
 }

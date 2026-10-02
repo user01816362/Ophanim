@@ -35,9 +35,13 @@ final class MCPServer {
     /// Tools that change no state. Everything else defaults to mutating.
     static let readOnlyTools: Set<String> = [
         "list_apps", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
-        "find_symbols", "get_config", "list_jailbreak_detectors", "list_presets",
-        "list_sources", "get_log_path", "container_info", "list_profiles",
-        "list_classes", "get_keymap", "uitree_read", "screenshot",
+        "find_symbols", "list_libraries", "scan_signature",
+        "get_config", "get_hooks", "validate_rule_script",
+        "list_jailbreak_detectors", "list_presets",
+        "list_sources", "search_source_apps", "refresh_sources",
+        "get_log_path", "container_info", "list_profiles",
+        "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
+        "list_classes", "uitree_read", "screenshot",
         "inspect_pick",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
@@ -45,10 +49,20 @@ final class MCPServer {
 
     /// Tools that delete or replace state (preview first where offered).
     static let destructiveTools: Set<String> = [
-        "uninstall_app", "set_rules", "set_objc_hooks", "set_swift_hooks",
-        "set_inline_hooks", "remove_source", "remove_tweak", "clear_logs",
-        "remove_profile", "switch_profile", "clear_container", "restore_container",
-        "inspect_clear_snapshots", "bookmark_remove", "set_keymap"
+        "install_app", "uninstall_app", "set_galgal_runtime",
+        "set_dyld_libraries", "set_app_category", "prune_files",
+        "set_config", "set_injection_strategy", "reset_settings",
+        "set_keymap", "rename_keymap", "delete_keymap",
+        "set_rules", "apply_preset",
+        "set_objc_hooks", "set_swift_hooks", "set_inline_hooks",
+        "add_source", "remove_source", "rename_source", "edit_source_url",
+        "reset_sources", "install_source_app", "source_transfer",
+        "add_tweak", "move_tweak", "remove_tweak", "set_tweak_enabled",
+        "tweak_folder", "resync_tweaks",
+        "clear_logs", "create_profile", "remove_profile", "switch_profile",
+        "clear_container", "backup_container", "restore_container",
+        "inspect_clear_snapshots",
+        "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
@@ -324,9 +338,31 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "rules": ["type": "array", "items": ["type": "object"], "description": "Full rules array (replaces existing)."]
+                    "rules": ["type": "array", "items": ["type": "object"], "description": "Full rules array (replaces existing). Validate script rules with validate_rule_script first."],
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "rules"]
+            ]
+        ],
+        [
+            "name": "validate_rule_script",
+            "description": "Syntax-check a JS rule body without writing anything (parses only, never executes). Use before set_rules.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "script": ["type": "string", "description": "JS source for action.script (ctx mutation contract)."]
+                ],
+                "required": ["script"]
+            ]
+        ],
+        [
+            "name": "get_hooks",
+            "description": "Read an app's three hook arrays (ObjC, Swift vtable, inline) plus the inline gate. "
+                + "Lightweight twin of get_config for hook polling (no hosting dump).",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["bundleID": ["type": "string", "description": "The app's bundle identifier."]],
+                "required": ["bundleID"]
             ]
         ],
         [
@@ -381,7 +417,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."]
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -401,7 +438,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."]
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -426,7 +464,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."]
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -474,6 +513,8 @@ final class MCPServer {
                     "spoofedOSVersion": ["type": "string", "description": "iOS version the app reports (empty = off)."],
                     "agentMode": ["type": "boolean", "description": "Arm Inspect agent-mode providers in the guest."],
                     "inspectDisableRedaction": ["type": "boolean", "description": "Hand capture to AI raw (explicit consent)."],
+                    "openWithLLDB": ["type": "boolean", "description": "Launch attached to LLDB (Debugger groupbox)."],
+                    "openLLDBWithTerminal": ["type": "boolean", "description": "Run LLDB inside Terminal instead of attaching silently."],
                     "clearLogsOnLaunch": ["type": "boolean", "description": "Fresh log each launch instead of history."],
                     "customTweakFolder": ["type": "string", "description": "Custom tweak directory (empty resets to default; must exist)."],
                     "iosDeviceModel": ["type": "string", "description": "iOS hardware model the app reports (e.g. iPad13,8)."],
@@ -546,9 +587,70 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "set_galgal_runtime",
+            "description": "Install or remove the Galgal runtime in an app's executable (settings-window Galgal button). Rewrites load commands.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "installed": ["type": "boolean", "description": "True = install Galgal, false = remove it."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to rewrite."]
+                ],
+                "required": ["bundleID", "installed"]
+            ]
+        ],
+        [
+            "name": "set_dyld_libraries",
+            "description": "Toggle DYLD injected libraries (introspection, iosFrameworks). Re-signs the binary; next launch applies.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "introspection": ["type": "boolean", "description": "Inject /usr/lib/system/introspection."],
+                    "iosFrameworks": ["type": "boolean", "description": "Inject iOSSupport frameworks path."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to re-sign."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "set_app_category",
+            "description": "Set the app's LSApplicationCategoryType and re-sign (Application Type groupbox).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "category": ["type": "string", "description": "Raw category value, e.g. public.app-category.games."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to re-sign."]
+                ],
+                "required": ["bundleID", "category"]
+            ]
+        ],
+        [
+            "name": "prune_files",
+            "description": "Trash per-app files left behind by uninstalled apps (prune-dangling-files setting).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true): list what would be trashed. Pass false to trash."]
+                ]
+            ]
+        ],
+        [
             "name": "list_sources",
             "description": "List subscribed AltStore-format app-source feeds with app counts and errors.",
             "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
+        ],
+        [
+            "name": "search_source_apps",
+            "description": "Search all subscribed source feeds for apps by name, bundle ID, or developer (same filter as the Sources window search).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "query": ["type": "string", "description": "Substring to match (case-insensitive)."]
+                ],
+                "required": ["query"]
+            ]
         ],
         [
             "name": "add_source",
@@ -581,6 +683,66 @@ final class MCPServer {
                     "dryRun": ["type": "boolean", "description": "Preview only (default true): report the version that would install. Pass false to install."]
                 ],
                 "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "refresh_sources",
+            "description": "Re-fetch one feed (by URL) or all feeds. Cache sync, no data loss.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "url": ["type": "string", "description": "Feed URL to refresh; omit to refresh all."]
+                ]
+            ]
+        ],
+        [
+            "name": "rename_source",
+            "description": "Rename a subscribed feed's display name.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "url": ["type": "string", "description": "Feed URL."],
+                    "name": ["type": "string", "description": "New display name."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to rename."]
+                ],
+                "required": ["url", "name"]
+            ]
+        ],
+        [
+            "name": "edit_source_url",
+            "description": "Re-point a feed at a new URL (cache follows, old cache purged).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "url": ["type": "string", "description": "Current feed URL."],
+                    "newUrl": ["type": "string", "description": "Replacement feed URL."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to re-point."]
+                ],
+                "required": ["url", "newUrl"]
+            ]
+        ],
+        [
+            "name": "reset_sources",
+            "description": "Drop every custom source + caches + resume data (back to shipped empty state).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to drop all."]
+                ]
+            ]
+        ],
+        [
+            "name": "source_transfer",
+            "description": "Pause / resume / cancel an in-flight feed download (transfer ring menu).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "action": ["type": "string", "description": "pause, resume, or cancel."],
+                    "version": ["type": "string", "description": "Resume with a pinned version (default: latest compatible)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to act."]
+                ],
+                "required": ["bundleID", "action"]
             ]
         ],
         [
@@ -773,12 +935,12 @@ final class MCPServer {
         ],
         [
             "name": "clear_container",
-            "description": "Wipe caches, data container, or keychain state.",
+            "description": "Wipe caches, data container, keychain state, or the single preferences plist.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "scope": ["type": "string"],
+                    "scope": ["type": "string", "description": "caches, data, keychain, or preferences."],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true): report targets + bytes. Pass false to wipe."]
                 ],
                 "required": ["bundleID"]
@@ -824,6 +986,29 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "list_libraries",
+            "description": "Linked libraries of an app binary (otool -L; Recon libraries section).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "scan_signature",
+            "description": "Byte-signature scan of an app binary (hex with ?? wildcards, e.g. '1F 20 ?? D5'; capped at 500 hits).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "pattern": ["type": "string", "description": "Byte pattern, e.g. '1F 20 ?? D5'."]
+                ],
+                "required": ["bundleID", "pattern"]
+            ]
+        ],
+        [
             "name": "set_injection_strategy",
             "description": "Persist embedded/sibling strategy and settle load commands.",
             "inputSchema": [
@@ -860,6 +1045,56 @@ final class MCPServer {
                     "dryRun": ["type": "boolean", "description": "Preview only (default true): report decoded counts + overwrite/backup plan. Pass false to write."]
                 ],
                 "required": ["bundleID", "name", "keymap"]
+            ]
+        ],
+        [
+            "name": "reset_settings",
+            "description": "Reset an app's settings to defaults (settings-window reset button; bundle binding preserved).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to reset."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "list_keymaps",
+            "description": "List an app's keymap files with sizes and the default marker.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "rename_keymap",
+            "description": "Rename a keymap file (order list follows).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "name": ["type": "string", "description": "Current keymap name."],
+                    "newName": ["type": "string", "description": "New keymap name."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to rename."]
+                ],
+                "required": ["bundleID", "name", "newName"]
+            ]
+        ],
+        [
+            "name": "delete_keymap",
+            "description": "Delete a keymap file (trash). Refuses the default keymap like the GUI does.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "name": ["type": "string", "description": "Keymap name to delete."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to delete."]
+                ],
+                "required": ["bundleID", "name"]
             ]
         ],
         [

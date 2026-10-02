@@ -57,6 +57,10 @@ struct AppSettingsData: Codable {
     var customTweakFolder: String?
     var spoofedOSVersion = ""
     var clearLogsOnLaunch = true
+    /// Debugger launch flags (Debugger groupbox). Persisted here — not on the
+    /// AppSettings wrapper — so they survive relaunch and MCP can manage them.
+    var openWithLLDB = false
+    var openLLDBWithTerminal = true
 
     /// Ophanim instrumentation config. Persisted under the "ophanim" key, read in-process by
     /// OphanimCore's OPConfigLoader at agent start.
@@ -103,6 +107,8 @@ struct AppSettingsData: Codable {
         customTweakFolder = try container.decodeIfPresent(String.self, forKey: .customTweakFolder)
         spoofedOSVersion = try container.decodeIfPresent(String.self, forKey: .spoofedOSVersion) ?? ""
         clearLogsOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .clearLogsOnLaunch) ?? true
+        openWithLLDB = try container.decodeIfPresent(Bool.self, forKey: .openWithLLDB) ?? false
+        openLLDBWithTerminal = try container.decodeIfPresent(Bool.self, forKey: .openLLDBWithTerminal) ?? true
         ophanim = try container.decodeIfPresent(OPConfig.self, forKey: .ophanim) ?? OPConfig()
     }
 }
@@ -125,8 +131,6 @@ struct AppSettingsData: Codable {
 
     let info: AppInfo
     let settingsUrl: URL
-    var openWithLLDB: Bool = false
-    var openLLDBWithTerminal: Bool = true
     // @Observable so SwiftUI re-renders on any mutation. AppSettings is a class, so views must
     // observe it via @Bindable (not @Binding) - mutating it through a Binding<AppSettings>
     // writes the same reference back without notifying observation, leaving dependent controls

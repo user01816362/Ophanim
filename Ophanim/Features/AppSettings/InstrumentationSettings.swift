@@ -165,10 +165,10 @@ struct InstrumentationView: View {
 
                 GroupBox("Debugger") {
                     VStack(alignment: .leading, spacing: 4) {
-                        Toggle("Open with LLDB", isOn: $settings.openWithLLDB)
+                        Toggle("Open with LLDB", isOn: $settings.settings.openWithLLDB)
                             .help("Launch this app attached to the LLDB debugger.")
-                        Toggle("Open LLDB in Terminal", isOn: $settings.openLLDBWithTerminal)
-                            .disabled(!settings.openWithLLDB)
+                        Toggle("Open LLDB in Terminal", isOn: $settings.settings.openLLDBWithTerminal)
+                            .disabled(!settings.settings.openWithLLDB)
                             .help("Run LLDB inside a Terminal window instead of attaching silently.")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

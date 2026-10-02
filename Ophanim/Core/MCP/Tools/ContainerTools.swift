@@ -99,8 +99,8 @@ enum ContainerTools {
     static func clearContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let scope = args["scope"] as? String,
-              ["caches", "data", "keychain"].contains(scope) else {
-            throw ToolRouter.bail("scope is required: caches, data, or keychain")
+              ["caches", "data", "keychain", "preferences"].contains(scope) else {
+            throw ToolRouter.bail("scope is required: caches, data, keychain, or preferences")
         }
         let targets: [URL]
         switch scope {
@@ -115,12 +115,24 @@ enum ContainerTools {
                 throw ToolRouter.bail("no data container could be resolved for \(bid); it may never have launched")
             }
             targets = [real]
+        case "preferences":
+            // Surgical single-plist wipe — same path the library context menu
+            // deletes (HostedAppView.deletePreferences / AppContainer.userPrefsUrl).
+            let prefs = AppContainer(bundleId: bid).userPrefsUrl
+            targets = FileManager.default.fileExists(atPath: prefs.path) ? [prefs] : []
         default:
             targets = KeyCoverKey(appBundleID: bid).allFiles.filter {
                 FileManager.default.fileExists(atPath: $0.path)
             }
         }
-        let bytes = targets.compactMap { ContainerService.directorySize($0) }.reduce(0, +)
+        let bytes: Int64 = targets.reduce(0) { total, url in
+            // directorySize enumerates directories; single-file scopes (preferences)
+            // read the file size directly.
+            if scope == "preferences" {
+                return total + Int64((try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+            }
+            return total + (ContainerService.directorySize(url) ?? 0)
+        }
         // Scope data wipes what the app knew: the container plus the agent analysis that
         // describes it (snapshot timeline + bookmarks). Marks outliving a data wipe would
         // point at a UI that no longer exists; uninstall already takes both, so the wipe

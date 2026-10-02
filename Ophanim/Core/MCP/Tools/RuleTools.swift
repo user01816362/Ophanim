@@ -1,4 +1,5 @@
 import Foundation
+import JavaScriptCore
 
 /// Rule preset + rule-replace tools. Preset dicts + rule merge/replace.
 enum RuleTools {
@@ -29,8 +30,33 @@ enum RuleTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let rulesArg = args["rules"] else { throw ToolRouter.bail("rules array is required") }
         let rules: [OPRule] = try ToolRouter.decode(rulesArg, label: "rules")
+        if args["dryRun"] as? Bool == true {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "wouldSet": rules.count])
+        }
         try SettingsStore.updateSettings(bid) { $0.ophanim.rules = rules }
         return "Set \(rules.count) rule(s) for \(bid)."
+    }
+
+    /// Syntax-check a JS rule body without writing anything. The source is
+    /// wrapped in an uncalled function so it PARSES but never executes (no
+    /// stub-ctx side effects, no infinite-loop risk from top-level code).
+    /// Scripts using top-level `return` will fail validation — the rule
+    /// contract is ctx mutation (ctx.block/ctx.returnValue/...), matching
+    /// OPInterceptor.runScript, so that rejection is correct. Read-only.
+    static func validateRuleScript(_ args: [String: Any]) throws -> String {
+        guard let source = args["script"] as? String, !source.isEmpty else {
+            throw ToolRouter.bail("script is required")
+        }
+        let ctx = JSContext()
+        var syntaxError: String?
+        ctx?.exceptionHandler = { _, exc in
+            syntaxError = exc?.toString()
+        }
+        ctx?.evaluateScript("function __ophanim_validate(){\n" + source + "\n}")
+        if let err = syntaxError {
+            return try ToolRouter.json(["valid": false, "error": err])
+        }
+        return try ToolRouter.json(["valid": true])
     }
 
     /// Rule dictionaries for a named preset (decoded into [OPRule] by applyPreset).
