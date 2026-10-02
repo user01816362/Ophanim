@@ -15,7 +15,8 @@ struct SandboxRules: Decodable {
 
     public static func buildRules(rules: [String], bundleID: String) -> [String] {
         var result: [String] = []
-        let template = RuleTemplate(data: ["NSUserName": "\(NSUserName())", "BundleID": bundleID])
+        let template = RuleTemplate(data: ["NSUserName": "\(NSUserName())", "BundleID": bundleID,
+                                             "HomeDirectory": FileManager.default.homeDirectoryForCurrentUser.path])
         for rule in rules {
             result.append(template.render(template: rule))
         }

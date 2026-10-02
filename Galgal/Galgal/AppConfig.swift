@@ -11,7 +11,13 @@ let settings = AppConfig.shared
     var settingsData: AppSettingsData
 
     override init() {
-        settingsUrl = URL(fileURLWithPath: "/Users/\(NSUserName())/Library/Containers/be.ophanim.Ophanim")
+        #if os(macOS)
+        let homeURL = FileManager.default.homeDirectoryForCurrentUser
+        #else
+        let homeURL = URL(fileURLWithPath: "/Users/\(NSUserName())")
+        #endif
+        settingsUrl = homeURL
+            .appendingPathComponent("Library/Containers/be.ophanim.Ophanim")
             .appendingPathComponent("App Settings")
             .appendingPathComponent("\(bundleIdentifier).plist")
         do {
@@ -19,7 +25,7 @@ let settings = AppConfig.shared
             settingsData = try PropertyListDecoder().decode(AppSettingsData.self, from: data)
         } catch {
             settingsData = AppSettingsData()
-            print("[Galgal] AppConfig decode failed.\n%@")
+            print("[Galgal] AppConfig decode failed: \(error)")
         }
     }
 

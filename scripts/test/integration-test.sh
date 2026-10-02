@@ -7,7 +7,6 @@ set -uo pipefail
 BID="be.ophanim.testharness"
 BIN="$HOME/Applications/Ophanim.app/Contents/MacOS/Ophanim"
 APP="$HOME/Library/Containers/be.ophanim.Ophanim/Applications/$BID.app"
-DIR="$HOME/Library/Containers/$BID/Data/Documents/Ophanim"
 [ -x "$BIN" ] || { echo "✗ Ophanim not installed at $BIN"; exit 1; }
 [ -d "$APP" ] || { echo "✗ test app not installed ($BID) - drop TestApp/build/OphanimTest.ipa into Ophanim"; exit 1; }
 
@@ -23,7 +22,31 @@ open "$APP"; sleep 12
 crashes_after=$(ls "$HOME/Library/Logs/DiagnosticReports/OphanimTest-"*.ips 2>/dev/null | wc -l | tr -d ' ')
 pkill -x OphanimTest 2>/dev/null
 
-LOG=$(ls -t "$DIR"/*.ndjson 2>/dev/null | head -1)
+# Where the capture logs live, asked from the product rather than hardcoded here.
+# A hardcoded path broke after the logs moved to Ophanim's shared container; get_log_path
+# returns the current directory plus every legacy directory it still scans, so the newest
+# log is found wherever it actually is.
+log_dirs() {
+	mcp "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"get_log_path\",\"arguments\":{\"bundleID\":\"$BID\"}}}" \
+	| python3 -c 'import json,sys
+try:
+    r = json.load(sys.stdin)["result"]
+    sc = r.get("structuredContent") or json.loads(r["content"][0]["text"])
+    print(sc["path"])
+    for d in sc.get("alsoScanned", []):
+        if d != sc["path"]: print(d)
+except Exception as e:
+    sys.stderr.write("could not resolve log dirs: %s\n" % e); sys.exit(1)'
+}
+DIRS=$(log_dirs) || exit 1
+
+# Newest log across every directory the product reports, not just the first. A capture
+# run writes to the current directory; an older log may sit in a legacy one.
+LOG=""
+for d in $DIRS; do
+	cand=$(ls -t "$d"/*.ndjson 2>/dev/null | head -1)
+	if [ -n "$cand" ] && { [ -z "$LOG" ] || [ "$cand" -nt "$LOG" ]; }; then LOG="$cand"; fi
+done
 [ -n "$LOG" ] || { echo "✗ no capture log produced"; exit 1; }
 
 echo "▸ asserting events (log: $(basename "$LOG"))…"
