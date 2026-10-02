@@ -203,7 +203,8 @@ final class InspectCommandPump: NSObject {
             return rsp
 
         case .screenshot:
-            guard let shot = InspectorScreenshot.capture(redact: redacted) else {
+            guard let shot = InspectorScreenshot.capture(redact: redacted,
+                                                         annotate: cmd.annotate ?? false) else {
                 return .failure(id: cmd.id, "no window available for capture")
             }
             let key = Inspector.keyWindowFramework()
@@ -303,7 +304,17 @@ final class InspectCommandPump: NSObject {
                 return .failure(id: cmd.id, "element '\(elementId)' is not in the key window - take a fresh tree")
             }
             guard InspectorActivator.setText(text, in: hit.view) else {
-                return .failure(id: cmd.id, "element '\(elementId)' (\(hit.cls)) is not a text field")
+                // Fallback for engine-rendered inputs (Flutter bridge, custom controls):
+                // tap to focus, then insertText into the first responder. Web content
+                // refuses inside typeText (JS owns that state).
+                let frame = hit.view.convert(hit.view.bounds, to: hit.window)
+                let point = CGPoint(x: frame.midX, y: frame.midY)
+                guard InspectorActivator.typeText(text, at: point, in: hit.window).acted else {
+                    return .failure(id: cmd.id, "element '\(elementId)' (\(hit.cls)) is not a text field")
+                }
+                return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                       imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                       acted: true, targetClass: hit.cls)
             }
             return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                    imageBase64: nil, mimeType: nil, width: nil, height: nil,

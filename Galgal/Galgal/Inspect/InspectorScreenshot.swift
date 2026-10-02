@@ -22,7 +22,7 @@ enum InspectorScreenshot {
     ///
     /// - Parameter redact: Black out secure-field frames before encoding.
     /// - Returns: JPEG data plus pixel size, or nil when no window is capturable.
-    static func capture(redact: Bool) -> (data: Data, width: Int, height: Int)? {
+    static func capture(redact: Bool, annotate: Bool = false) -> (data: Data, width: Int, height: Int)? {
         guard let window = Inspector.keyWindow() else { return nil }
         let bounds = window.bounds
         guard bounds.width > 1, bounds.height > 1 else { return nil }
@@ -62,6 +62,18 @@ enum InspectorScreenshot {
             }
         }
         guard let out = ctx.makeImage() else { return nil }
+        // Optional overlay (default off): actionable-node frames + class names, drawn
+        // AFTER redaction fill so boxes never leak masked text (labels are class names
+        // only). Same membership rule as the host nodes[] filter, so overlay boxes and
+        // tappable ids agree. Tree frames are window points; the image is window points
+        // × scale — one uniform factor, no per-axis drift.
+        let final: CGImage
+        if annotate, let overlaid = overlay(out, in: window, targetW: targetW, targetH: targetH,
+                                            scale: scale) {
+            final = overlaid
+        } else {
+            final = out
+        }
         // Encode straight into mutable data: Finalize writes the JPEG there, no copy-out API
         // needed (there is none - the destination owns the buffer).
         let encoded = NSMutableData()
@@ -69,8 +81,60 @@ enum InspectorScreenshot {
                                                           "public.jpeg" as CFString, 1, nil) else {
             return nil
         }
-        CGImageDestinationAddImage(dest, out, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
+        CGImageDestinationAddImage(dest, final, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
         return (encoded as Data, targetW, targetH)
+    }
+
+    /// Frames of actionable nodes for the annotate overlay: buttons, text inputs,
+    /// and labeled views — the same membership rule as the host nodes[] filter, so
+    /// every drawn box has a tappable id. Class names only, never text: safe to
+    /// draw over redacted captures. Capped; touch-unknown views stay unboxed.
+    private static func actionableFrames(in window: UIWindow) -> [(frame: CGRect, cls: String)] {
+        var out: [(CGRect, String)] = []
+        func walk(_ view: UIView) {
+            if out.count >= 100 { return }
+            let role = Inspector.role(of: view)
+            let (text, _, _) = Inspector.classify(view)
+            if role == "button" || role == "textfield" || role == "textview" ||
+               !(text?.isEmpty ?? true) || view.accessibilityLabel != nil {
+                let f = view.convert(view.bounds, to: window)
+                guard f.width >= 4, f.height >= 4 else {
+                    for kid in Inspector.visibleChildren(of: view) { walk(kid) }
+                    return
+                }
+                let short = String(describing: type(of: view)).split(separator: ".").last.map(String.init) ?? "?"
+                out.append((f, short))
+            }
+            for kid in Inspector.visibleChildren(of: view) { walk(kid) }
+        }
+        for kid in Inspector.visibleChildren(of: window) { walk(kid) }
+        return out
+    }
+
+    /// Draw red frames + class labels over `image` (top-left origin, UIKit space).
+    /// Returns nil on renderer failure (caller falls back to the plain capture).
+    private static func overlay(_ image: CGImage, in window: UIWindow,
+                                targetW: Int, targetH: Int, scale: CGFloat) -> CGImage? {
+        let ui = UIImage(cgImage: image)
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: targetW, height: targetH))
+        return renderer.image { _ in
+            ui.draw(at: .zero)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 10),
+                .foregroundColor: UIColor.red,
+                .backgroundColor: UIColor(white: 0, alpha: 0.55),
+            ]
+            for (frame, cls) in actionableFrames(in: window) {
+                let rect = CGRect(x: frame.origin.x * scale,
+                                  y: frame.origin.y * scale,
+                                  width: frame.width * scale,
+                                  height: frame.height * scale)
+                UIColor.red.setStroke()
+                UIRectFrame(rect)
+                (cls as NSString).draw(at: CGPoint(x: rect.minX + 2, y: max(0, rect.minY - 13)),
+                                       withAttributes: attrs)
+            }
+        }.cgImage
     }
 }

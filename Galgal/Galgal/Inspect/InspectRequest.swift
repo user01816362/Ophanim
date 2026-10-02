@@ -73,6 +73,9 @@ struct InspectCommand: Codable {
     var className: String?
     /// setText: replacement text for a field.
     var text: String?
+    /// screenshot: overlay actionable-node frames + class names (default false).
+    /// Additive optional - old hosts never send it, old guests ignore it.
+    var annotate: Bool?
 }
 
 /// Guest -> host. Payload shapes are op-specific JSON values, kept intentionally loose so a

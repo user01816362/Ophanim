@@ -1188,11 +1188,12 @@ final class MCPServer {
         ],
         [
             "name": "screenshot",
-            "description": "Capture a screenshot (image block + dimensions). Response names detected frameworks + scene.",
+            "description": "Capture a screenshot (image block + dimensions). Response names detected frameworks + scene. Pass annotate:true to overlay actionable-node frames + class names (same membership as uitree nodes[]).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
-                    "bundleID": ["type": "string"]
+                    "bundleID": ["type": "string"],
+                    "annotate": ["type": "boolean"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1260,7 +1261,7 @@ final class MCPServer {
         ],
         [
             "name": "set_text",
-            "description": "Set text on an element with optional snapshot pins.",
+            "description": "Set text on an element with optional snapshot pins. Direct write for UITextField/views; tap-focus + insertText fallback for engine-rendered inputs (Flutter); web inputs refuse stated.",
             "inputSchema": [
                 "type": "object",
                 "properties": [

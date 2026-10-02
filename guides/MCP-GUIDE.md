@@ -187,6 +187,18 @@ pairs, marks budget-cut or redaction-mismatched pairs `partial`;
 `inspect_clear_snapshots` is D/I dryRun-default
 (`InspectTools.swift:236-349`). Gestures take `snapshot: none|pre|post|both`
 (default none — each leg costs a full tree transaction;
+`InspectService.swift:137-155`).
+
+Framework coverage for text entry (`set_text` writes `UITextField`/
+`UITextView` directly — no tapping, no keyboard): UIKit and SwiftUI
+(hosts the same two classes) fully covered; **React Native covered** —
+its inputs are UIKit-level `RCTUITextField`/`RCTUITextView`
+(first-party `react-native` source), caught by the same classifier;
+**Flutter not covered** — it renders into a single engine view with no
+`UIViews` per widget, so there is nothing to write to (tap/swipe/
+screenshot/capture still work; engine-level text injection is out of
+scope for the policy model).
+(default none — each leg costs a full tree transaction;
 `InspectService.swift:137-155`). Bookmarks: `bookmark_add` (class/symbol by
 name; element needs a pinned snapshot or one is captured fresh; bookmark and
 pin caps enforced), `bookmark_note`, `bookmark_move` (dryRun-default, unknown

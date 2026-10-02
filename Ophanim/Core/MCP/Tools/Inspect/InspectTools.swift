@@ -100,7 +100,10 @@ enum InspectTools {
             // also need structured ids to tap/set_text. Walk flat — no nesting — keep
             // buttons, text inputs (field + view: empty views have no text yet, which
             // is exactly when set_text needs them), and labeled nodes; capped so the
-            // summary stays small.
+            // summary stays small. The input roles must stay identical to the classes
+            // InspectorActivator.setText accepts (UITextField/UITextView — Apple's full
+            // first-party text-entry set: UISearchTextField subclasses UITextField,
+            // SwiftUI fields host the same two) — a role added there belongs here.
             var flat: [[String: Any]] = []
             func collect(_ n: InspectNode) {
                 let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
@@ -123,15 +126,17 @@ enum InspectTools {
             ])
 
         case "screenshot":
-            let rsp = try InspectControl.transact(bundleID: bid, op: .screenshot)
+            let annotate = (args["annotate"] as? Bool) ?? false
+            let rsp = try InspectControl.transact(bundleID: bid, op: .screenshot,
+                                                  annotate: annotate ? true : nil)
             guard let b64 = rsp.imageBase64, !b64.isEmpty else {
                 throw ToolRouter.bail("screenshot captured nothing for \(bid) - is a window visible?")
             }
             let w = rsp.width ?? 0, h = rsp.height ?? 0
             return MCPServer.toolResultImage(id, base64: b64, mimeType: rsp.mimeType ?? "image/jpeg",
-                                   summary: "screenshot \(w)x\(h) redacted=\(redacted)",
+                                   summary: "screenshot \(w)x\(h) redacted=\(redacted) annotated=\(annotate)",
                                    structured: ["bundleID": bid, "width": w, "height": h,
-                                                "redacted": redacted])
+                                                "redacted": redacted, "annotated": annotate])
 
         case "tap_element":
             let elementId = (args["elementId"] as? String).flatMap { $0.isEmpty ? nil : $0 }

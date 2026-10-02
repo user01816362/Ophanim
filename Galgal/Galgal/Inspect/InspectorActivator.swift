@@ -87,7 +87,7 @@ enum InspectorActivator {
     /// effects (delegates, keyboards) do NOT run - tap the field first when the app needs
     /// them. Works on secure fields; the text comes from the operator, so redaction (which
     /// guards what flows OUT) does not apply. Only UITextField/UITextView accept text;
-    /// anything else fails stated.
+    /// anything else fails stated (the pump then tries typeText below).
     ///
     /// - Parameter text: Replacement text for the field.
     /// - Parameter view: Target view (must be a text field or text view).
@@ -104,5 +104,59 @@ enum InspectorActivator {
             return true
         }
         return false
+    }
+
+    /// TypeText fallback for inputs setText cannot address (engine-rendered fields like
+    /// Flutter's hidden UITextInput bridge, custom controls): tap to focus, then
+    /// `insertText` into whatever became first responder (Apple's public UIKeyInput
+    /// primitive — the same call a custom keyboard makes). Fully in-process: responder
+    /// chain + UIKeyInput, no HID/TCC involved. Refuses web content (WKWebView inputs
+    /// need JS key events; a blind insert would desync page state) and reports the
+    /// focused control's class so the response names what actually took the text.
+    ///
+    /// - Parameter text: Text to insert at the focused input's cursor.
+    /// - Parameter point: Window point to tap for focus (element center).
+    /// - Parameter window: Key window hosting the point.
+    /// - Returns: Whether text was inserted, and the focused control's class.
+    static func typeText(_ text: String, at point: CGPoint, in window: UIWindow)
+    -> (acted: Bool, targetClass: String?) {
+        let (focused, _) = tap(at: point, in: window)
+        guard focused else { return (false, nil) }
+        // Let focus land (same runloop-turn constraint as swipe phases).
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        guard let first = currentFirstResponder() else { return (false, nil) }
+        let cls = String(describing: type(of: first))
+        // Web inputs drive page state through JS; inserting behind its back corrupts it.
+        var ancestor: UIResponder? = first
+        while let a = ancestor {
+            if String(describing: type(of: a)).contains("WKWebView") { return (false, cls) }
+            ancestor = a.next
+        }
+        guard let input = first as? UITextInput else { return (false, cls) }
+        input.insertText(text)
+        return (true, cls)
+    }
+
+    /// Current first responder via the standard sendAction probe (no private API:
+    /// the action travels the responder chain and the focused object answers it).
+    ///
+    /// - Returns: The focused responder, or nil when nothing is focused.
+    private static func currentFirstResponder() -> UIResponder? {
+        opFoundFirstResponder = nil
+        UIApplication.shared.sendAction(#selector(UIResponder.opNoteFirstResponder(_:)),
+                                        to: nil, from: nil, for: nil)
+        return opFoundFirstResponder
+    }
+}
+
+/// File-private first-responder slot for the probe above (weak: never retains app objects).
+private weak var opFoundFirstResponder: UIResponder?
+
+extension UIResponder {
+    /// Probe target: the focused responder records itself when the action reaches it.
+    ///
+    /// - Parameter sender: Always nil for this probe.
+    @objc func opNoteFirstResponder(_ sender: Any?) {
+        opFoundFirstResponder = self
     }
 }
