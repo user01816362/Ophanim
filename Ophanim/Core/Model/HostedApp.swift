@@ -99,7 +99,7 @@ class HostedApp: BaseApp, @unchecked Sendable {
             SnapshotStore.sweepUnpinned(bundleID: info.bundleIdentifier)
 
             if try !Entitlements.areEntitlementsValid(app: self) {
-                sign()
+                try sign()
             }
 
             if try !isInfoPlistSigned() {
