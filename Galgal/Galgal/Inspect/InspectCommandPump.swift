@@ -172,7 +172,7 @@ final class InspectCommandPump: NSObject {
                                        imageBase64: nil, mimeType: nil, width: nil, height: nil,
                                        acted: nil, targetClass: nil)
             }
-            let (nodes, truncated, by, frameworks, evidence, rnArch, scene) = Inspector.snapshot(redact: redacted,
+            let (nodes, truncated, by, frameworks, evidence, rnArch, scene, vcs) = Inspector.snapshot(redact: redacted,
                                                             mode: mode,
                                                             filter: cmd.filter,
                                                             maxDepth: depthCap,
@@ -181,7 +181,7 @@ final class InspectCommandPump: NSObject {
             let root = InspectNode(id: "root", cls: "Windows", role: "container", frame: [0, 0, 0, 0],
                                    text: nil, placeholder: nil, axLabel: nil, axIdentifier: nil,
                                    enabled: true, secure: false, framework: nil, layer: nil,
-                                   children: nodes)
+                                   vc: nil, children: nodes)
             var rsp = InspectResponse(id: cmd.id, ok: true, error: nil,
                                    truncated: truncated, truncatedBy: by.isEmpty ? nil : by,
                                    tree: root,
@@ -189,6 +189,7 @@ final class InspectCommandPump: NSObject {
                                    acted: nil, targetClass: nil)
             if !frameworks.isEmpty { rsp.frameworksDetected = frameworks }
             if !evidence.isEmpty { rsp.frameworkEvidence = evidence }
+            if !vcs.isEmpty { rsp.vcs = vcs }
             rsp.rnArch = rnArch
             rsp.scene = scene
             return rsp
@@ -241,6 +242,20 @@ final class InspectCommandPump: NSObject {
             return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                    imageBase64: nil, mimeType: nil, width: nil, height: nil,
                                    acted: true, targetClass: cls ?? result.targetClass)
+
+        case .pick:
+            guard let x = cmd.x, let y = cmd.y else {
+                return .failure(id: cmd.id, "pick needs x/y, each in 0...1")
+            }
+            guard let hit = Inspector.pick(x: x, y: y, mode: cmd.mode ?? .full) else {
+                return .failure(id: cmd.id, "nothing hittable at (\(x), \(y)) - take a fresh tree")
+            }
+            var pick_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                   imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                   acted: nil, targetClass: hit.cls)
+            pick_rsp.elementId = hit.id
+            pick_rsp.viewController = hit.vc
+            return pick_rsp
 
         case .swipe:
             // Same key-window contract as tap: the touch path targets it, so anything else

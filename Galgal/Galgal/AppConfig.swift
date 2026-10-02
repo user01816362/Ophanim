@@ -11,13 +11,7 @@ let settings = AppConfig.shared
     var settingsData: AppSettingsData
 
     override init() {
-        #if os(macOS)
-        let homeURL = FileManager.default.homeDirectoryForCurrentUser
-        #else
-        let homeURL = URL(fileURLWithPath: "/Users/\(NSUserName())")
-        #endif
-        settingsUrl = homeURL
-            .appendingPathComponent("Library/Containers/be.ophanim.Ophanim")
+        settingsUrl = URL(fileURLWithPath: "/Users/\(NSUserName())/Library/Containers/be.ophanim.Ophanim")
             .appendingPathComponent("App Settings")
             .appendingPathComponent("\(bundleIdentifier).plist")
         do {

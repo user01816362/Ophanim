@@ -61,4 +61,50 @@ enum EventTools {
         if let bid { payload["bundleID"] = bid }
         return try ToolRouter.json(payload)
     }
+
+    /// Replay-grade curl export rendered from a recorded network event (zero capture
+    /// changes): method + url + req.* headers + decoded body when textual. Picks the
+    /// newest URLSession request matching url/host/since; binary bodies are noted,
+    /// never dumped. Prove-it: paste the command in Terminal, compare statuses.
+    static func exportCurl(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let since = (args["since"] as? Double) ?? 0
+        let urlFilter = (args["url"] as? String)?.lowercased()
+        let hostFilter = (args["host"] as? String)?.lowercased()
+        let all = ReportBuilder.events(bid, category: "network", search: nil, limit: 0)
+        let cands = all.filter { e in
+            guard let url = e.fields["url"], !url.isEmpty,
+                  e.timestamp.timeIntervalSince1970 * 1000 > since else { return false }
+            if let uf = urlFilter, !url.lowercased().contains(uf) { return false }
+            if let hf = hostFilter,
+               !(e.fields["host"]?.lowercased().contains(hf) ?? url.lowercased().contains(hf)) {
+                return false
+            }
+            return true
+        }
+        guard let e = cands.last, let url = e.fields["url"] else {
+            throw ToolRouter.bail("no recorded request matches"
+                + (urlFilter.map { " url '\($0)'" } ?? "")
+                + (hostFilter.map { " host '\($0)'" } ?? ""))
+        }
+        func sh(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        var parts = ["curl", "-X", e.fields["method"] ?? "GET", sh(url)]
+        for (k, v) in e.fields.filter({ $0.key.hasPrefix("req.") }).sorted(by: { $0.key < $1.key }) {
+            let name = String(k.dropFirst(4))
+            if name.lowercased() == "content-length" { continue }
+            parts += ["-H", sh("\(name): \(v)")]
+        }
+        var note: String? = nil
+        if let body = e.requestBody, !body.isEmpty {
+            if let text = String(data: body, encoding: .utf8) {
+                parts += ["--data-raw", sh(String(text.prefix(4096)))]
+                if text.count > 4096 { note = "body truncated to 4096 chars" }
+            } else {
+                note = "binary body (\(body.count) bytes) omitted - add --data-binary yourself"
+            }
+        }
+        var payload: [String: Any] = ["bundleID": bid, "url": url, "curl": parts.joined(separator: " ")]
+        if let note { payload["note"] = note }
+        return try ToolRouter.json(payload)
+    }
 }

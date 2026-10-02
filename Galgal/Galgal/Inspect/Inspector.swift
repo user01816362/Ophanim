@@ -112,7 +112,8 @@ enum Inspector {
     static func snapshot(redact: Bool, mode: InspectMode, filter: String?,
                          maxDepth: Int = maxDepth, maxNodes: Int = maxNodes)
     -> (nodes: [InspectNode], truncated: Bool, truncatedBy: [String],
-        frameworks: [String], evidence: [String: [String]], rnArch: String?, scene: String) {
+        frameworks: [String], evidence: [String: [String]], rnArch: String?, scene: String,
+        vcs: [String]) {
         let depthCap = min(max(maxDepth, 1), maxDepth)
         let nodeCap = min(max(maxNodes, 1), maxNodes)
         let windows = sortedWindows()
@@ -147,6 +148,7 @@ enum Inspector {
         // up to 5 matched class names. Class presence alone never claims pixels.
         var evidence: [String: [String]] = [:]
         var found: [String] = []
+        var vcs: [String] = []
         func collect(_ n: InspectNode) {
             if let fw = n.framework {
                 if !found.contains(fw) { found.append(fw) }
@@ -154,6 +156,7 @@ enum Inspector {
                     evidence[fw, default: []].append(n.cls)
                 }
             }
+            if let vc = n.vc, !vcs.contains(vc) { vcs.append(vc) }
             for c in n.children { collect(c) }
         }
         for n in nodes { collect(n) }
@@ -168,7 +171,7 @@ enum Inspector {
             else if paper { rnArch = "paper" }
             else { rnArch = "unknown" }
         }
-        return (nodes, truncated, by, found, evidence, rnArch, scene)
+        return (nodes, truncated, by, found, evidence, rnArch, scene, vcs)
     }
 
     /// Framework owning the key window's pixels, for the screenshot op (no tree walk).
@@ -213,6 +216,47 @@ enum Inspector {
             else { rnArch = "unknown" }
         }
         return ([found], rnArch, scene)
+    }
+
+    /// Geometric pick: frontmost view at normalized x/y, hitTest-independent, so
+    /// interaction-disabled views resolve. Mirrors resolve()'s traversal exactly
+    /// (collapse, visibleChildren, web opacity, leaf drops), so the returned id
+    /// re-resolves in the same mode. Unfiltered walk assumed: ids index the full
+    /// forest, like a filter-less uiTree read.
+    static func pick(x: Double, y: Double, mode: InspectMode)
+    -> (id: String, cls: String, vc: String?, role: String)? {
+        guard (0...1).contains(x), (0...1).contains(y) else { return nil }
+        for (wi, window) in sortedWindows().enumerated() {
+            guard !window.isHidden, window.alpha > 0.01 else { continue }
+            let p = CGPoint(x: window.bounds.origin.x + CGFloat(x) * window.bounds.width,
+                            y: window.bounds.origin.y + CGFloat(y) * window.bounds.height)
+            guard window.bounds.contains(p) else { continue }
+            var current: UIView = window
+            var id = "\(wi)"
+            var descended = true
+            while descended {
+                descended = false
+                let target = (mode == .compact) ? collapse(current) : current
+                if mode == .compact, isCollapsible(target),
+                   visibleChildren(of: target).isEmpty { break }
+                if String(describing: type(of: target)).contains("WKWebView") { break }
+                let kids = visibleChildren(of: target)
+                var hit: (view: UIView, index: Int)? = nil
+                for (i, kid) in kids.enumerated() {
+                    let f = kid.convert(kid.bounds, to: window)
+                    if f.contains(p) { hit = (kid, i) }  // keep last = frontmost
+                }
+                if let h = hit {
+                    current = h.view
+                    id += ".\(h.index)"
+                    descended = true
+                }
+            }
+            let final = (mode == .compact) ? collapse(current) : current
+            let cls = String(describing: type(of: final))
+            return (id, cls, viewController(of: final), role(of: final))
+        }
+        return nil
     }
 
     /// Resolve a positional id ("0.2.1") by re-walking IN THE SAME MODE. ids are only meaningful
@@ -444,6 +488,7 @@ enum Inspector {
             enabled: (target as? UIControl)?.isEnabled ?? true,
             secure: secure && redact,
             framework: fw, layer: layer,
+            vc: viewController(of: target),
             children: children)
         return (node, consumed, depthCut, nodeCut)
     }

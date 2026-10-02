@@ -34,10 +34,11 @@ final class MCPServer {
 
     /// Tools that change no state. Everything else defaults to mutating.
     static let readOnlyTools: Set<String> = [
-        "list_apps", "query_events", "tail_events", "analyze_app", "app_imports",
+        "list_apps", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
         "find_symbols", "get_config", "list_jailbreak_detectors", "list_presets",
         "list_sources", "get_log_path", "container_info", "list_profiles",
         "list_classes", "get_keymap", "uitree_read", "screenshot",
+        "inspect_pick",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -900,6 +901,34 @@ final class MCPServer {
                     "y": ["type": "string"],
                     "mode": ["type": "string"],
                     "snapshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_pick",
+            "description": "Resolve the frontmost view at normalized x/y to an elementId (hitTest-independent; disabled views resolve).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "x": ["type": "string"],
+                    "y": ["type": "string"],
+                    "mode": ["type": "string"]
+                ],
+                "required": ["bundleID", "x", "y"]
+            ]
+        ],
+        [
+            "name": "export_curl",
+            "description": "Render the newest matching recorded request as a replay-grade curl command.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "url": ["type": "string", "description": "Substring filter."],
+                    "host": ["type": "string", "description": "Substring filter."],
+                    "since": ["type": "number", "description": "Cursor (epoch ms)."]
                 ],
                 "required": ["bundleID"]
             ]

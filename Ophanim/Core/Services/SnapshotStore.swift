@@ -75,6 +75,9 @@ struct SnapshotManifest: Codable {
     /// Instance-proven frameworks owning pixels at capture (nil = pre-framework
     /// manifest or indistinguishable UIKit). Informational: never a pairing key.
     var frameworks: [String]? = nil
+    /// View controllers owning walked pixels (union, ordered). Informational:
+    /// answers which screens a snapshot spans without re-reading the tree.
+    var vcs: [String]? = nil
     var nodes: Int
     var treeHash: String
     var shotFile: String?
@@ -101,6 +104,7 @@ enum SnapshotStore {
                         redacted: Bool,
                         truncated: Bool, truncatedBy: [String]? = nil,
                         scene: String? = nil, frameworks: [String]? = nil,
+                        vcs: [String]? = nil,
                         tree: InspectNode, treeBytes: Data,
                         jpeg: Data? = nil, width: Int? = nil, height: Int? = nil) -> SnapshotManifest {
         let dir = snapshotsDir(bundleID: bundleID)
@@ -132,7 +136,7 @@ enum SnapshotStore {
             trigger: trigger, opRef: opRef, mode: mode.rawValue, filter: filter,
             rootId: rootId, depthLimit: depthLimit, nodeLimit: nodeLimit,
             redacted: redacted, truncated: truncated, truncatedBy: truncatedBy,
-            scene: scene, frameworks: frameworks,
+            scene: scene, frameworks: frameworks, vcs: vcs,
             nodes: nodeCount(tree), treeHash: hash(treeBytes),
             shotFile: shotFile, width: width, height: height, tree: tree)
         if let data = try? JSONEncoder().encode(manifest) {

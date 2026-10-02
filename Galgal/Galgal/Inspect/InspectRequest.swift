@@ -24,6 +24,9 @@ enum InspectOp: String, Codable {
     case classes
     case element
     case classDetail
+    /// Geometric pick: frontmost view at normalized x/y (hitTest-independent, so
+    /// interaction-disabled views resolve). Returns elementId + class + VC.
+    case pick
 }
 
 /// Tree density. `full` walks everything (positional ids over the raw hierarchy, deepest).
@@ -92,6 +95,7 @@ struct InspectResponse: Codable {
     var targetClass: String?
     /// element: superclass chain (nearest first) + owning view controller (responder chain).
     var superclasses: [String]? = nil
+    /// Owning view controller (responder chain) for element ops, if any.
     var viewController: String? = nil
     /// classes: matched names + total loaded (before filter).
     var classes: [String]? = nil
@@ -109,6 +113,11 @@ struct InspectResponse: Codable {
     /// Key-window scene at capture ("<sceneId>:level<n>:key"), so diffs can refuse
     /// cross-scene pairs stated instead of mixing windows silently.
     var scene: String? = nil
+    /// View controllers owning walked pixels (union, ordered), so operators know
+    /// which screens a tree spans without per-node reads.
+    var vcs: [String]? = nil
+    /// pick: positional id of the frontmost view at the point (same-mode resolvable).
+    var elementId: String? = nil
 
     static func failure(id: String, _ message: String) -> InspectResponse {
         InspectResponse(id: id, ok: false, error: message, truncated: nil, truncatedBy: nil, tree: nil, imageBase64: nil,
@@ -170,6 +179,9 @@ struct InspectNode: Codable {
     /// CATransformLayer) — nil otherwise, so payloads stay small and diffs only fire
     /// on real layer changes, never on old layer-less timelines.
     var layer: String? = nil
+    /// Owning view controller (responder chain), so every tap answers which screen
+    /// owns it without a second element read.
+    var vc: String? = nil
     var children: [InspectNode]
 }
 

@@ -112,6 +112,26 @@ enum InspectTools {
                         "targetClass": rsp.targetClass ?? "unknown"]
             })
 
+        case "inspect_pick":
+            func norm(_ key: String) throws -> Double {
+                guard let v = ToolRouter.coerceDouble(args, key),
+                      (0...1).contains(v) else {
+                    throw ToolRouter.bail("\(key) is required in 0...1")
+                }
+                return v
+            }
+            let mode = (args["mode"] as? String).flatMap(InspectMode.init(rawValue:)) ?? .full
+            let rsp = try InspectControl.transact(bundleID: bid, op: .pick,
+                                                  x: norm("x"), y: norm("y"),
+                                                  mode: mode)
+            guard let elementId = rsp.elementId else {
+                throw ToolRouter.bail("nothing hittable at the point - take a fresh tree")
+            }
+            var payload: [String: Any] = ["bundleID": bid, "elementId": elementId,
+                                   "class": rsp.targetClass ?? "unknown"]
+            if let vc = rsp.viewController { payload["viewController"] = vc }
+            return MCPServer.toolResult(id, payload)
+
         case "swipe":
             func norm(_ key: String) throws -> Double {
                 guard let v = ToolRouter.coerceDouble(args, key),
@@ -244,7 +264,7 @@ enum InspectTools {
                 redacted: redacted,
                 truncated: treeRsp.truncated ?? false,
                 truncatedBy: treeRsp.truncatedBy,
-                scene: treeRsp.scene, frameworks: treeRsp.frameworksDetected,
+                scene: treeRsp.scene, frameworks: treeRsp.frameworksDetected, vcs: treeRsp.vcs,
                 tree: tree, treeBytes: treeData, jpeg: jpeg, width: w, height: h)
             var payload: [String: Any] = [
                 "bundleID": bid, "id": man.id, "capturedAt": man.capturedAt,
@@ -377,7 +397,7 @@ enum InspectTools {
                         bundleID: bid, trigger: "manual", opRef: nil,
                         mode: mode, filter: nil, redacted: redacted,
                         truncated: rsp.truncated ?? false,
-                        scene: rsp.scene, frameworks: rsp.frameworksDetected,
+                        scene: rsp.scene, frameworks: rsp.frameworksDetected, vcs: rsp.vcs,
                         tree: tree, treeBytes: treeData).id
                 }
             }
@@ -606,7 +626,7 @@ enum InspectTools {
                                  steps: steps, textLength: textLength),
             mode: mode, filter: nil, redacted: redacted,
             truncated: rsp.truncated ?? false,
-            scene: rsp.scene, frameworks: rsp.frameworksDetected,
+            scene: rsp.scene, frameworks: rsp.frameworksDetected, vcs: rsp.vcs,
             tree: tree, treeBytes: treeData)
     }
 
@@ -621,6 +641,7 @@ enum InspectTools {
         if let rootId = m.rootId { d["rootId"] = rootId }
         if let scene = m.scene { d["scene"] = scene }
         if let frameworks = m.frameworks { d["frameworks"] = frameworks }
+        if let vcs = m.vcs { d["vcs"] = vcs }
         d["depthLimit"] = m.depthLimit
         d["nodeLimit"] = m.nodeLimit
         if let shotFile = m.shotFile { d["shotFile"] = shotFile }
@@ -718,6 +739,7 @@ enum InspectTools {
     /// dispatcher forks on this (never its own copy) so the two cannot drift.
     static let inspectToolNames: Set<String> = [
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
+        "inspect_pick",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff",
         "inspect_clear_snapshots",
