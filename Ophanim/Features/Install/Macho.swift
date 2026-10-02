@@ -374,16 +374,21 @@ class Macho {
         report["isFramework"] = isFramework
         if isFramework { report["binary"] = binaryURL.path }
 
-        guard let magic = data.first else {
+        guard data.count >= 4 else {
             report["loadable"] = false
             report["reason"] = "empty file"
             return report
         }
-        // 0xFEEDFACF (MH_MAGIC_64, little endian) or its swapped form.
-        let magicLE = UInt32(magic) | (UInt32(data.count > 1 ? data[1] : 0) << 8)
-        let is64 = magicLE == 0xFEEDFACF || magicLE == 0xFEEDFACE
-        report["isMachO"] = is64
-        guard is64 else {
+        // Little-endian 4-byte magic: MH_MAGIC_64, its byte-swapped form, or a
+        // fat binary (universal tweaks are plausible artistically). Previously this
+        // compared a 2-byte value against 4-byte constants, which rejected every
+        // file including valid arm64 binaries (proven vs the host app binary).
+        let magicLE = UInt32(data[0]) | (UInt32(data[1]) << 8)
+            | (UInt32(data[2]) << 16) | (UInt32(data[3]) << 24)
+        let isMachO = magicLE == 0xFEEDFACF || magicLE == 0xCFFAEDFE
+            || magicLE == 0xCAFEBABE || magicLE == 0xBEBAFECA
+        report["isMachO"] = isMachO
+        guard isMachO else {
             report["loadable"] = false
             report["reason"] = "not a Mach-O file (a script or data file was given)"
             return report
