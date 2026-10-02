@@ -419,7 +419,7 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
                     "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
@@ -441,7 +441,7 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
                     "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
@@ -468,7 +468,7 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing)."],
+                    "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
                     "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]

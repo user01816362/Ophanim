@@ -18,6 +18,33 @@ import ObjectiveC.runtime
 
 enum OPConfigurableHooks {
     private static var installed = Set<String>()
+    /// Saved originals for P5 bounded revert (key → method + IMP before our swizzle).
+    private static var originals = [String: (m: Method, imp: IMP)]()
+
+    /// Stable install key (also the removal-diff identity).
+    private static func key(_ h: OPObjCHook) -> String {
+        "\(h.classMethod ? "+" : "-")[\(h.className) \(h.selector)]"
+    }
+
+    /// P5 (bounded revert): restore the original IMP for every installed hook that is
+    /// no longer wanted (removed from config or category-disabled). Main thread only,
+    /// called from installUserHooks before install(). In-flight block calls hold their
+    /// own `orig` capture and complete untouched; new calls hit the restored IMP.
+    /// The discarded block IMP leaks (tiny, same as install already does).
+    static func removeNotIn(_ hooks: [OPObjCHook]) {
+        var wanted = Set<String>()
+        for h in hooks where OPAgent.shared.isActive(h.category) { wanted.insert(key(h)) }
+        for k in installed.subtracting(wanted) {
+            if let saved = originals[k] {
+                method_setImplementation(saved.m, saved.imp)
+                originals.removeValue(forKey: k)
+                OPAgent.shared.observe(OPEvent(category: .process, layer: .objc,
+                    api: "ophanim.objcHook.remove",
+                    summary: "\(k) → restored", fields: ["result": "restored", "key": k]))
+            }
+            installed.remove(k)
+        }
+    }
 
     static func install() {
         let hooks = OPAgent.shared.config.objcHooks
@@ -44,7 +71,7 @@ enum OPConfigurableHooks {
 
     @discardableResult
     private static func swizzle(_ h: OPObjCHook) -> String {
-        let key = "\(h.classMethod ? "+" : "-")[\(h.className) \(h.selector)]"
+        let key = self.key(h)
         if installed.contains(key) { return "already-installed" }
         guard let base = NSClassFromString(h.className) else { return "class-not-found" }
         // P6: image scoping — skip classes from non-matching images (fail-open, counted).
@@ -59,6 +86,7 @@ enum OPConfigurableHooks {
         guard isVoid else { return "not-void" }
         let api = h.api ?? "\(h.className).\(h.selector)"
         let cat = h.category
+        originals[key] = (m, method_getImplementation(m))
         let imp = imp_implementationWithBlock(makeBlock(max(0, min(3, h.args)), m, sel, api, cat))
         method_setImplementation(m, imp)
         installed.insert(key)

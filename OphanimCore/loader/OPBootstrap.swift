@@ -84,7 +84,13 @@ enum OPBootstrapCore {
     /// User-configured ObjC/Swift/inline hooks. Split out from installHooks() so config live-reload can
     /// re-run JUST these to pick up newly added hooks without re-doing the one-time base setup. Each is
     /// idempotent (tracks what it has already installed), so re-running only installs the new entries.
+    /// P5: removal runs first — hooks dropped from config (or category-disabled) are reverted
+    /// before new ones install. Main thread only (same as reload).
     static func installUserHooks() {
+        let cfg = OPAgent.shared.config
+        OPConfigurableHooks.removeNotIn(cfg.objcHooks)   // user-specified ObjC boundary hooks (OPConfig.objcHooks)
+        OPSwiftHooks.removeNotIn(cfg.swiftHooks)          // user-specified native-Swift vtable hooks (OPConfig.swiftHooks)
+        OPInlineHooks.removeNotIn(cfg.inlineHooks)        // inline (machine-code) hooks (OPConfig.inlineHooks; gated)
         OPConfigurableHooks.install()   // user-specified ObjC boundary hooks (OPConfig.objcHooks)
         OPSwiftHooks.install()          // user-specified native-Swift vtable hooks (OPConfig.swiftHooks)
         OPInlineHooks.install()         // inline (machine-code) hooks (OPConfig.inlineHooks; gated)

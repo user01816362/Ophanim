@@ -51,6 +51,34 @@ enum OPInlineHooks {
     /// are NOT marked done (their target symbol/module may load later), but are logged only once.
     private static var doneKeys = Set<String>()
     private static var unresolvedLogged = Set<String>()
+    /// P5 (bounded revert): config-key → resolved target + hook id, so removal restores
+    /// the saved original bytes. The harness self-test key never lands here (no config
+    /// entry), so the self-test hook is never removed.
+    private static var addrs = [String: UInt]()
+    private static var ids = [String: UInt32]()
+
+    /// P5 (bounded revert): restore original bytes for every installed hook that is no
+    /// longer wanted (removed from config or category-disabled). Main thread only, from
+    /// installUserHooks before install(). `op_inline_uninstall` restores the prologue but
+    /// quarantines the page (never unmaps: a mid-trampoline thread still completes safely;
+    /// new calls hit the restored original). Pages stay mapped — bounded by OP_MAX_HOOKS.
+    static func removeNotIn(_ hooks: [OPInlineHook]) {
+        var wanted = Set<String>()
+        for h in hooks where OPAgent.shared.isActive(h.category) { wanted.insert(key(h)) }
+        for k in Set(addrs.keys).subtracting(wanted) {
+            if let addr = addrs[k] {
+                let status = statusString(op_inline_uninstall(addr))
+                OPAgent.shared.observe(OPEvent(category: .process, layer: .interpose,
+                    api: "ophanim.inlineHook.remove",
+                    summary: "\(k) → \(status)", fields: ["result": status, "key": k]))
+            }
+            if let hid = ids[k] { table.removeValue(forKey: hid) }
+            addrs.removeValue(forKey: k)
+            ids.removeValue(forKey: k)
+            doneKeys.remove(k)
+            unresolvedLogged.remove(k)
+        }
+    }
 
     /// Stable identity of a configured hook across reloads.
     private static func key(_ h: OPInlineHook) -> String {
@@ -84,6 +112,13 @@ enum OPInlineHooks {
             let status = statusString(op_inline_install(addr, id))
             logInstall(hook.api, addr, status)
             if status != "ok", !status.hasPrefix("already") { failures[status, default: 0] += 1 }
+            // Record revert info only on success: any other status leaves no live patch
+            // of ours behind ("already-hooked" belongs to a co-installed patch — uninstalling
+            // it on our removal would clobber someone else's hook).
+            if status == "ok" || status.hasPrefix("ok ") {
+                addrs[k] = addr
+                ids[k] = id
+            }
             doneKeys.insert(k)                            // resolved → installed or hard-failed; settle it
         }
         if !failures.isEmpty {

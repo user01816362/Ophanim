@@ -26,6 +26,36 @@ enum OPSwiftHooks {
     private struct Entry { var orig: UnsafeRawPointer?; var api: String; var category: OPCategory }
     private static var table = [Entry](repeating: Entry(orig: nil, api: "", category: .process), count: poolSize)
     private static var used = 0
+    /// P5 (bounded revert): key → vtable slot + pool index, so removal writes the saved
+    /// original back. Freed pool indices are reused (bump allocator would pin pool-full
+    /// after repeated add/remove cycles).
+    private static var slots = [String: (slot: UnsafeMutableRawPointer, idx: Int)]()
+    private static var freeIdx = [Int]()
+
+    /// Stable install key (also the removal-diff identity).
+    private static func key(_ h: OPSwiftHook) -> String { "\(h.className) \(h.method)" }
+
+    /// P5 (bounded revert): restore the saved original slot pointer for every patched hook
+    /// that is no longer wanted (removed from config or category-disabled). Main thread
+    /// only, from installUserHooks before install(). The table Entry is deliberately left
+    /// intact (a mid-flight trampoline call still forwards); reuse overwrites it.
+    static func removeNotIn(_ hooks: [OPSwiftHook]) {
+        var wanted = Set<String>()
+        for h in hooks where OPAgent.shared.isActive(h.category) { wanted.insert(key(h)) }
+        for k in patched.subtracting(wanted) {
+            if let r = slots[k] {
+                if let orig = table[r.idx].orig {
+                    r.slot.storeBytes(of: orig, as: UnsafeRawPointer.self)
+                }
+                freeIdx.append(r.idx)
+                slots.removeValue(forKey: k)
+                OPAgent.shared.observe(OPEvent(category: .process, layer: .objc,
+                    api: "ophanim.swiftHook.remove",
+                    summary: "\(k) → restored", fields: ["result": "restored", "key": k]))
+            }
+            patched.remove(k)
+        }
+    }
 
     // The trampoline ABI: a Swift instance method passes `self` in x20 (callee-saved → survives) and
     // up to 3 args in x0–x2; a 3-pointer-arg C function reads x0–x2 (extra/unused for lower-arity
@@ -89,9 +119,9 @@ enum OPSwiftHooks {
     }
 
     private static func patch(_ hook: OPSwiftHook) -> String {
-        let key = "\(hook.className) \(hook.method)"
+        let key = self.key(hook)
         if patched.contains(key) { return "already-installed" }
-        guard used < poolSize else { return "pool-full" }
+        guard freeIdx.last != nil || used < poolSize else { return "pool-full" }
         guard let cls = NSClassFromString(hook.className) else { return "class-not-found" }
         // P6: image scoping — skip classes from non-matching images (fail-open, counted).
         guard OPImageScope.matches(hook.imageGlob, class: cls) else { return "image-mismatch" }
@@ -128,10 +158,11 @@ enum OPSwiftHooks {
         }
         guard let slot else { return "method-not-found" }
 
-        let idx = used
+        let idx: Int
+        if let free = freeIdx.popLast() { idx = free } else { idx = used; used += 1 }
         table[idx] = Entry(orig: slot.load(as: UnsafeRawPointer.self),
                            api: hook.api ?? matched, category: hook.category)
-        used += 1
+        slots[key] = (slot, idx)
 
         let trampPtr = unsafeBitCast(pool[idx], to: UnsafeRawPointer.self)
         let pg = sysconf(Int32(_SC_PAGESIZE))
