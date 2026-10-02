@@ -1,8 +1,18 @@
+//
+//  SettingsStore.swift
+//  Ophanim
+//
+//  Sole plist read/write owner for per-app settings. Read-only queries go to
+//  AppQueryService; log aggregation goes to ReportBuilder.
+//
+
 import Foundation
 
 /// Sole plist read/write owner for per-app settings. Read-only queries go to
 /// AppQueryService; log aggregation goes to ReportBuilder.
 enum SettingsStore {
+    /// The `set_config` writable field names. `rejectUnknownKeys` gates on this,
+    /// so a new `applyPatch` branch without a key here is unreachable headless.
     static let setConfigKeys: Set<String> = [
         "bundleID",
         "enabled", "autoOpenLog", "captureBacktraces", "captureNetworkCallers", "bypassPinning", "enableInlineHooks",
@@ -21,17 +31,27 @@ enum SettingsStore {
         "openWithLLDB", "openLLDBWithTerminal",
     ]
     /// Decode the per-app AppSettingsData from its plist (the encoded settings model).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The decoded settings, or nil when the plist is missing/corrupt.
     static func appSettings(_ bundleID: String) -> AppSettingsData? {
         guard let data = try? Data(contentsOf: AppQueryService.settingsURL(bundleID)) else { return nil }
         return try? PropertyListDecoder().decode(AppSettingsData.self, from: data)
     }
 
+    /// The instrumentation (OphanimCore) sub-config for an app.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The `OPConfig`, or nil when the app has no settings.
     static func config(_ bundleID: String) -> OPConfig? { appSettings(bundleID)?.ophanim }
 
     /// Full view of an app's config, grouped so it is not a verbatim dump of the flat settings
     /// struct: `instrumentation` is the OphanimCore engine config; `hosting` is everything else
     /// (jailbreak bypass, keychain emulation, reported device model, and the window/graphics/input
     /// options). Nothing is hidden - an MCP client can read every field the app persists.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The grouped projection, or nil when the app has no settings.
     static func configProjection(_ bundleID: String) -> [String: Any]? {
         guard let s = appSettings(bundleID) else { return nil }
         func asDict<T: Encodable>(_ value: T) -> [String: Any] {
@@ -51,6 +71,12 @@ enum SettingsStore {
     /// Mutate the full per-app settings and persist them. A running app picks the change up live via
     /// the agent's config-file poll (categories/rules/sinks/pinning); newly added hooks and the
     /// injection strategy apply on next launch.
+    ///
+    /// Missing settings start from defaults with the bundle binding backfilled.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter mutate: The in-place mutation to persist.
+    /// - Throws: Rethrows `mutate` errors; filesystem/encode failures propagate.
     static func updateSettings(_ bundleID: String, _ mutate: (inout AppSettingsData) throws -> Void) throws {        var settings = appSettings(bundleID) ?? AppSettingsData()
         if settings.bundleIdentifier.isEmpty { settings.bundleIdentifier = bundleID }
         try mutate(&settings)
@@ -60,12 +86,21 @@ enum SettingsStore {
     }
 
     /// Mutate just the instrumentation (OphanimCore) sub-config and persist.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter mutate: The in-place `OPConfig` mutation to persist.
+    /// - Throws: Rethrows `mutate` errors; filesystem/encode failures propagate.
     static func updateConfig(_ bundleID: String, _ mutate: (inout OPConfig) throws -> Void) throws {
         try updateSettings(bundleID) { try mutate(&$0.ophanim) }
     }
 
     /// Apply a set_config argument patch to settings. Unit-testable without JSON:
     /// pass a plain dictionary, assert on the mutated struct.
+    ///
+    /// - Parameter args: The `set_config` args (already unknown-key gated).
+    /// - Parameter s: The settings to patch in place.
+    /// - Throws: `ToolRouter.bail` on invalid values (out-of-range
+    ///   `bodyCapBytes`, unknown jailbreak ids are filtered, missing tweak folder).
     static func applyPatch(_ args: [String: Any], to s: inout AppSettingsData) throws {
         // Instrumentation (OphanimCore)
         if let on = args["enabled"] as? Bool { s.ophanim.enabled = on }
@@ -85,7 +120,7 @@ enum SettingsStore {
             s.ophanim.sinks = sel
         }
         if let on = args["logToSharedDir"] as? Bool { s.ophanim.logToSharedDir = on }
-        if let cap = args["bodyCapBytes"] as? Int {
+        if let cap = ToolRouter.coerceInt(args, "bodyCapBytes") {
             // Bounded so a bad value cannot silence capture entirely or allocate a
             // pathological buffer per event.
             guard (1024...8 * 1024 * 1024).contains(cap) else {
@@ -137,7 +172,7 @@ enum SettingsStore {
         // Hosting: window / display / graphics / input - full parity with the app's settings.
         if let on = args["disableDisplaySleep"] as? Bool { s.disableTimeout = on }
         if let on = args["keymapping"] as? Bool { s.keymapping = on }
-        if let v = args["sensitivity"] as? Double { s.sensitivity = Float(v) }
+        if let v = ToolRouter.coerceDouble(args, "sensitivity") { s.sensitivity = Float(v) }
         if let on = args["alwaysOnTop"] as? Bool { s.floatingWindow = on }
         if let on = args["hideTitleBar"] as? Bool { s.hideTitleBar = on }
         if let on = args["rootWorkDir"] as? Bool { s.rootWorkDir = on }
@@ -150,15 +185,15 @@ enum SettingsStore {
         if let on = args["metalHUD"] as? Bool { s.metalHUD = on }
         if let on = args["notch"] as? Bool { s.notch = on }
         if let on = args["inverseScreenValues"] as? Bool { s.inverseScreenValues = on }
-        if let v = args["displayRotation"] as? Int { s.displayRotation = v }
-        if let v = args["windowWidth"] as? Int { s.windowWidth = v }
-        if let v = args["windowHeight"] as? Int { s.windowHeight = v }
-        if let v = args["customScaler"] as? Double { s.customScaler = v }
-        if let v = args["resolution"] as? Int { s.resolution = v }
-        if let v = args["aspectRatio"] as? Int { s.aspectRatio = v }
-        if let v = args["windowFixMethod"] as? Int { s.windowFixMethod = v }
-        if let v = args["resizableAspectRatioType"] as? Int { s.resizableAspectRatioType = v }
-        if let v = args["resizableAspectRatioWidth"] as? Int { s.resizableAspectRatioWidth = v }
-        if let v = args["resizableAspectRatioHeight"] as? Int { s.resizableAspectRatioHeight = v }
+        if let v = ToolRouter.coerceInt(args, "displayRotation") { s.displayRotation = v }
+        if let v = ToolRouter.coerceInt(args, "windowWidth") { s.windowWidth = v }
+        if let v = ToolRouter.coerceInt(args, "windowHeight") { s.windowHeight = v }
+        if let v = ToolRouter.coerceDouble(args, "customScaler") { s.customScaler = v }
+        if let v = ToolRouter.coerceInt(args, "resolution") { s.resolution = v }
+        if let v = ToolRouter.coerceInt(args, "aspectRatio") { s.aspectRatio = v }
+        if let v = ToolRouter.coerceInt(args, "windowFixMethod") { s.windowFixMethod = v }
+        if let v = ToolRouter.coerceInt(args, "resizableAspectRatioType") { s.resizableAspectRatioType = v }
+        if let v = ToolRouter.coerceInt(args, "resizableAspectRatioWidth") { s.resizableAspectRatioWidth = v }
+        if let v = ToolRouter.coerceInt(args, "resizableAspectRatioHeight") { s.resizableAspectRatioHeight = v }
     }
 }

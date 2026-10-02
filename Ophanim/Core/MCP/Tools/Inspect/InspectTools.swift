@@ -17,6 +17,12 @@ enum InspectTools {
     /// around one inspect op. `capture` builds the pin for a phase ("pre"/"post" is
     /// folded into the trigger name by the caller); `perform` runs the op and returns
     /// its result payload. One shape, three ops - no copy-pasted pre/post blocks.
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter snap: Which legs to pin.
+    /// - Parameter capture: Builds the pin for a phase, returning the snapshot id.
+    /// - Parameter perform: Runs the op, returning its result payload.
+    /// - Returns: The enveloped tool result (payload merged with snapshot ids).
     static func withSnapshots(id: Any?, snap: (pre: Bool, post: Bool),
                        capture: (String) throws -> String,
                        perform: () throws -> [String: Any]) throws -> [String: Any] {
@@ -30,6 +36,10 @@ enum InspectTools {
     /// Tree-read arguments shared by uitree_read and inspect_snapshot (mode, substring
     /// filter, subtree root, agent budget caps). Parsed once here so the two readers
     /// cannot drift.
+    ///
+    /// - Parameter args: The tool's `args` dict.
+    /// - Returns: The parsed mode, filter, root id, and validated caps.
+    /// - Throws: `ToolRouter.bail` on an unknown mode or out-of-range caps.
     static func treeArgs(_ args: [String: Any]) throws
         -> (mode: InspectMode, filter: String?, rootId: String?, depth: Int?, nodes: Int?) {
         let mode = try inspectMode(args)
@@ -41,8 +51,20 @@ enum InspectTools {
 
     // MARK: - Tool dispatch
 
-    /// Dispatch for the three Inspect tools. Gate first: Agent Mode off means refuse, stated -
+    /// Dispatch for the inspect tools (`inspectToolNames`). Gate first: Agent Mode off means refuse, stated -
     /// never an empty tree or a black screenshot that looks like success.
+    ///
+    /// Single gate (`InspectGate.requireLive`): not-installed / not-running /
+    /// Agent-Mode-off each names its own fix; guest-pump silence stays at the
+    /// timeout site. Element ids are positional per-walk — a moved view fails
+    /// "take a fresh tree", never a guessed tap.
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter name: The inspect wire name (must be in `inspectToolNames`).
+    /// - Parameter args: The tool's `args` dict (`bundleID` required).
+    /// - Returns: The full response (image blocks included where applicable).
+    /// - Throws: `ToolRouter.bail` on gate refusal, stale element ids, bad
+    ///   coordinates, or guest timeout/silence.
     static func runInspectTool(_ id: Any?, _ name: String, _ args: [String: Any]) throws -> [String: Any] {
         let bid = try ToolRouter.requireBundleID(args)
         // Single gate (InspectGate.requireLive): not-installed / not-running / host-setting
@@ -187,7 +209,7 @@ enum InspectTools {
 
         case "inspect_classes":
             let filter = (args["filter"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            let limit = (args["limit"] as? Int) ?? 200
+            let limit = ToolRouter.coerceInt(args, "limit") ?? 200
             guard (1...2000).contains(limit) else { throw ToolRouter.bail("limit must be 1...2000") }
             let rsp = try InspectControl.transact(bundleID: bid, op: .classes,
                                                   filter: filter, limit: limit)
@@ -285,7 +307,7 @@ enum InspectTools {
             return MCPServer.toolResult(id, payload)
 
         case "inspect_timeline":
-            let limit = (args["limit"] as? Int) ?? 20
+            let limit = ToolRouter.coerceInt(args, "limit") ?? 20
             guard limit >= 1 else { throw ToolRouter.bail("limit must be >= 1") }
             let trigger = (args["trigger"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             var all = SnapshotStore.list(bundleID: bid)
@@ -504,7 +526,7 @@ enum InspectTools {
                                    "members": members(after: after, gid: gid)])
 
         case "bookmark_list":
-            let limit = (args["limit"] as? Int) ?? 200
+            let limit = ToolRouter.coerceInt(args, "limit") ?? 200
             guard limit >= 1 else { throw ToolRouter.bail("limit must be >= 1") }
             let kind = (args["kind"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             if let kind, !["class", "element", "symbol"].contains(kind) {
@@ -616,6 +638,23 @@ enum InspectTools {
 
     /// One plain uiTree transaction pinned as a timeline entry. No new op, no guest change:
     /// the guest cannot tell this read from a normal uitree_read.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter trigger: The snapshot trigger name (`pre-*`/`post-*`/manual).
+    /// - Parameter op: The op reference recorded on the snapshot.
+    /// - Parameter mode: The tree mode.
+    /// - Parameter redacted: The effective redaction flag (frozen on the snapshot).
+    /// - Parameter elementId: Optional target element.
+    /// - Parameter x: Optional tap x in 0...1.
+    /// - Parameter y: Optional tap y in 0...1.
+    /// - Parameter x1: Optional swipe start x in 0...1.
+    /// - Parameter y1: Optional swipe start y in 0...1.
+    /// - Parameter x2: Optional swipe end x in 0...1.
+    /// - Parameter y2: Optional swipe end y in 0...1.
+    /// - Parameter steps: Optional swipe steps.
+    /// - Parameter textLength: Optional set-text length (never the text itself).
+    /// - Returns: The captured snapshot manifest.
+    /// - Throws: `ToolRouter.bail` when the tree does not decode.
     // MARK: - Snapshot and bookmark helpers
 
     static func captureTreeSnapshot(_ bid: String, trigger: String, op: String,
@@ -643,6 +682,9 @@ enum InspectTools {
     }
 
     /// Manifest without the tree: listings carry metadata, trees stay on disk until a diff.
+    ///
+    /// - Parameter manifest: The snapshot manifest to summarize.
+    /// - Returns: The listing dict (no tree bytes).
     static func manifestSummary(_ manifest: SnapshotManifest) -> [String: Any] {
         var summary: [String: Any] = [
             "id": manifest.id, "bundleID": manifest.bundleID, "capturedAt": manifest.capturedAt,
@@ -665,6 +707,10 @@ enum InspectTools {
     /// Resolve a group ref (id or name), creating by name when absent. Returns the group id.
     /// Creation-on-reference keeps filing a one-call act; pure renames go through
     /// bookmark_note.
+    ///
+    /// - Parameter store: The bookmark store (mutated on create).
+    /// - Parameter ref: The group id or name.
+    /// - Returns: The group id.
     static func resolveBookmarkGroup(in store: inout BookmarkStoreData, ref: String) -> String {
         if let existing = store.groups.first(where: { $0.id == ref || $0.name == ref }) { return existing.id }
         let group = BookmarkGroup(id: BookmarkStore.mintID("grp_"), name: ref, note: nil,
@@ -675,6 +721,10 @@ enum InspectTools {
     }
 
     /// Read-only twin for dry-runs: reports whether the call would create the group.
+    ///
+    /// - Parameter store: The bookmark store (never mutated).
+    /// - Parameter ref: The group id or name.
+    /// - Returns: The (id, name, created) triple.
     static func peekBookmarkGroup(in store: BookmarkStoreData, ref: String)
     -> (id: String, name: String, created: Bool) {
         if let group = store.groups.first(where: { $0.id == ref || $0.name == ref }) {
@@ -683,6 +733,12 @@ enum InspectTools {
         return (BookmarkStore.mintID("grp_"), ref, true)
     }
 
+    /// Renders one bookmark as a listing dict (target + tags + staleness).
+    ///
+    /// - Parameter bookmark: The bookmark to render.
+    /// - Parameter stale: Whether the target outlived its snapshot/tree.
+    /// - Parameter staleReason: Why it is stale (nil when fresh).
+    /// - Returns: The bookmark summary dict.
     static func bookmarkDict(_ bookmark: AgentBookmark, stale: Bool, staleReason: String?)
     -> [String: Any] {
         var target: [String: Any] = ["kind": bookmark.target.kind]
@@ -704,6 +760,10 @@ enum InspectTools {
         return summary
     }
 
+    /// Renders one bookmark group as a listing dict (members by id).
+    ///
+    /// - Parameter group: The group to render.
+    /// - Returns: The group summary dict.
     static func groupDict(_ group: BookmarkGroup) -> [String: Any] {
         var summary: [String: Any] = ["id": group.id, "name": group.name,
                                 "members": group.bookmarkIds,
@@ -724,10 +784,14 @@ enum InspectTools {
     /// Agent-narrowable tree caps, validated in the steps/limit vocabulary. Omitted means
     /// the historic defaults. Ints ride through; whole-number Doubles (JSON's only number
     /// shape) coerce, like tap's x/y.
+    ///
+    /// - Parameter args: The tool's `args` dict.
+    /// - Returns: The (depth, node) caps (nil each when omitted).
+    /// - Throws: `ToolRouter.bail` on non-integer or out-of-range caps.
     static func treeCaps(_ args: [String: Any]) throws -> (depth: Int?, nodes: Int?) {
         func cap(_ key: String, _ hi: Int) throws -> Int? {
             guard let raw = args[key] else { return nil }
-            guard let v = (raw as? Int) ?? (raw as? Double).map(Int.init) else {
+            guard let v = ToolRouter.coerceInt(["v": raw], "v") else {
                 throw ToolRouter.bail("\(key) must be an integer 1...\(hi)")
             }
             guard (1...hi).contains(v) else { throw ToolRouter.bail("\(key) must be 1...\(hi)") }
@@ -739,6 +803,10 @@ enum InspectTools {
 
     /// Tree mode shared by every elementId-taking tool: ids only resolve in the mode whose
     /// walk produced them, so the mode rides along and defaults to full, never guessed.
+    ///
+    /// - Parameter args: The tool's `args` dict.
+    /// - Returns: The parsed mode (`.full` when omitted).
+    /// - Throws: `ToolRouter.bail` on an unknown mode string.
     static func inspectMode(_ args: [String: Any]) throws -> InspectMode {
         guard let raw = args["mode"] as? String else { return .full }
         guard let mode = InspectMode(rawValue: raw) else {
@@ -761,6 +829,15 @@ enum InspectTools {
 
     /// Live-first class inventory: live runtime classes when Agent Mode runs,
     /// static strings otherwise (ObjC classes invisible statically - stated).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter filter: Optional case-insensitive substring.
+    /// - Parameter limit: Max rows per list.
+    /// - Returns: The inventory payload (`source` names `live` or `binary`, with
+    ///   a `note` stating what each source misses).
+    /// - Throws: Rethrows `ReportBuilder.staticClassInventory` failures (app not
+    ///   installed, unreadable binary); live-transaction failures surface as
+    ///   `liveError` instead of throwing.
     static func classInventory(_ bundleID: String, filter: String?, limit: Int) throws -> [String: Any] {
         let liveAllowed = (try? InspectGate.requireLive(bundleID: bundleID)) != nil
         var liveClasses: [String]? = nil

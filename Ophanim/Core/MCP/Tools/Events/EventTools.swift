@@ -1,15 +1,31 @@
+//
+//  EventTools.swift
+//  Ophanim
+//
+//  Event query tools. Filter/cursor/limit logic + event JSON encoding.
+//
+
 import Foundation
 
 /// Event query tools. Filter/cursor/limit logic + event JSON encoding.
+///
+/// `tail_events` long-polls (bounded `waitMs`); `subscribe_events` pushes
+/// cursor+count on stdout for stdio children (HTTP stays poll-only).
 enum EventTools {
 
     // MARK: - Reads
 
+    /// Returns captured instrumentation events for an app, newest last.
+    ///
+    /// - Parameter args: `bundleID` (required); `category` (optional filter);
+    ///   `search` (optional case-insensitive substring over api/summary/fields);
+    ///   `limit` (default 200, newest kept).
+    /// - Returns: JSON with `count` and the `events` array.
     static func queryEvents(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let category = args["category"] as? String
         let search = args["search"] as? String
-        let limit = (args["limit"] as? Int) ?? 200
+        let limit = ToolRouter.coerceInt(args, "limit") ?? 200
         let events = ReportBuilder.events(bid, category: category, search: search, limit: limit)
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
         let data = try enc.encode(events)
@@ -17,15 +33,24 @@ enum EventTools {
         return try ToolRouter.json(["count": events.count, "events": arr])
     }
 
+    /// Streams new captured events since a cursor, for live monitoring.
+    ///
+    /// Long-poll: blocks up to `waitMs` (cap 30 s) and returns early on new
+    /// events, so a client can tail without a hot loop. `waitMs` 0 (default)
+    /// is a single poll. `since: 0` (or omitted) returns the latest batch.
+    ///
+    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms,
+    ///   default 0); `limit` (default 100, newest); `waitMs` (default 0, max 30000).
+    /// - Returns: JSON with `count`, the next `cursor`, `waitedMs`, and `events`.
     static func tailEvents(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
-        let since = (args["since"] as? Double) ?? Double((args["since"] as? Int) ?? 0)
-        let limit = (args["limit"] as? Int) ?? 100
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
+        let limit = ToolRouter.coerceInt(args, "limit") ?? 100
         // Long-poll: block up to waitMs (cap 30 s) and return early on new events, so a
         // client can tail without a hot loop. waitMs 0 (default) = single poll, old shape.
         // One waiter per child at most (the handler is synchronous); the request counts
         // against the normal per-tool rate limit like any other call.
-        let waitMs = min(max((args["waitMs"] as? Int) ?? 0, 0), 30000)
+        let waitMs = min(max(ToolRouter.coerceInt(args, "waitMs") ?? 0, 0), 30000)
         let deadline = Date().addingTimeInterval(Double(waitMs) / 1000.0)
         let started = Date()
         while true {
@@ -49,16 +74,25 @@ enum EventTools {
     /// Best-effort push: register this stdio child for cursor+count notifications
     /// (`notifications/events/added` on stdout). Bodies still come via tail_events.
     /// Refuses outside a stdio child (HTTP stays poll-only).
+    ///
+    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms, default 0).
+    /// - Returns: JSON with `subscribed`, `bundleID`, `cursor`, and the fetch hint.
+    /// - Throws: `ToolRouter.bail` when called outside a stdio `--mcp` child.
     // MARK: - Subscriptions
 
     static func subscribeEvents(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
-        let since = (args["since"] as? Double) ?? Double((args["since"] as? Int) ?? 0)
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
         let cursor = try EventNotifier.subscribe(bundleID: bid, since: since)
         return try ToolRouter.json(["subscribed": true, "bundleID": bid, "cursor": cursor,
                              "note": "watch stdout for notifications/events/added; fetch bodies with tail_events"])
     }
 
+    /// Stops push notifications: one bundleID, or all when omitted.
+    ///
+    /// - Parameter args: `bundleID` (optional; omit to unsubscribe all).
+    /// - Returns: JSON with `subscribed: false`, `threadParked`, and `bundleID`
+    ///   when one was named.
     static func unsubscribeEvents(_ args: [String: Any]) throws -> String {
         let bid = (args["bundleID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         let parked = EventNotifier.unsubscribe(bundleID: bid)
@@ -71,11 +105,17 @@ enum EventTools {
     /// changes): method + url + req.* headers + decoded body when textual. Picks the
     /// newest URLSession request matching url/host/since; binary bodies are noted,
     /// never dumped. Prove-it: paste the command in Terminal, compare statuses.
+    ///
+    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms, default 0);
+    ///   `url`/`host` (optional case-insensitive substring filters).
+    /// - Returns: JSON with `bundleID`, `url`, the `curl` command, and a `note`
+    ///   when the body was truncated or omitted.
+    /// - Throws: `ToolRouter.bail` when no recorded request matches.
     // MARK: - Export
 
     static func exportCurl(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
-        let since = (args["since"] as? Double) ?? 0
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
         let urlFilter = (args["url"] as? String)?.lowercased()
         let hostFilter = (args["host"] as? String)?.lowercased()
         let all = ReportBuilder.events(bid, category: "network", search: nil, limit: 0)

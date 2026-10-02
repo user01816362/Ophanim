@@ -27,6 +27,9 @@ final class MCPServer {
 
     /// The version a request declared, if any. Modern requests carry it in
     /// `_meta`; a request with no version is treated as legacy.
+    ///
+    /// - Parameter params: The JSON-RPC `params` object.
+    /// - Returns: The declared protocol version, or nil when absent.
     private static func requestedVersion(_ params: [String: Any]) -> String? {
         guard let meta = params["_meta"] as? [String: Any] else { return nil }
         return meta[metaProtocolVersion] as? String
@@ -63,9 +66,17 @@ final class MCPServer {
         "clear_container", "backup_container", "restore_container",
         "inspect_clear_snapshots",
         "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
+        "tap_element", "swipe", "set_text",
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
+    ///
+    /// Version-gates modern (`_meta`-carrying) requests, then serves the MCP
+    /// lifecycle (`initialize`, `tools/list`, `tools/call`) from the static
+    /// catalog. Unknown methods answer `-32601`, never a guess.
+    ///
+    /// - Parameter msg: The decoded JSON-RPC message.
+    /// - Returns: The response object, or nil for notifications (no reply).
     func handle(_ msg: [String: Any]) -> [String: Any]? {
         let id = msg["id"]
         guard let method = msg["method"] as? String else { return nil }
@@ -129,6 +140,12 @@ final class MCPServer {
     private static let rateLogLock = NSLock()
 
     /// Seconds the caller must wait, or nil if the call is allowed.
+    ///
+    /// Rolling per-tool window (`rateLimitPerMinute` per `MCPTimeouts.rateWindow`):
+    /// the oldest call in the window is what must age out first.
+    ///
+    /// - Parameter tool: The wire name being rate-checked.
+    /// - Returns: The wait in seconds, or nil when the call may proceed.
     private func rateLimited(tool: String) -> Int? {
         Self.rateLogLock.lock()
         defer { Self.rateLogLock.unlock() }
@@ -146,6 +163,17 @@ final class MCPServer {
         return max(1, Int(ceil(wait)))
     }
 
+    /// Runs one `tools/call`: rate-limits, then routes inspect tools to their
+    /// full-response path and everything else through `runTool`.
+    ///
+    /// Tool failures arrive as `isError` results with self-correcting text,
+    /// never as JSON-RPC errors — except the rate-limit refusal, which states
+    /// the wait so the caller retries instead of guessing.
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter name: The tool wire name.
+    /// - Parameter args: The tool's `arguments` object.
+    /// - Returns: The response object (always non-nil for `tools/call`).
     private func callTool(_ id: Any?, name: String, arguments args: [String: Any]) -> [String: Any]? {
         // Per-tool limit so a chatty read cannot starve a destructive call; the
         // refusal states the wait so a model retries rather than guesses.
@@ -179,6 +207,12 @@ final class MCPServer {
         }
     }
 
+    /// Looks up the handler in `ToolRouter.handlers` and runs it.
+    ///
+    /// - Parameter name: The tool wire name.
+    /// - Parameter args: The tool's `arguments` object.
+    /// - Returns: The handler's JSON text (object payload or plain message).
+    /// - Throws: `ToolRouter.bail` (`unknown tool: <name>`) for unregistered names.
     private func runTool(_ name: String, _ args: [String: Any]) throws -> String {
         guard let handler = ToolRouter.handlers[name] else { throw ToolRouter.bail("unknown tool: \(name)") }
         return try handler(args)
@@ -186,6 +220,11 @@ final class MCPServer {
 
     // MARK: JSON-RPC helpers
 
+    /// Wraps a result payload in the JSON-RPC envelope.
+    ///
+    /// - Parameter id: The request id (null when absent).
+    /// - Parameter value: The `result` object.
+    /// - Returns: The enveloped response.
     static func result(_ id: Any?, _ value: [String: Any]) -> [String: Any] {
         ["jsonrpc": "2.0", "id": id ?? NSNull(), "result": value]
     }
@@ -193,6 +232,10 @@ final class MCPServer {
     /// A tool result with machine-readable payload: `resultType` marks it
     /// complete, `structuredContent` carries the payload, and the text block
     /// keeps older clients working.
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter payload: The JSON object mirrored as text and structured content.
+    /// - Returns: The enveloped tool result.
     static func toolResult(_ id: Any?, _ payload: [String: Any]) -> [String: Any] {
         let text = (try? ToolRouter.json(payload)) ?? "{}"
         return Self.result(id, [
@@ -202,6 +245,11 @@ final class MCPServer {
         ])
     }
 
+    /// Plain-text tool success (for handlers returning a message, not JSON).
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter message: The human-readable confirmation.
+    /// - Returns: The enveloped tool result with `isError: false`.
     static func toolText(_ id: Any?, _ message: String) -> [String: Any] {
         Self.result(id, [
             "resultType": "complete",
@@ -210,6 +258,11 @@ final class MCPServer {
         ])
     }
 
+    /// Tool failure with a self-correcting message (fix the name/args, then retry).
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter message: The `Error: …` text shown to the caller.
+    /// - Returns: The enveloped tool result with `isError: true`.
     static func toolError(_ id: Any?, _ message: String) -> [String: Any] {
         Self.result(id, [
             "resultType": "complete",
@@ -220,6 +273,13 @@ final class MCPServer {
     /// Image result per the spec content-block shape ({type, data, mimeType}) plus
     /// dimensions as structured content. Text fallback first so pre-structuredContent
     /// clients still get a readable summary.
+    ///
+    /// - Parameter id: The request id echoed in the response.
+    /// - Parameter base64: The base-64 image bytes.
+    /// - Parameter mimeType: The image media type (e.g. `image/jpeg`).
+    /// - Parameter summary: The text-block fallback (dimensions + redaction state).
+    /// - Parameter structured: The machine-readable payload (bundleID, width, height).
+    /// - Returns: The enveloped tool result with text + image blocks.
     static func toolResultImage(_ id: Any?, base64: String, mimeType: String,
                                 summary: String, structured: [String: Any]) -> [String: Any] {
         Self.result(id, [
@@ -230,6 +290,14 @@ final class MCPServer {
         ])
     }
 
+    /// JSON-RPC error envelope (method/version failures, not tool failures —
+    /// those answer `isError` via `toolError`).
+    ///
+    /// - Parameter id: The request id (null when absent).
+    /// - Parameter code: The JSON-RPC error code.
+    /// - Parameter message: The error text.
+    /// - Parameter data: Optional machine-readable detail (e.g. supported versions).
+    /// - Returns: The enveloped error response.
     private func error(_ id: Any?, code: Int, message: String, data: [String: Any]? = nil) -> [String: Any] {
         var body: [String: Any] = ["code": code, "message": message]
         if let data { body["data"] = data }
@@ -756,7 +824,7 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "recursive": ["type": "string"]
+                    "recursive": ["type": "boolean"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -767,9 +835,10 @@ final class MCPServer {
             "inputSchema": [
                 "type": "object",
                 "properties": [
+                    "bundleID": ["type": "string", "description": "Accepted but unused (kept for call compatibility)."],
                     "path": ["type": "string"]
                 ],
-                "required": ["bundleID"]
+                "required": ["path"]
             ]
         ],
         [
@@ -780,10 +849,10 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "path": ["type": "string"],
-                    "replace": ["type": "string"],
+                    "replace": ["type": "boolean"],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to copy."]
                 ],
-                "required": ["bundleID"]
+                "required": ["bundleID", "path"]
             ]
         ],
         [
@@ -797,7 +866,7 @@ final class MCPServer {
                     "to": ["type": "string"],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to rename."]
                 ],
-                "required": ["bundleID"]
+                "required": ["bundleID", "from", "to"]
             ]
         ],
         [
@@ -810,7 +879,7 @@ final class MCPServer {
                     "name": ["type": "string"],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to remove."]
                 ],
-                "required": ["bundleID"]
+                "required": ["bundleID", "name"]
             ]
         ],
         [
@@ -821,10 +890,10 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "name": ["type": "string"],
-                    "enabled": ["type": "string"],
+                    "enabled": ["type": "boolean"],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to apply."]
                 ],
-                "required": ["bundleID"]
+                "required": ["bundleID", "name", "enabled"]
             ]
         ],
         [
@@ -836,10 +905,10 @@ final class MCPServer {
                     "bundleID": ["type": "string"],
                     "action": ["type": "string"],
                     "name": ["type": "string"],
-                    "newName": ["type": "string"],
+                    "newName": ["type": "string", "description": "Required for action=rename."],
                     "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to apply."]
                 ],
-                "required": ["bundleID"]
+                "required": ["bundleID", "action", "name"]
             ]
         ],
         [
@@ -984,7 +1053,7 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "filter": ["type": "string"],
-                    "limit": ["type": "string"]
+                    "limit": ["type": "integer"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1111,8 +1180,8 @@ final class MCPServer {
                     "rootId": ["type": "string"],
                     "mode": ["type": "string"],
                     "filter": ["type": "string"],
-                    "depthLimit": ["type": "string"],
-                    "nodeLimit": ["type": "string"]
+                    "depthLimit": ["type": "integer"],
+                    "nodeLimit": ["type": "integer"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1136,8 +1205,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "elementId": ["type": "string"],
-                    "x": ["type": "string"],
-                    "y": ["type": "string"],
+                    "x": ["type": "number"],
+                    "y": ["type": "number"],
                     "mode": ["type": "string"],
                     "snapshot": ["type": "string"]
                 ],
@@ -1151,8 +1220,8 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "x": ["type": "string"],
-                    "y": ["type": "string"],
+                    "x": ["type": "number"],
+                    "y": ["type": "number"],
                     "mode": ["type": "string"]
                 ],
                 "required": ["bundleID", "x", "y"]
@@ -1179,11 +1248,11 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "x1": ["type": "string"],
-                    "y1": ["type": "string"],
-                    "x2": ["type": "string"],
-                    "y2": ["type": "string"],
-                    "steps": ["type": "string"],
+                    "x1": ["type": "number"],
+                    "y1": ["type": "number"],
+                    "x2": ["type": "number"],
+                    "y2": ["type": "number"],
+                    "steps": ["type": "integer"],
                     "snapshot": ["type": "string"]
                 ],
                 "required": ["bundleID"]
@@ -1212,7 +1281,7 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string"],
                     "filter": ["type": "string"],
-                    "limit": ["type": "string"]
+                    "limit": ["type": "integer"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1252,9 +1321,9 @@ final class MCPServer {
                     "rootId": ["type": "string"],
                     "mode": ["type": "string"],
                     "filter": ["type": "string"],
-                    "depthLimit": ["type": "string"],
-                    "nodeLimit": ["type": "string"],
-                    "withScreenshot": ["type": "string"]
+                    "depthLimit": ["type": "integer"],
+                    "nodeLimit": ["type": "integer"],
+                    "withScreenshot": ["type": "boolean"]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1266,7 +1335,7 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "limit": ["type": "string"],
+                    "limit": ["type": "integer"],
                     "trigger": ["type": "string"]
                 ],
                 "required": ["bundleID"]
@@ -1353,11 +1422,11 @@ final class MCPServer {
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "limit": ["type": "string"],
+                    "limit": ["type": "integer"],
                     "kind": ["type": "string"],
                     "tag": ["type": "string"],
                     "group": ["type": "string"],
-                    "checkFresh": ["type": "string"]
+                    "checkFresh": ["type": "boolean"]
                 ],
                 "required": ["bundleID"]
             ]
