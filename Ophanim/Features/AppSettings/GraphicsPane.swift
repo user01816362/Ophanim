@@ -63,26 +63,6 @@ struct GraphicsView: View {
                     .help("settings.picker.iosDevice.help")
                 }
                 HStack {
-                    Text("settings.picker.spoofedOSVersion")
-                    Spacer()
-                    TextField(NSLocalizedString("settings.picker.spoofedOSVersion.placeholder", comment: ""),
-                              text: $settings.settings.spoofedOSVersion)
-                        .frame(width: 320)
-                        .help("settings.picker.spoofedOSVersion.help")
-                        .onChange(of: settings.settings.spoofedOSVersion) { _, new in
-                            // Dotted numerics only ("17.6.1"): letters break the
-                            // iOS->Darwin mapping and would spoof garbage.
-                            let ok = !new.isEmpty && new.allSatisfy {
-                                $0.isNumber || $0 == "."
-                            }
-                            if !new.isEmpty && !ok {
-                                settings.settings.spoofedOSVersion = String(new.filter {
-                                    $0.isNumber || $0 == "."
-                                })
-                            }
-                        }
-                }
-                HStack {
                     if showResolutionWarning {
                         Spacer()
                         let highResIcon = Image(systemName: "exclamationmark.triangle")

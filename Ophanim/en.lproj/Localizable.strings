@@ -261,6 +261,9 @@
 "settings.customPlugins.selectFolder" = "Select Tweak Folder";
 "settings.tab.container" = "Container";
 "settings.customPlugins.title" = "Custom Plugins";
+"settings.customPlugins.empty" = "No custom plugins installed.";
+"settings.customPlugins.warningConfirm" = "Add Anyway";
+"settings.customPlugins.warningMessage" = "Custom plugins are arbitrary code that runs with full access to this app's process. Only add plugins from people you trust.";
 "settings.container.missing" = "No container (never launched)";
 "settings.container.restoreRunning" = "Quit the app before restoring its container.";
 "sources.window.title" = "App Sources";
