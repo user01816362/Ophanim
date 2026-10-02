@@ -131,7 +131,24 @@ public enum OPImageScope {
         var info = Dl_info()
         guard dladdr(unsafeBitCast(cls, to: UnsafeRawPointer.self), &info) != 0,
               let fname = info.dli_fname else { return false }
-        return OPGlob.match(g, String(cString: fname))
+        return globMatch(g, String(cString: fname))
+    }
+
+    /// Minimal shell-glob (`*`/`?`, case-insensitive, full-string). Kept local instead of
+    /// reusing OPGlob: OPInterceptor.swift is guest-only, while this file also compiles
+    /// into the host app target (OPConfig + OPEvent only).
+    private static func globMatch(_ pattern: String, _ text: String) -> Bool {
+        var rx = "^"
+        for ch in pattern {
+            switch ch {
+            case "*": rx += ".*"
+            case "?": rx += "."
+            default: rx += NSRegularExpression.escapedPattern(for: String(ch))
+            }
+        }
+        rx += "$"
+        guard let re = try? NSRegularExpression(pattern: rx, options: [.caseInsensitive]) else { return false }
+        return re.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil
     }
 }
 
