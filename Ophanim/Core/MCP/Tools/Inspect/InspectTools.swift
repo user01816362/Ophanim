@@ -98,11 +98,13 @@ enum InspectTools {
             // Flat actionable-node list for text-only bridges: the full tree ships as
             // a text block (nesting blows past client object-depth limits), but agents
             // also need structured ids to tap/set_text. Walk flat — no nesting — keep
-            // buttons, textfields, and labeled nodes, capped so the summary stays small.
+            // buttons, text inputs (field + view: empty views have no text yet, which
+            // is exactly when set_text needs them), and labeled nodes; capped so the
+            // summary stays small.
             var flat: [[String: Any]] = []
             func collect(_ n: InspectNode) {
                 let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
-                if n.role == "button" || n.role == "textfield" || labeled {
+                if n.role == "button" || n.role == "textfield" || n.role == "textview" || labeled {
                     var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
                                             "enabled": n.enabled]
                     if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
