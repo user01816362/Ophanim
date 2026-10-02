@@ -111,18 +111,23 @@ enum AppTools {
             return try ToolRouter.json(["bundleID": bid, "installed": current, "changed": false])
         }
         let sema = DispatchSemaphore(value: 0)
-        var installError: String?
+        // Box, not a captured var: mutating a captured var makes the Task
+        // closure non-Sendable under Swift 6 (same pattern as SourceTools.addSource).
+        final class ErrorBox: @unchecked Sendable {
+            var message: String?
+        }
+        let box = ErrorBox()
         Task {
             if want {
                 do { try await Galgal.installInIPA(exe) }
-                catch { installError = error.localizedDescription }
+                catch { box.message = error.localizedDescription }
             } else {
                 await Galgal.removeFromApp(exe)
             }
             sema.signal()
         }
         sema.wait()
-        if let err = installError { throw ToolRouter.bail("Galgal install failed: \(err)") }
+        if let err = box.message { throw ToolRouter.bail("Galgal install failed: \(err)") }
         // Removal completes via an async finish-handle: settle-poll like
         // setInjectionStrategy before reporting.
         let deadline = Date().addingTimeInterval(MCPTimeouts.installSettle)

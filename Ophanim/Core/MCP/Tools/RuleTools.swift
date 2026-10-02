@@ -17,6 +17,15 @@ enum RuleTools {
         let dicts = try Self.presetRules(name)
         let data = try JSONSerialization.data(withJSONObject: dicts)
         let preset = try JSONDecoder().decode([OPRule].self, from: data)
+        // Explicit-true preview like the hook setters (omitted = apply, the
+        // historical contract): report which ids would merge vs skip.
+        if args["dryRun"] as? Bool == true {
+            let existing = Set(SettingsStore.appSettings(bid)?.ophanim.rules.map { $0.id } ?? [])
+            let wouldAdd = preset.map(\.id).filter { !existing.contains($0) }
+            let skipped = preset.map(\.id).filter { existing.contains($0) }
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "preset": name,
+                                 "wouldAdd": wouldAdd, "skipped": skipped])
+        }
         var finalCount = 0
         try SettingsStore.updateSettings(bid) { s in
             let ids = Set(s.ophanim.rules.map { $0.id })
