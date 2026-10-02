@@ -74,7 +74,39 @@ private func redacted(_ event: OPEvent, keys: [String]) -> OPEvent {
     for k in e.fields.keys where lower.contains(k.lowercased()) {
         e.fields[k] = "‹redacted›"
     }
+    // Bodies used to pass through raw: a token in JSON/form payload is exactly
+    // what redactionKeys promises to mask. Structured bodies get key-level
+    // masking; anything else containing a key is replaced wholesale (a partial
+    // mask would leak context around the value).
+    if let b = e.requestBody { e.requestBody = redactedBody(b, keys: lower) }
+    if let b = e.responseBody { e.responseBody = redactedBody(b, keys: lower) }
     return e
+}
+
+/// Mask redaction keys inside a captured body. JSON objects and form-encoded
+/// pairs get value-level masking; unstructured text containing a key is
+/// replaced outright; binary/non-UTF8 passes through untouched.
+private func redactedBody(_ data: Data, keys: Set<String>) -> Data {
+    guard let text = String(data: data, encoding: .utf8) else { return data }
+    let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    if t.hasPrefix("{"),
+       let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        var m = obj
+        for k in m.keys where keys.contains(k.lowercased()) { m[k] = "‹redacted›" }
+        return (try? JSONSerialization.data(withJSONObject: m)) ?? data
+    }
+    if t.contains("=") && !t.hasPrefix("<") {
+        let parts = t.split(separator: "&", omittingEmptySubsequences: false).map { part -> String in
+            let kv = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard kv.count == 2, keys.contains(String(kv[0]).lowercased()) else { return String(part) }
+            return "\(kv[0])=‹redacted›"
+        }
+        return Data(parts.joined(separator: "&").utf8)
+    }
+    if keys.contains(where: { text.lowercased().contains($0) }) {
+        return Data("‹redacted body›".utf8)
+    }
+    return data
 }
 
 /// File sink supporting NDJSON or flat plain-text, append-only.

@@ -160,6 +160,13 @@ file op (`TweakTools.swift:46`, `72`, `89`, `113-114`).
 | `query_events` | R/I | `category?`, `search?` (case-insensitive over api/summary/fields), `limit` (default 200, newest kept) (`EventTools.swift:5-15`) |
 | `tail_events` | R/I | Live poll: pass back `cursor` as `since` (ms epoch; `since:0` = latest batch, not history). `limit` default 100; `waitMs` long-poll up to 30000 ms (default 0 = single poll). Response carries `cursor`, `waitedMs` (`EventTools.swift:17-44`) |
 | `subscribe_events` | live effect | Push `notifications/events/added` (cursor+count) on stdout; bodies via `tail_events`. **Stdio children only** — refuses over HTTP (`EventTools.swift:46-55`) |
+
+Backtraces are ObjC-layer only by architecture, not by omission: ring-drained
+(interpose/socket/TLS) events materialize on the consumer thread, where the
+stack would be wrong, so only synchronous swizzle events carry
+`captureBacktraces` stacks (`OPAgent.swift` event path). Use the network
+caller-attribution flag (`captureNetworkCallers`, default off: dladdr cost)
+for the hot-path equivalent.
 | `unsubscribe_events` | live effect | `bundleID` optional — one feed or all. Reports `threadParked` (`EventTools.swift:57-63`) |
 | `export_curl` | R/I | Newest recorded request matching `url?`/`host?`/`since?` rendered as replay-grade curl (method + url + `req.*` headers, text body to 4096 chars; binary bodies noted, never dumped) (`EventTools.swift:65-109`) |
 | `analyze_app` | R/I | Behavior/privacy rollup from events + `crash` section: previous run's explanation (`last-crash.json`) or explicit no-artifact statement (`ReconTools.swift:5-8`) |
@@ -290,6 +297,13 @@ ship a dead app; the top-level seal covers their resources
   `tail_events` on stdio).
 - Hook loop: `app_imports` → `find_symbols` → `set_*_hooks` → relaunch →
   `query_events` to confirm.
+- Zero-code trace (frida-trace shape, no engine work): `find_symbols` for the
+  keyword → `list_classes` (live) → `inspect_class_detail` on each class hit
+  → hand-write `set_objc_hooks` entries (className + selector) → validate
+  with `set_objc_hooks` `dryRun:true` → apply → `query_events` for the
+  `ophanim.objcHook.install` lines + `installSummary`. Never cross-product
+  static selectors × classes (pairings must come from the live inventory);
+  revert with `set_objc_hooks` minus the entries (P5 reverts on reload).
 - Rule loop: `validate_rule_script` → `set_rules` (`dryRun:true` first) →
   live, no relaunch for rules.
 - Tweak iteration: `inspect_tweak` → `add_tweak` (dryRun preview) →

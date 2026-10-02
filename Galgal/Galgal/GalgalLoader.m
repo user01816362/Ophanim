@@ -358,6 +358,31 @@ DYLD_INTERPOSE(gg_usleep, usleep)
 
 @implementation GalgalLoader
 
+/// Load per-app user tweaks from Frameworks/UserPlugins (populated by the host tweak
+/// store sync): plain .dylib files directly, .framework bundles via their binary.
+/// Dotfiles and the .disabled convention are skipped, mirroring the host scan, so the
+/// GUI toggle and the loader can never disagree about what runs. Main queue only.
+static void OPLoadUserTweaks(void) {
+    NSString *plugins = [[[[NSBundle mainBundle] bundlePath]
+        stringByAppendingPathComponent:@"Frameworks"] stringByAppendingPathComponent:@"UserPlugins"];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL isDir = NO;
+    if (![fm fileExistsAtPath:plugins isDirectory:&isDir] || !isDir) { return; }
+    for (NSString *name in [fm contentsOfDirectoryAtPath:plugins error:nil]) {
+        if ([name hasPrefix:@"."] || [name hasSuffix:@".disabled"]) { continue; }
+        NSString *full = [plugins stringByAppendingPathComponent:name];
+        if ([name hasSuffix:@".framework"]) {
+            full = [full stringByAppendingPathComponent:
+                    [[name stringByDeletingPathExtension] lastPathComponent]];
+        } else if (![name hasSuffix:@".dylib"]) {
+            continue;
+        }
+        void *handle = dlopen([full fileSystemRepresentation], RTLD_NOW);
+        NSLog(@"[Ophanim] tweak %@: %s", name,
+              handle ? "loaded" : dlerror());
+    }
+}
+
 static void __attribute__((constructor)) initialize(void) {
     [Ophanim launch];
 
@@ -373,6 +398,13 @@ static void __attribute__((constructor)) initialize(void) {
     // enable it.
     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
         [InspectBoot maybeStart];
+        // User tweaks (Frameworks/UserPlugins, synced by the host tweak store): dlopen each
+        // .dylib / framework binary on the main queue - constructors are not guaranteed
+        // main-thread and dlopen runs initializers. Skips dotfiles + the .disabled
+        // convention (mirrors the host store scan). RTLD_NOW fails loud in the log for
+        // missing symbols instead of crashing later at first call. No-op when the dir
+        // is absent (no tweaks installed).
+        OPLoadUserTweaks();
     }];
 
     if (ue_status == 0) {

@@ -10,6 +10,13 @@ import Foundation
 
 /// Pure aggregation over decoded OPEvents: NDJSON scan + behavior/privacy report.
 enum ReportBuilder {
+    /// Parse cache for the tail hot loop: run files are append-only, so a file whose
+    /// size is unchanged parses to the same events and is never re-decoded. Size
+    /// shrink (rotation/replacement) re-parses from scratch. Bounded (128 files)
+    /// so long-lived hosts cannot accumulate stale entries.
+    nonisolated(unsafe) private static var parseCache = [String: (size: UInt64, events: [OPEvent])]()
+    private static let parseCacheLock = NSLock()
+
     /// Load captured events for an app, newest last, optionally filtered, capped to `limit`.
     ///
     /// Both log dirs are scanned (current shared container + legacy data-container
@@ -21,16 +28,12 @@ enum ReportBuilder {
     /// - Parameter limit: Max events kept (`0` = all).
     /// - Returns: The events, oldest first.
     static func events(_ bundleID: String, category: String?, search: String?, limit: Int) -> [OPEvent] {
-        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         var all: [OPEvent] = []
         for dir in logDirs(bundleID) {
             guard let files = try? FileManager.default.contentsOfDirectory(
                 at: dir, includingPropertiesForKeys: nil) else { continue }
             for f in files where f.pathExtension == "ndjson" {
-                guard let text = try? String(contentsOf: f, encoding: .utf8) else { continue }
-                for line in text.split(separator: "\n") {
-                    guard let d = line.data(using: .utf8),
-                          let e = try? decoder.decode(OPEvent.self, from: d) else { continue }
+                for e in cachedEvents(in: f) {
                     if let category, e.category.rawValue != category { continue }
                     if let search, !search.isEmpty,
                        !(e.api.localizedCaseInsensitiveContains(search)
@@ -44,6 +47,31 @@ enum ReportBuilder {
         }
         all.sort { $0.timestamp < $1.timestamp }
         return limit > 0 && all.count > limit ? Array(all.suffix(limit)) : all
+    }
+
+    /// Decoded events for one NDJSON file, via the size-keyed parse cache above.
+    /// Parsing happens outside the lock (a duplicate parse on a race resolves to
+    /// identical content: same size + append-only = same events).
+    private static func cachedEvents(in file: URL) -> [OPEvent] {
+        let size = UInt64((try? file.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0)
+        parseCacheLock.lock()
+        let hit = parseCache[file.path]
+        parseCacheLock.unlock()
+        if let hit, hit.size == size { return hit.events }
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        var parsed: [OPEvent] = []
+        if let text = try? String(contentsOf: file, encoding: .utf8) {
+            for line in text.split(separator: "\n") {
+                guard let d = line.data(using: .utf8),
+                      let e = try? decoder.decode(OPEvent.self, from: d) else { continue }
+                parsed.append(e)
+            }
+        }
+        parseCacheLock.lock()
+        if parseCache.count > 128 { parseCache.removeAll() }
+        parseCache[file.path] = (size, parsed)
+        parseCacheLock.unlock()
+        return parsed
     }
 
     /// Where capture NDJSON lives. The current path is Ophanim's shared container keyed by bundle id
