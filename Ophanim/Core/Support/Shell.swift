@@ -108,11 +108,19 @@ import Foundation
     /// Sign nested code leaf-first (TN2206 discourages `--deep` for signing).
     /// Signs bundled frameworks/bundles/dylibs plus PlugIns/Frameworks/Helpers
     /// contents before the caller signs the top-level bundle.
+    /// Resource-only bundles without Info.plist (e.g. Settings.bundle) are not
+    /// signable code — codesign rejects them with "bundle format unrecognized",
+    /// which used to abort the whole seal and ship a dead app. They are skipped
+    /// (the top-level seal covers their resources); same for non-Mach-O files.
     private static func signNestedCode(in dir: URL) throws {
         let fm = FileManager.default
         let nestedExts = ["framework", "bundle", "dylib", "app", "appex"]
         if let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) {
             for item in items where nestedExts.contains(item.pathExtension) {
+                guard isSignableCode(item) else {
+                    Log.shared.log("Skipping resource-only \(item.lastPathComponent) (no code to sign)")
+                    continue
+                }
                 try run("/usr/bin/codesign", "-fs-", item.path)
             }
         }
@@ -121,9 +129,32 @@ import Foundation
             guard let nested = try? fm.contentsOfDirectory(
                 at: subdir, includingPropertiesForKeys: nil) else { continue }
             for item in nested {
+                guard isSignableCode(item) else {
+                    Log.shared.log("Skipping resource-only \(item.lastPathComponent) (no code to sign)")
+                    continue
+                }
                 try run("/usr/bin/codesign", "-fs-", item.path)
             }
         }
+    }
+
+    /// A nested item is signable code when it is a Mach-O file or a bundle directory
+    /// carrying Info.plist — top-level or modern Contents/ layout (codesign identifies
+    /// bundles through it: resource bundles *with* Info.plist sign fine, ones without
+    /// abort the seal). Same Mach-O magic the installer itself uses to resolve binaries.
+    private static func isSignableCode(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return false }
+        if isDir.boolValue {
+            return FileManager.default.fileExists(
+                atPath: url.appendingPathComponent("Info.plist").path)
+                || FileManager.default.fileExists(
+                    atPath: url.appendingPathComponent("Contents/Info.plist").path)
+        }
+        guard let handle = try? FileHandle(forReadingFrom: url),
+              let data = try? handle.read(upToCount: 4) else { return false }
+        try? handle.close()
+        return Array(data) == [202, 254, 186, 190] || Array(data) == [207, 250, 237, 254]
     }
 
     static func setMetalHUD(_ bundleID: String, enabled: Bool) throws {

@@ -119,7 +119,7 @@ class Installer {
                     finalURL = try wrap(app)
                     let installedApp = HostedApp(appUrl: finalURL)
 
-                    installedApp.sign()
+                    try installedApp.sign()
                 }
 
                 ipa.releaseTempDir()

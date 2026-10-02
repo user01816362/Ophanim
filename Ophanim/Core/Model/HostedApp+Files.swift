@@ -37,19 +37,17 @@ extension HostedApp {
         AppsVM.shared.fetchApps()
     }
 
-    func sign() {
-        do {
-            let tmpDir = FileManager.default.temporaryDirectory
-            let tmpEnts = tmpDir
-                .appendingEscapedPathComponent(ProcessInfo().globallyUniqueString)
-                .appendingPathExtension("plist")
-            let conf = try Entitlements.composeEntitlements(self)
-            try conf.store(tmpEnts)
-            try Shell.signAppWith(executable, entitlements: tmpEnts)
-            try FileManager.default.removeItem(at: tmpEnts)
-        } catch {
-            print(error)
-            Log.shared.error(error)
-        }
+    /// Final seal after wrap. Throws (instead of merely logging) so a broken seal
+    /// fails the install loudly via Installer's catch — a half-sealed app that
+    /// "installs" but dies on launch is worse than a stated failure.
+    func sign() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+        let tmpEnts = tmpDir
+            .appendingEscapedPathComponent(ProcessInfo().globallyUniqueString)
+            .appendingPathExtension("plist")
+        let conf = try Entitlements.composeEntitlements(self)
+        try conf.store(tmpEnts)
+        try Shell.signAppWith(executable, entitlements: tmpEnts)
+        try FileManager.default.removeItem(at: tmpEnts)
     }
 }
