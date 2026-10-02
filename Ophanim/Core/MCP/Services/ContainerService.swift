@@ -1,7 +1,18 @@
+//
+//  ContainerService.swift
+//  Ophanim
+//
+//  Container/log filesystem reads: sizes, reports, log-dir exposure.
+//
+
 import Foundation
 
 /// Container/log filesystem reads: sizes, reports, log-dir exposure.
 enum ContainerService {
+    /// Recursive byte size of a directory (regular files only).
+    ///
+    /// - Parameter url: The directory to measure.
+    /// - Returns: The total bytes, or nil when the directory cannot be enumerated.
     static func directorySize(_ url: URL) -> Int64? {
         guard let en = FileManager.default.enumerator(
             at: url, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return nil }
@@ -13,6 +24,12 @@ enum ContainerService {
         return total
     }
 
+    /// Resolved container report for an app: real path (not composed), size,
+    /// prefs plist, and profiles. Agents get the paths without rebuilding them.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The report (`resolved` false with a `note` when no data
+    ///   container matches — e.g. never launched).
     static func containerReport(_ bundleID: String) -> [String: Any] {
         var report: [String: Any] = ["bundleID": bundleID, "installed": AppQueryService.appURL(bundleID) != nil]
 

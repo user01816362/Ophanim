@@ -1,3 +1,12 @@
+//
+//  SettingsWindowManager.swift
+//  Ophanim
+//
+//  Standalone editor-window owner plus the rules-domain shims. One resizable,
+//  non-modal NSWindow per key; SwiftUI content hosted in AppKit (macOS 12 has no
+//  SwiftUI openWindow(for:)).
+//
+
 import SwiftUI
 import AppKit
 
@@ -13,6 +22,16 @@ final class SettingsWindowManager: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowManager()
     private var windows: [String: NSWindow] = [:]
 
+    /// Shows content in a standalone window keyed by `key`; re-showing brings the
+    /// existing window forward. Non-content-driven windows get a fixed size (SwiftUI
+    /// ideal size is ambiguous under maxWidth/maxHeight .infinity).
+    ///
+    /// - Parameter key: The window identity (one window per key).
+    /// - Parameter title: The window title.
+    /// - Parameter size: The initial content size.
+    /// - Parameter minSize: The minimum content size.
+    /// - Parameter contentDrivenSize: When true, SwiftUI drives the size (Recon/Log).
+    /// - Parameter content: The SwiftUI content to host.
     func show<Content: View & Sendable>(key: String, title: String,
                              size: NSSize, minSize: NSSize,
                              contentDrivenSize: Bool = false,

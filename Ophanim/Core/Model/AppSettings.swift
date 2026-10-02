@@ -2,6 +2,9 @@
 //  AppSettings.swift
 //  Ophanim
 //
+//  Per-app settings model (AppSettingsData, Codable plist) + NS defaults bridge.
+//  Sole writer is SettingsStore; the GUI edits through AppSettings.
+//
 
 import AppKit
 import Combine

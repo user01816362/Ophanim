@@ -11,7 +11,11 @@
 import Foundation
 
 @objc(OPTLSBridge) public final class OPTLSBridge: NSObject {
-    /// direction: 0 = read (inbound/response), 1 = write (outbound/request).
+    /// Logs decrypted TLS bytes from the C SSL_read/SSL_write interposers. Observe-only.
+    ///
+    /// - Parameter direction: 0 for read (inbound/response), 1 for write (outbound/request).
+    /// - Parameter bytes: Plaintext bytes (copied, capped to bodyCap).
+    /// - Parameter length: True byte count (logged even when the copy is capped).
     @objc public static func log(direction: Int32, bytes: UnsafeRawPointer?, length: Int32) {
         guard length > 0, let bytes = bytes else { return }
         let outbound = direction == 1

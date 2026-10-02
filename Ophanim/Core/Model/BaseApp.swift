@@ -2,6 +2,9 @@
 //  BaseApp.swift
 //  Ophanim
 //
+//  Shared app-bundle base: bundle URL, executable/entitlements paths, Mach-O
+//  inventory. HostedApp adds lifecycle on top.
+//
 
 import Foundation
 

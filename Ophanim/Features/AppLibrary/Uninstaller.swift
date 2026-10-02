@@ -2,17 +2,21 @@
 //  Uninstaller.swift
 //  Ophanim
 //
-//  Created by TheMoonThatRises on 9/26/22.
+//  App removal + state inventory. Popup-driven uninstall honoring UninstallPreferences;
+//  per-app and OS-owned state enumeration plus orphan pruning for headless callers.
 //
 
 import SwiftUI
 
+/// Checkbox row model for the uninstall popup's accessory view.
 struct CheckBoxHelper {
     var view: NSView
     var button: NSButton
     var buttonvar: String
 }
 
+/// App removal + state inventory. The popup path honors UninstallPreferences; the
+/// per-app / external-state enumerators take everything (no prefs gating) for MCP.
 class Uninstaller {
     static let bundleID = "be.ophanim.Ophanim"
 
@@ -57,6 +61,11 @@ class Uninstaller {
         return (paths, unresolved)
     }
 
+    /// Resolves the real sandbox container by reading each candidate's metadata plist:
+    /// ad-hoc-signed apps get a UUID-named container, so the composed path is unusable.
+    ///
+    /// - Parameter bundleID: The hosted app's bundle identifier.
+    /// - Returns: The container URL, or nil when no candidate claims the bundle id.
     static func containerURL(for bundleID: String) -> URL? {
         let containers = libraryUrl.appendingPathComponent("Containers")
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -90,6 +99,12 @@ class Uninstaller {
         Uninstaller.libraryUrl.appendingPathComponent("Saved Application State")
     ]
 
+    /// Builds one popup checkbox row, restoring its persisted check state.
+    ///
+    /// - Parameter yaxis: The row's vertical offset in the accessory stack.
+    /// - Parameter text: The checkbox title.
+    /// - Parameter varname: The UninstallPreferences key backing the checkbox.
+    /// - Returns: The row view, button, and prefs key.
     @MainActor
     private static func createButtonView(_ yaxis: CGFloat, _ text: String, _ varname: String) -> CheckBoxHelper {
         let button = NSButton(checkboxWithTitle: text, target: self, action: nil)
@@ -107,6 +122,9 @@ class Uninstaller {
         return CheckBoxHelper(view: view, button: button, buttonvar: varname)
     }
 
+    /// Shows the uninstall popup (per-item toggles + suppression), then uninstalls.
+    ///
+    /// - Parameter app: The hosted app to remove.
     @MainActor
     static func uninstallPopup(_ app: HostedApp) async {
         if UninstallPreferences.shared.showUninstallPopup {
@@ -170,6 +188,11 @@ class Uninstaller {
         }
     }
 
+    /// Removes the app bundle plus every selected state slice (cache, keymap,
+    /// settings, entitlements, ChainGuard). Prunes the bundle-ID cache only when
+    /// all five slices went (a full removal, not a partial one).
+    ///
+    /// - Parameter app: The hosted app to remove.
     static func uninstall(_ app: HostedApp) async {
         var uninstallNum = 0
 
@@ -217,6 +240,9 @@ class Uninstaller {
         }
     }
 
+    /// Confirms, then clears the app's caches (data containers stay).
+    ///
+    /// - Parameter app: The hosted app whose caches to clear.
     @MainActor
     static func clearCachePopup(_ app: HostedApp) async {
         let alert = NSAlert()
@@ -234,10 +260,17 @@ class Uninstaller {
         await clearCache(of: app)
     }
 
+    /// Clears the app's caches without confirmation (the popup above confirmed).
+    ///
+    /// - Parameter app: The hosted app whose caches to clear.
     static func clearCache(of app: HostedApp) async {
         await app.clearAllCache()
     }
 
+    /// Trashes cached/container state matching the bundle id (best-effort; missing
+    /// entries are skipped, nothing throws).
+    ///
+    /// - Parameter bundleId: The bundle identifier substring to match.
     static func clearExternalCache(_ bundleId: String) {
         do {
             for cache in cacheURLs {
@@ -265,6 +298,9 @@ class Uninstaller {
         return (files, files.map { $0.deletingPathExtension().lastPathComponent })
     }
 
+    /// Trashes orphaned state (bundle IDs no longer installed) and rewrites the ID
+    /// cache without them. Candidates come from pruneCandidates, so dryRun previews
+    /// exactly this set.
     static func pruneFiles() {
         do {
             let (files, _) = pruneCandidates()

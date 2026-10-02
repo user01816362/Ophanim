@@ -22,7 +22,9 @@ enum OPReentry {
         set { pthread_setspecific(key, newValue ? UnsafeRawPointer(bitPattern: 1) : nil) }
     }
 
-    /// Run `body` with the guard set (and restored afterward).
+    /// Runs `body` with the guard set (and restored afterward).
+    ///
+    /// - Parameter body: Work to run while instrumentation is suppressed on this thread.
     static func guarded(_ body: () -> Void) {
         let was = active
         active = true

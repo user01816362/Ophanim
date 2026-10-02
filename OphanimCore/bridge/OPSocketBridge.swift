@@ -10,6 +10,11 @@
 import Foundation
 
 @objc(OPSocketBridge) public final class OPSocketBridge: NSObject {
+    /// Logs one outbound connection attempt. Observe-only.
+    ///
+    /// - Parameter host: Destination host or IP string.
+    /// - Parameter port: Destination port.
+    /// - Parameter family: Address family (AF_INET6 vs IPv4/other).
     @objc public static func logConnect(host: NSString, port: Int32, family: Int32) {
         OPObserve.emit(category: .network) {
             let ctx = OPCallContext(category: .network, layer: .socket, api: "connect",
@@ -20,6 +25,9 @@ import Foundation
         }
     }
 
+    /// Logs one DNS lookup. Observe-only.
+    ///
+    /// - Parameter node: Hostname passed to getaddrinfo.
     @objc public static func logDNS(_ node: NSString) {
         OPObserve.emit(category: .network) {
             let ctx = OPCallContext(category: .network, layer: .socket, api: "getaddrinfo",

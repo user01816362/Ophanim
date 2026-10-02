@@ -2,11 +2,14 @@
 //  UninstallSettings.swift
 //  Ophanim
 //
-//  Created by TheMoonThatRises on 9/26/22.
+//  Uninstall preferences + orphan prune. Toggles choose what an uninstall removes;
+//  prune sweeps leftover state for apps no longer installed.
 //
 
 import SwiftUI
 
+/// Persisted uninstall toggles (what each slice removal honors). First access may be
+/// off-main (MCP transport), so the shared init hops to main for @AppStorage.
 class UninstallPreferences: NSObject, ObservableObject {
     nonisolated(unsafe) static var shared: UninstallPreferences = {
         // @AppStorage init is MainActor-isolated; first access may come from a
@@ -23,6 +26,7 @@ class UninstallPreferences: NSObject, ObservableObject {
     @AppStorage("ShowUninstallPopup") var showUninstallPopup = true
 }
 
+/// Uninstall-preferences form plus the orphan-prune action.
 struct UninstallSettings: View {
     public nonisolated(unsafe) static var shared: UninstallSettings = {
         // View init is MainActor-isolated. assumeIsolated is statically permitted;

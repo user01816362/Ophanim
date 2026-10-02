@@ -11,9 +11,14 @@
 import Foundation
 
 @objc(OPFSBridge) public final class OPFSBridge: NSObject {
-    // Takes a raw C string (not NSString): open/stat/access can be called by malloc itself during
-    // heap setup, so the caller MUST NOT allocate. We set the re-entrancy guard first, then build
-    // the Swift String - any malloc→stat→hook re-entry then bails before allocating.
+    /// Logs one filesystem interpose hit from Galgal's wrappers. Observe-only.
+    ///
+    /// Takes a raw C string (not NSString): open/stat/access can be called by malloc itself during
+    /// heap setup, so the caller MUST NOT allocate. The re-entrancy guard is set first, then the
+    /// Swift String is built - any malloc→stat→hook re-entry then bails before allocating.
+    ///
+    /// - Parameter api: Intercepted API name (open/stat/access/rename/unlink).
+    /// - Parameter cpath: Raw path bytes.
     @objc public static func log(api: NSString, cpath: UnsafePointer<CChar>?) {
         OPObserve.emit(category: .filesystem) {
             let path = cpath.map { String(cString: $0) } ?? ""

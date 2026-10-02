@@ -25,6 +25,9 @@ enum SourceInstallState: Equatable {
     case failed(String)
 }
 
+/// Background-tolerant download+install store (one active transfer per bundle id).
+/// Owns the URLSession, generations, resume data, and row state; views and MCP only
+/// start/pause/resume/cancel. Interrupted transfers restore as paused on init.
 @Observable
 final class SourceInstalls: NSObject, @unchecked Sendable {
     static let shared = SourceInstalls()
@@ -55,6 +58,11 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
     /// more than the version string). In-memory only; resume data persists separately.
     private var versionObjects: [String: SourceAppVersion] = [:]
 
+    /// The version object behind the in-flight/paused transfer (retry/resume need
+    /// the object, not just the version string).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The in-flight version, if any.
     func versionObject(for bundleID: String) -> SourceAppVersion? {
         versionObjects[bundleID]
     }
@@ -77,12 +85,21 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         sweepStaging()
     }
 
+    /// Current transfer/install state for a bundle id (idle when never touched).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The current state.
     func state(for bundleID: String) -> SourceInstallState {
         states[bundleID] ?? .idle
     }
 
     // MARK: - Control (called from rows / context menus / MCP)
 
+    /// Starts a fresh transfer, retiring any previous one (new generation; late
+    /// callbacks from the cancelled twin are dropped by the generation check).
+    ///
+    /// - Parameter app: The source app to install.
+    /// - Parameter version: The feed version to download.
     func start(app: SourceApp, version: SourceAppVersion) {
         let bid = app.bundleIdentifier
         cancelTask(for: bid, keepResume: false)
@@ -99,6 +116,9 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         task.resume()
     }
 
+    /// Pauses a transfer, persisting resume data when the server offers any.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
     func pause(bundleID bid: String) {
         guard let task = tasks[bid] else { return }
         tasks[bid] = nil
@@ -112,6 +132,11 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Resumes from stored resume data (fresh download when the server refused
+    /// Range). Keeps prior progress as the starting display value.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter version: The version to resume (fresh-download fallback target).
     func resume(bundleID bid: String, version: SourceAppVersion) {
         cancelTask(for: bid, keepResume: true)
         let gen = (generations[bid] ?? 0) + 1
@@ -130,6 +155,9 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         task.resume()
     }
 
+    /// Cancels a transfer and drops its resume data + version (back to idle).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
     func cancel(bundleID bid: String) {
         cancelTask(for: bid, keepResume: false)
         removeResume(for: bid)
@@ -140,6 +168,13 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
 
     // MARK: - Delegate callbacks (via DownloadDelegate, always on MainActor here)
 
+    /// Applies a progress callback, dropping stale generations and non-downloading
+    /// states (a superseded twin's late events must never move the survivor).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter gen: The callback's transfer generation.
+    /// - Parameter written: Bytes written so far.
+    /// - Parameter expected: Expected total bytes (-1 when unknown).
     func downloadProgress(bundleID bid: String, generation gen: Int,
                           written: Int64, expected: Int64) {
         guard isCurrent(bid, generation: gen),
@@ -152,6 +187,14 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         generations[bid] == gen
     }
 
+    /// Hands a staged download to the installer: validates the zip magic first (an
+    /// HTML error page saved as .ipa must fail here, not as unzip corruption), then
+    /// installs with the prefs Galgal decision (never a modal). The installer's
+    /// verdict reconciles the row.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter gen: The callback's transfer generation.
+    /// - Parameter dest: The staged file in our Downloads dir.
     func downloadFinished(bundleID bid: String, generation gen: Int, stagedAt dest: URL) {
         guard isCurrent(bid, generation: gen) else { return }
         tasks[bid] = nil
@@ -189,6 +232,13 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Fails a transfer: with resume data it parks as paused (resumable), without it
+    /// states the error and clears the in-flight version.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter gen: The callback's transfer generation.
+    /// - Parameter error: The terminal error.
+    /// - Parameter resumeData: Server-provided resume data, when offered.
     func downloadFailed(bundleID bid: String, generation gen: Int,
                         error: Error, resumeData: Data?) {
         guard isCurrent(bid, generation: gen) else { return }
@@ -319,6 +369,8 @@ final class SourceInstalls: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Fresh UUID staging URL in our Downloads dir (dir ensured). Used synchronously
+    /// inside the delegate callback (session tmp dies when the callback returns).
     fileprivate nonisolated static func stageURL() -> URL {
         try? FileManager.default.createDirectory(at: stagingDir,
                                                  withIntermediateDirectories: true)
@@ -336,6 +388,8 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unc
 
     init(owner: SourceInstalls) { self.owner = owner }
 
+    /// Splits the taskDescription back into bundle id + generation (nil when the
+    /// task is not one of ours).
     private func identity(of task: URLSessionTask) -> (bid: String, gen: Int)? {
         let parts = (task.taskDescription ?? "").split(separator: "\n").map(String.init)
         guard parts.count >= 2, let gen = Int(parts[1]) else { return nil }

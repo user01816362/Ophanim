@@ -2,6 +2,8 @@
 //  HostedApp+KeyCover.swift
 //  Ophanim
 //
+//  HostedApp keychain unlock (KeyCover) at launch.
+//
 
 import Foundation
 import AppKit

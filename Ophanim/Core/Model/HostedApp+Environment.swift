@@ -2,6 +2,8 @@
 //  HostedApp+Environment.swift
 //  Ophanim
 //
+//  HostedApp launch environment: DYLD paths, Metal/capture keys.
+//
 
 import Foundation
 // MARK: - Environment Management

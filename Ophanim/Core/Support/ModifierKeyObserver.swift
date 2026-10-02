@@ -2,6 +2,7 @@
 //  ModifierKeyObserver.swift
 //  Ophanim
 //
+//  Global modifier-key state observer for key mapping.
 //  Created by Venti on 14/02/2024.
 //
 

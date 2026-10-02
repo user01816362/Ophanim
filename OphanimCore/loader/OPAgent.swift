@@ -25,9 +25,13 @@ public final class OPAgent: @unchecked Sendable {
 
     private init() {}
 
-    /// Idempotent. Safe to call from a dylib constructor. Starts a self-contained config poller so
-    /// edits from the GUI/MCP apply live (no app restart); returns whether instrumentation is
-    /// currently enabled.
+    /// Idempotent start. Callers must already be off the dyld constructor path
+    /// (OPBootstrap defers here via DispatchQueue.main.async — see OPBootstrap.swift —
+    /// because crash-trap install forbids constructor context). Starts a self-contained
+    /// config poller so edits from the GUI/MCP apply live (no app restart); returns
+    /// whether instrumentation is currently enabled.
+    ///
+    /// - Returns: Whether instrumentation is currently enabled.
     @discardableResult
     public func start() -> Bool {
         lock.lock()
@@ -52,7 +56,9 @@ public final class OPAgent: @unchecked Sendable {
     public private(set) lazy var runId: String =
         "\(OPFileSink.runStamp())-\(ProcessInfo.processInfo.processIdentifier)"
 
-    /// (Re)load config and rebuild sinks/interceptor. Caller holds `lock`.
+    /// (Re)loads config and rebuilds sinks/interceptor. Caller holds `lock`.
+    ///
+    /// - Parameter boot: True on first start (emits an attach event), false on reload.
     private func applyConfigLocked(boot: Bool) {
         config = OPConfigLoader.load(from: configURL)
         // Push the active-category bitmask to the C ring so its interpose producers (fs/process/…)
@@ -95,22 +101,39 @@ public final class OPAgent: @unchecked Sendable {
     }
 
     /// True when a category's hooks should install at all (cheap gate for hook registration).
+    ///
+    /// - Parameter category: Capture category to test.
+    /// - Returns: Whether the category is active under the current config.
     public func isActive(_ category: OPCategory) -> Bool { config.isActive(category) }
 
+    /// Per-launch body capture cap in bytes.
+    ///
+    /// - Returns: The configured cap from the active config.
     public var bodyCap: Int { config.bodyCapBytes }
 
     /// Pure logging - no interception.
+    ///
+    /// - Parameter event: Event to fan out to the active sinks (no-op when disabled).
     public func observe(_ event: OPEvent) {
         sinks?.emit(event)
     }
 
-    /// Consult the rules for a call. Hook modules call this, apply the returned decision (block,
+    /// Consults the rules for a call. Hook modules call this, apply the returned decision (block,
     /// rewrite args/return, delay, fault), then emit the resulting event via `observe`.
+    ///
+    /// - Parameter ctx: The in-flight call description.
+    /// - Returns: The disposition plus any replacement payload (`.observe` when disabled).
     public func intercept(_ ctx: OPCallContext) -> OPDecision {
         interceptor?.decide(ctx) ?? .observe
     }
 
-    /// Convenience: build an event from a context + the disposition that was applied.
+    /// Builds an event from a context plus the disposition that was applied.
+    ///
+    /// - Parameter ctx: The in-flight call description.
+    /// - Parameter decision: Disposition to stamp onto the event.
+    /// - Parameter summary: One-line summary. Empty means the plain-text renderer derives one.
+    /// - Parameter extraFields: Extra fields merged over the context fields.
+    /// - Returns: The stamped event, with bodies capped to `bodyCap`.
     public func event(from ctx: OPCallContext, decision: OPDecision, summary: String = "",
                       extraFields: [String: String] = [:]) -> OPEvent {
         var fields = ctx.fields
@@ -134,6 +157,7 @@ public final class OPAgent: @unchecked Sendable {
                        backtrace: backtrace)
     }
 
+    /// Flushes every active sink synchronously.
     public func flush() { sinks?.flush() }
 
     // MARK: - Live config watch

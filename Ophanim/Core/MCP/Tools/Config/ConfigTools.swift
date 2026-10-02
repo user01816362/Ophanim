@@ -1,10 +1,28 @@
+//
+//  ConfigTools.swift
+//  Ophanim
+//
+//  Config projection + patch tools. Field-level patch via SettingsStore;
+//  hook/strategy writes take effect on relaunch, capture applies live.
+//
+
 import Foundation
 
 /// Config projection + patch tools.
+///
+/// Reads mirror what `set_config` can write (grouped `instrumentation` +
+/// `hosting`); writes persist to the per-app settings plist. Capture
+/// categories apply live via the agent config poll, newly added hooks and
+/// the injection strategy on next launch.
 enum ConfigTools {
 
     // MARK: - Reads
 
+    /// Reads an app's full per-app config as grouped JSON.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: Grouped JSON (`instrumentation` + `hosting`).
+    /// - Throws: `ToolRouter.bail` when `bundleID` is missing or has no settings.
     static func getConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let projection = SettingsStore.configProjection(bid) else { throw ToolRouter.bail("no settings found for \(bid)") }
@@ -13,6 +31,17 @@ enum ConfigTools {
 
     // MARK: - Writes
 
+    /// Modifies an app's per-app settings. Any omitted field is left unchanged.
+    ///
+    /// Unknown keys are rejected with a did-you-mean hint. Capture categories,
+    /// rules, sinks, and pinning apply live; newly added hooks and the
+    /// injection strategy take effect on next launch.
+    ///
+    /// - Parameter args: `bundleID` (required) plus any `SettingsStore.setConfigKeys`
+    ///   field to patch.
+    /// - Returns: `Updated. New config:` followed by the fresh projection JSON.
+    /// - Throws: `ToolRouter.bail` on unknown keys or invalid values
+    ///   (e.g. out-of-range `bodyCapBytes`, missing tweak folder).
     static func setConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         try ToolRouter.rejectUnknownKeys(args, allowed: SettingsStore.setConfigKeys, tool: "set_config")
@@ -21,11 +50,27 @@ enum ConfigTools {
         return "Updated. New config:\n" + body
     }
 
+    /// Lists the jailbreak/root-detection SDKs Ophanim can bypass.
+    ///
+    /// - Parameter args: No arguments.
+    /// - Returns: JSON with `count` and the `detectors` (`id` + `label`) list.
     static func listJailbreakDetectors(_ args: [String: Any]) throws -> String {
         let dets = JBBypassCatalog.all.map { ["id": $0.id, "label": $0.label] }
         return try ToolRouter.json(["count": dets.count, "detectors": dets])
     }
 
+    /// Switches an app's injection strategy between embedded and sibling.
+    ///
+    /// Rewrites the binary load commands, then polls until they reflect the
+    /// request (bounded by `MCPTimeouts.installSettle`). Destructive: dryRun
+    /// previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `strategy` (`embedded`/`sibling`,
+    ///   required); `dryRun: false` executes.
+    /// - Returns: Dry-run JSON with `wouldChange`, or the result with
+    ///   `changed` + poll `verified`.
+    /// - Throws: `ToolRouter.bail` when `strategy` is missing/invalid or the app
+    ///   is not installed.
     static func setInjectionStrategy(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let raw = args["strategy"] as? String,
@@ -70,6 +115,12 @@ enum ConfigTools {
 
     // MARK: - Keymaps
 
+    /// Reads an app's active keymap blob. Read-only by design.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: The keymap JSON text.
+    /// - Throws: `ToolRouter.bail` when the app is not installed or the keymap
+    ///   cannot be encoded.
     static func getKeymap(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
@@ -84,6 +135,13 @@ enum ConfigTools {
     /// Headless keymap write (full-blob replace). The blob reuses the exact decode
     /// path the GUI uses, then goes through the validated writer: name gate, enforced
     /// bundle binding, backup-before-write, atomic replace. dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `name` (required); `keymap`
+    ///   (full Keymap object, required); `allowBundleMismatch` (default false).
+    /// - Returns: JSON with counts, `wouldOverwrite`, and (on write) the written
+    ///   path + backup path.
+    /// - Throws: `ToolRouter.bail` when `name`/`keymap` is missing, the blob does
+    ///   not decode, or validation refuses the write — nothing is written.
     static func setKeymap(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else {
@@ -131,6 +189,10 @@ enum ConfigTools {
     /// Reset an app's settings to defaults — headless twin of the settings-window
     /// reset button (AppSettings.reset). Destructive: dryRun previews by default.
     /// The bundle binding is preserved (GUI drops it; the store backfills it).
+    ///
+    /// - Parameter args: `bundleID` (required); `dryRun: false` executes.
+    /// - Returns: Dry-run JSON with `wouldReset`, or confirmation JSON.
+    /// - Throws: `ToolRouter.bail` when the app has no settings.
     static func resetSettings(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard SettingsStore.appSettings(bid) != nil else {
@@ -148,6 +210,10 @@ enum ConfigTools {
 
     /// List an app's keymap files — headless twin of the keymap library rows
     /// (KeymapView). Read-only.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: JSON with the `keymaps` (`name`, `bytes`, `default`) and `count`.
+    /// - Throws: `ToolRouter.bail` when the app is not installed.
     static func listKeymaps(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let url = AppQueryService.appURL(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
@@ -168,6 +234,12 @@ enum ConfigTools {
     }
 
     /// Rename a keymap file (updates the order list too). Destructive: dryRun previews.
+    ///
+    /// - Parameter args: `bundleID` (required); `name` + `newName` (required);
+    ///   `dryRun: false` executes.
+    /// - Returns: Dry-run JSON, or confirmation with `from`/`to`.
+    /// - Throws: `ToolRouter.bail` when names are missing, the app is not
+    ///   installed, or the rename fails.
     static func renameKeymap(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let from = args["name"] as? String, !from.isEmpty,
@@ -187,6 +259,12 @@ enum ConfigTools {
 
     /// Delete a keymap file (trash). Refuses the default keymap like the GUI
     /// context menu does. Destructive: dryRun previews.
+    ///
+    /// - Parameter args: `bundleID` (required); `name` (required);
+    ///   `dryRun: false` executes.
+    /// - Returns: Dry-run JSON, or confirmation with the deleted `name`.
+    /// - Throws: `ToolRouter.bail` when `name` is missing, names the default
+    ///   keymap, the app is not installed, or the delete fails.
     static func deleteKeymap(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else {

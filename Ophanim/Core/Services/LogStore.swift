@@ -22,11 +22,18 @@ enum LogStore {
     /// Directories that hold an app's run files. Canonical first (the only writer), legacy
     /// second (read for pre-fix history). Inspect protocol files cohabit the canonical dir
     /// and are never run files - every function here filters by name, not just extension.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The canonical dir first, then the legacy dir.
     static func runDirectories(bundleID: String) -> [URL] {
         [OPPaths.logDirectory(forBundleID: bundleID),
          OPPaths.legacyLogDirectory(forBundleID: bundleID)]
     }
 
+    /// All run files (`run-*`.ndjson/.log) across both dirs, oldest first.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The run files, oldest first.
     static func runFiles(bundleID: String) -> [URL] {
         var out: [URL] = []
         for dir in runDirectories(bundleID: bundleID) {
@@ -46,6 +53,9 @@ enum LogStore {
     /// so the file being written is never touched. Silent on failure: worst case the
     /// directory stays untidied and readers cope anyway. Crash-cause files prune alongside
     /// (same keep-N, same silence) so a run's explanation never outlives its log.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter keep: How many newest runs survive.
     static func pruneRuns(bundleID: String, keep: Int = 3) {
         let runs = runFiles(bundleID: bundleID)
         guard runs.count > keep else { return }
@@ -61,6 +71,9 @@ enum LogStore {
     /// mints the new stamp file, and never while the app runs (an instance still alive from
     /// before holds the newest files open - deleting those orphans the writer). Returns
     /// false when skipped, so callers can state it instead of claiming a fresh log.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: True when anything was removed (false = skipped or nothing to do).
     @discardableResult
     static func clearPreviousRuns(bundleID: String) -> Bool {
         guard !ContainerProfiles.isRunning(bundleID: bundleID) else { return false }

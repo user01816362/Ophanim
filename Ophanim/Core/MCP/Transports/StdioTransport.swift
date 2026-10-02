@@ -1,8 +1,20 @@
+//
+//  StdioTransport.swift
+//  Ophanim
+//
+//  Headless `--mcp` stdio transport: newline-delimited JSON-RPC over
+//  stdin/stdout, one child per client. Shared state is file-backed.
+//
+
 import Foundation
 import Darwin
 
 // MARK: - stdio transport (headless `--mcp`)
 
+/// stdio transport (headless `--mcp`): newline-delimited JSON-RPC over
+/// stdin/stdout, one child per connected client. Shared state is file-backed
+/// (settings plists, NDJSON logs, inspect slot); in-memory state does not
+/// cross children.
 enum MCPStdioTransport {
     /// Serializes stdout writes: the request loop below and the event-notifier
     /// thread share one pipe, and concurrent FileHandle writes would interleave bytes.
@@ -13,6 +25,8 @@ enum MCPStdioTransport {
     nonisolated(unsafe) private(set) static var notifierActive = false
 
     /// One locked line write (response or notification).
+    ///
+    /// - Parameter data: The JSON bytes (newline appended by the transport).
     static func writeLine(_ data: Data) {
         writeLock.lock()
         FileHandle.standardOutput.write(data)
@@ -21,6 +35,13 @@ enum MCPStdioTransport {
     }
 
     /// Blocking newline-delimited JSON-RPC loop over stdin/stdout. Never returns.
+    ///
+    /// Exits with usage guidance when launched interactively (both stdio ends
+    /// are TTYs): a real client always holds our stdout as a pipe, so the TTY
+    /// check never trips a client. Malformed lines are skipped, notifications
+    /// get no reply.
+    ///
+    /// - Returns: Never.
     static func run() -> Never {
         // stdio mode is meant to be spawned by an MCP client that drives requests over the stdin
         // pipe. Launched interactively (a terminal, or double-clicking the app) stdin is a TTY with

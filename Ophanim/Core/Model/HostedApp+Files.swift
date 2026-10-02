@@ -2,6 +2,8 @@
 //  HostedApp+Files.swift
 //  Ophanim
 //
+//  HostedApp filesystem/codesign: alias, seal (sign), deletion.
+//
 
 import Foundation
 // MARK: - FS / Codesign
@@ -40,6 +42,8 @@ extension HostedApp {
     /// Final seal after wrap. Throws (instead of merely logging) so a broken seal
     /// fails the install loudly via Installer's catch — a half-sealed app that
     /// "installs" but dies on launch is worse than a stated failure.
+    ///
+    /// - Throws: Entitlement composition or codesign failures propagate.
     func sign() throws {
         let tmpDir = FileManager.default.temporaryDirectory
         let tmpEnts = tmpDir

@@ -36,6 +36,7 @@ struct BookmarkTarget: Codable {
     var superclasses: [String]?
 }
 
+/// One agent annotation: a stable finding reference plus comment/tags.
 struct AgentBookmark: Codable {
     var id: String              // bm_<hex>
     var bundleID: String
@@ -47,6 +48,7 @@ struct AgentBookmark: Codable {
     var snapshotRef: String?
 }
 
+/// A named filing group over bookmark ids (members follow the bookmark).
 struct BookmarkGroup: Codable {
     var id: String              // grp_<hex>
     var name: String
@@ -56,6 +58,7 @@ struct BookmarkGroup: Codable {
     var updatedAt: String
 }
 
+/// The per-app bookmark file schema (versioned for forward migration).
 struct BookmarkStoreData: Codable {
     var version: Int
     var bookmarks: [AgentBookmark]
@@ -72,6 +75,9 @@ enum BookmarkStore {
     /// Test seam: logic tests point the store at a temp dir without Galgal.
     nonisolated(unsafe) static var testRoot: URL? = nil
 
+    /// Store root (test-overridable). Created on demand.
+    ///
+    /// - Returns: The `AgentBookmarks` directory URL.
     static func storeRoot() -> URL {
         let root = (testRoot ?? Galgal.ophanimContainer)
             .appendingPathComponent("AgentBookmarks")
@@ -79,10 +85,18 @@ enum BookmarkStore {
         return root
     }
 
+    /// Per-app bookmark file URL.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The store file URL (may not exist yet).
     static func fileURL(bundleID: String) -> URL {
         storeRoot().appendingPathComponent("\(bundleID).json")
     }
 
+    /// Loads an app's bookmarks. Missing/corrupt files read as empty (never fatal).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The store data, or an empty store.
     static func load(bundleID: String) -> BookmarkStoreData {
         guard let data = try? Data(contentsOf: fileURL(bundleID: bundleID)),
               let store = try? JSONDecoder().decode(BookmarkStoreData.self, from: data) else {
@@ -96,6 +110,10 @@ enum BookmarkStore {
     /// Read-modify-write under a process-local lock, committed atomically. Same posture
     /// as both existing writers (.atomic, no cross-process lock): a lost update costs a
     /// comment, and the alternative (a lock protocol) does not exist anywhere in the repo.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter body: The in-place mutation to commit.
+    /// - Returns: The committed store data.
     @discardableResult
     static func modify(bundleID: String,
                        _ body: (inout BookmarkStoreData) throws -> Void) rethrows -> BookmarkStoreData {
@@ -111,14 +129,25 @@ enum BookmarkStore {
 
     /// Snapshot ids pinned by any bookmark: these survive the launch sweep and the
     /// keep-N prune. Bounded by maxPins at pin time.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The pinned snapshot ids.
     static func snapshotRefs(bundleID: String) -> Set<String> {
         Set(load(bundleID: bundleID).bookmarks.compactMap(\.snapshotRef))
     }
 
+    /// ISO-8601 timestamp for bookmark fields.
+    ///
+    /// - Parameter date: The date to stamp (default now).
+    /// - Returns: The timestamp string.
     static func stamp(_ date: Date = Date()) -> String {
         ISO8601DateFormatter().string(from: date)
     }
 
+    /// Mints a prefixed random id (`bm_`/`grp_` + 8 hex chars).
+    ///
+    /// - Parameter prefix: The id prefix.
+    /// - Returns: The fresh id.
     static func mintID(_ prefix: String) -> String {
         prefix + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)
     }

@@ -15,6 +15,8 @@
 import SwiftUI
 import AppKit
 
+/// Visual editor for one hosted app's interception rules (matcher + action). Rows
+/// are bound by rule id, never by index (see the file header).
 struct RulesEditorView: View {
     @Bindable var settings: AppSettings
     @State private var selection: String?
@@ -106,7 +108,7 @@ struct RulesEditorView: View {
         }
     }
 
-    // MARK: mutate-and-persist helpers (all keyed by rule id, never by array index)
+    // MARK: - Helpers (id-keyed mutate/persist; never by array index)
 
     private func rule(_ id: String) -> OPRule? { rules.first(where: { $0.id == id }) }
 

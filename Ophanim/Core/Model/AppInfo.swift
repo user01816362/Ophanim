@@ -2,6 +2,9 @@
 //  AppInfo.swift
 //  Ophanim
 //
+//  Info.plist model: typed accessors over bundle metadata + category types.
+//  Read at install/launch; written back on retarget/category change.
+//
 
 import Foundation
 

@@ -33,6 +33,9 @@ enum OPSwiftHooks {
     private static var freeIdx = [Int]()
 
     /// Stable install key (also the removal-diff identity).
+    ///
+    /// - Parameter h: Configured Swift hook.
+    /// - Returns: Class + method identity string.
     private static func key(_ h: OPSwiftHook) -> String { "\(h.className) \(h.method)" }
 
     /// P5 (bounded revert): restore the saved original slot pointer for every patched hook
@@ -94,6 +97,8 @@ enum OPSwiftHooks {
     /// pool slot every reload).
     private static var patched = Set<String>()
 
+    /// Installs every configured native-Swift vtable hook for active categories. Idempotent:
+    /// re-runs on live reload pick up new hooks without re-patching (or re-logging) existing ones.
     static func install() {
         let hooks = OPAgent.shared.config.swiftHooks
         guard !hooks.isEmpty else { return }
@@ -118,6 +123,10 @@ enum OPSwiftHooks {
         }
     }
 
+    /// Patches one hook's vtable slot to its pool trampoline.
+    ///
+    /// - Parameter hook: Configured Swift hook.
+    /// - Returns: "ok (...)" on success, otherwise a stable failure reason.
     private static func patch(_ hook: OPSwiftHook) -> String {
         let key = self.key(hook)
         if patched.contains(key) { return "already-installed" }

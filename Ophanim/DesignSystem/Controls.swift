@@ -1,3 +1,12 @@
+//
+//  Controls.swift
+//  Ophanim
+//
+//  Shared blocking-task toggle style. Long per-app tasks (Galgal install,
+//  introspection / framework injection) swap their toggle for a spinner via
+//  BlockingTask so a second flip cannot overlap the run.
+//
+
 import SwiftUI
 
 /// Long-running per-app task that blocks its toggle with a spinner.
@@ -5,6 +14,8 @@ enum BlockingTask {
     case none, galgal, introspection, iosFrameworks, applicationCategoryType
 }
 
+/// Toggle that swaps itself for a spinner while its `role` task runs, so a second
+/// flip cannot overlap the in-flight operation.
 struct AsyncToggleStyle: ToggleStyle {
     @Binding var task: BlockingTask
 
@@ -30,6 +41,11 @@ struct AsyncToggleStyle: ToggleStyle {
 }
 
 extension ToggleStyle where Self == AsyncToggleStyle {
+    /// Binds a toggle to one `role` of the owner's shared task state.
+    ///
+    /// - Parameter task: Shared task state; the toggle spins while it equals `role`.
+    /// - Parameter role: This toggle's task.
+    /// - Returns: The blocking toggle style.
     static func async(_ task: Binding<BlockingTask>, role: BlockingTask) -> AsyncToggleStyle {
         AsyncToggleStyle(task: task, role: role)
     }

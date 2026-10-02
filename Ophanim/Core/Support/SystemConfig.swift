@@ -2,6 +2,8 @@
 //  SystemConfig.swift
 //  Ophanim
 //
+//  System posture checks: SIP, AMFI, PRAM, play-sign.
+//
 
 import Foundation
 

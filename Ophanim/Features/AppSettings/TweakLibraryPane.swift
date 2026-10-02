@@ -1,11 +1,16 @@
 //
-//  CustomDylibView.swift
+//  TweakLibraryPane.swift
 //  Ophanim
+//
+//  Custom-tweak (dylib/framework) library for one app: tweak-folder selection,
+//  install/remove/enable lists, and the new-folder sheet. Backed by TweakLibraryVM.
 //
 
 import SwiftUI
 import AppKit
 
+/// Per-app tweak library: folder picker, installed-tweak list with enable toggles,
+/// add/remove, and validated new-folder creation. Reloads from disk on appear.
 struct CustomDylibView: View {
     var app: HostedApp
     @Bindable var settings: AppSettings

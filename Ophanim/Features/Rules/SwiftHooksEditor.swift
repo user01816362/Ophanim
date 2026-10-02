@@ -2,6 +2,9 @@
 //  SwiftHooksEditor.swift
 //  Ophanim
 //
+//  Visual editor for OPConfig.swiftHooks: index-keyed list plus the vtable-target
+//  form (class runtime name + mangled-method substring, category, label).
+//
 
 import SwiftUI
 import AppKit
@@ -79,7 +82,7 @@ struct SwiftHooksEditorView: View {
         }
     }
 
-    // MARK: index-safe mutate/persist helpers (selection cleared before removal)
+    // MARK: - Helpers (index-keyed mutate/persist; selection cleared before removal)
 
     private func add() {
         var a = settings.settings.ophanim.swiftHooks

@@ -2,10 +2,15 @@
 //  HostedAppView.swift
 //  Ophanim
 //
+//  One hosted-app tile in both grid and list forms. Double-tap launches, single-tap
+//  selects; the context menu covers settings, keymap, cache clears, and uninstall.
+//
 
 import SwiftUI
 import DataCache
 
+/// One hosted-app tile. Launch runs off the main thread with a progress flag; the
+/// single-tap select is simultaneous so picking a row never waits on a double-tap.
 struct HostedAppView: View {
     @Binding var selectedBackgroundColor: Color
     @Binding var selectedTextColor: Color
@@ -31,7 +36,9 @@ struct HostedAppView: View {
                     }
                 }
             })
-            .simultaneousGesture(TapGesture().onEnded {
+    /// Single-tap selects immediately (simultaneous with the double-tap recognizer above,
+    /// so selection never waits out the double-tap timeout).
+    .simultaneousGesture(TapGesture().onEnded {
                 selected = viewModel.app
             })
             .contextMenu {
@@ -90,6 +97,9 @@ struct HostedAppView: View {
             }
     }
 
+    /// Deletes the app's container preferences plist (sandboxed defaults), if present.
+    ///
+    /// - Parameter app: The hosted app's bundle identifier.
     func deletePreferences(app: String) {
         let plistURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library")
@@ -111,6 +121,9 @@ struct HostedAppView: View {
     }
 }
 
+/// Tile body shared by grid and list: icon (cached, placeholder spinner), name,
+/// Galgal-missing warning, and launch progress. Icon fetch is user-initiated (visible
+/// now); the Galgal/starting check is background (can wait).
 struct HostedAppConditionalView: View {
     @Binding var selectedBackgroundColor: Color
     @Binding var selectedTextColor: Color

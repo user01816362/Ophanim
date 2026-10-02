@@ -1,3 +1,12 @@
+//
+//  HTTPTransport.swift
+//  Ophanim
+//
+//  Opt-in HTTP transport (Streamable HTTP over a POSIX socket). Loopback stays
+//  open (same-machine trust); non-loopback fails closed with a bearer token.
+//  Push notifications are stdio-only; over HTTP clients poll tail_events.
+//
+
 import Foundation
 import Darwin
 
@@ -11,10 +20,6 @@ var mcpConfiguredPort: UInt16 {
     return (1024...65535).contains(v) ? UInt16(v) : kMCPPort
 }
 
-/// The configured bind address as a string: "loopback" (default, 127.0.0.1), "all" (0.0.0.0 - all
-/// interfaces), or a specific IPv4 address. UserDefaults `ophanim.mcp.bind` holds the mode; when it
-/// is "specific" the address is read from `ophanim.mcp.bindIP`.
-///
 /// The configured MCP HTTP token (UserDefaults `ophanim.mcp.token`). Empty = none
 /// configured. Required for write tools on non-loopback binds (see requiredToken);
 /// loopback stays open (same-machine trust boundary, current behavior).
@@ -25,6 +30,9 @@ var mcpConfiguredToken: String {
 /// Token required for this request, if any. Loopback never requires one; a
 /// non-loopback bind fails closed (mint-and-print on first use, persisted).
 /// Reads stay open everywhere; only tools/call names outside the read-only sets pay.
+///
+/// - Parameter bindMode: The active bind mode/address.
+/// - Returns: The required bearer token, or nil when this request needs none.
 func mcpRequiredToken(bindMode: String) -> String? {
     if bindMode == "loopback" { return nil }
     let existing = mcpConfiguredToken
@@ -38,6 +46,9 @@ func mcpRequiredToken(bindMode: String) -> String? {
 }
 
 /// Read-only tool names (catalog annotations + read-only inspect readers): token-exempt.
+///
+/// - Parameter name: The `tools/call` tool name.
+/// - Returns: True when the tool never pays the bearer-token gate.
 func mcpTokenExempt(tool name: String) -> Bool {
     if MCPServer.readOnlyTools.contains(name) { return true }
     return ["uitree_read", "screenshot", "inspect_classes", "inspect_element",
@@ -45,6 +56,9 @@ func mcpTokenExempt(tool name: String) -> Bool {
             "bookmark_list"].contains(name)
 }
 
+/// The configured bind address as a string: "loopback" (default, 127.0.0.1), "all" (0.0.0.0 - all
+/// interfaces), or a specific IPv4 address. UserDefaults `ophanim.mcp.bind` holds the mode; when it
+/// is "specific" the address is read from `ophanim.mcp.bindIP`.
 var mcpConfiguredBind: String {
     let mode = UserDefaults.standard.string(forKey: "ophanim.mcp.bind") ?? "loopback"
     if mode == "specific" {
@@ -56,6 +70,9 @@ var mcpConfiguredBind: String {
 
 /// Resolve a bind mode/address string to a network-order IPv4 address. Falls back to loopback for
 /// anything unrecognized so we never accidentally bind wide open.
+///
+/// - Parameter mode: The bind mode (`loopback`, `all`, or an IPv4 address).
+/// - Returns: The network-order IPv4 address to bind.
 func mcpResolveBind(_ mode: String) -> in_addr_t {
     switch mode.lowercased() {
     case "loopback", "local", "127.0.0.1": return inet_addr("127.0.0.1")
@@ -78,6 +95,9 @@ final class MCPHTTPTransport {
 
     /// Start the HTTP server on the given port + bind address (defaults to the configured values).
     /// Idempotent; silently no-ops if already running or the address is unavailable.
+    ///
+    /// - Parameter port: The port to bind (default the configured port).
+    /// - Parameter bindArg: The bind mode/address (default the configured bind).
     func start(port: UInt16? = nil, bind bindArg: String? = nil) {
         guard listenFD < 0 else { return }
         let port = port ?? mcpConfiguredPort
@@ -106,6 +126,8 @@ final class MCPHTTPTransport {
         queue.async { MCPHTTPTransport.shared.acceptLoop(fd) }
     }
 
+    /// Stops the listener. In-flight handlers run to completion; the accept loop
+    /// exits on the closed descriptor.
     func stop() {
         if listenFD >= 0 { close(listenFD); listenFD = -1 }
         isRunning = false

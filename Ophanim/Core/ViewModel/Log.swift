@@ -1,11 +1,15 @@
 //
-//  Logger.swift
+//  Log.swift
 //  Ophanim
+//
+//  Shared log sink (Log.shared): GUI console + Shell output mirror.
 //
 
 import Foundation
 import SwiftUI
 
+/// Shared log sink: GUI console + `Shell` output mirror (`print` plus an
+/// in-memory buffer; `error`/`msg` also raise MainActor alerts).
 @Observable class Log: @unchecked Sendable {
 
     nonisolated(unsafe) static let shared = Log()

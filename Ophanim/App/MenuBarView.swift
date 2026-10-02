@@ -2,11 +2,15 @@
 //  MenuBarView.swift
 //  Ophanim
 //
+//  App menu commands: log copy + signing setup, Help replacements, cache clearing.
+//  Thin Commands wrappers; no state of their own.
+//
 
 import AppKit
 import SwiftUI
 import DataCache
 
+/// App-menu additions after System Services: copy the log, open signing setup.
 struct OphanimMenuView: Commands {
     @Binding var isSigningSetupShown: Bool
     var body: some Commands {
@@ -22,6 +26,7 @@ struct OphanimMenuView: Commands {
     }
 }
 
+/// Help-menu replacement: docs, website, repo links (plus a debug crash trigger).
 struct OphanimHelpMenuView: Commands {
     var body: some Commands {
         CommandGroup(replacing: .help) {
@@ -51,6 +56,8 @@ struct OphanimHelpMenuView: Commands {
     }
 }
 
+/// View-menu replacement: cache clearing. Wipes both the DataCache store and the
+/// app's on-disk image cache, which are separate stores.
 struct OphanimViewMenuView: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {}

@@ -10,6 +10,11 @@
 import Foundation
 
 @objc(OPKeychainBridge) public final class OPKeychainBridge: NSObject {
+    /// Logs one SecItem call from Galgal's existing interposers. Observe-only, never dumps secrets.
+    ///
+    /// - Parameter api: SecItem API name.
+    /// - Parameter query: Query dictionary (only class/account/service/access-group are read).
+    /// - Parameter status: OSStatus from the call.
     @objc public static func log(api: NSString, query: NSDictionary?, status: Int32) {
         OPObserve.emit(category: .keychain) {
             var fields: [String: String] = ["status": String(status)]

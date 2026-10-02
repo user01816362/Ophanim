@@ -2,11 +2,14 @@
 //  KeyCoverViews.swift
 //  Ophanim
 //
-//  Created by Venti on 01/02/2023.
+//  KeyCover unlock prompt: validates the master password into memory so a touched
+//  locked chain can decrypt. Shown on demand, not at launch.
 //
 
 import SwiftUI
 
+/// Master-password prompt for unlocking a chain. A valid password stays in memory
+/// (Smart Unlock); a wrong one only flags the field, never dismisses.
 struct KeyCoverUnlockingPrompt: View {
     @State private var password = ""
     @State private var passwordError = false
@@ -45,6 +48,7 @@ struct KeyCoverUnlockingPrompt: View {
         }
     }
 
+    /// Validates the typed password; on success keeps it in memory for later chains.
     func unlock() {
         if KeyCoverPassword.shared.validatePassword(password) {
             // if Smart Unlock is enabled, store the masterKey

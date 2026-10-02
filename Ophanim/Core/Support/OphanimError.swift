@@ -9,6 +9,10 @@ import AudioToolbox
 import Foundation
 import SwiftUI
 
+/// Shared install/launch/container failure cases, surfaced through Log and Toast.
+///
+/// `containerRunning` is also thrown headless (e.g. `restore_container`) so MCP
+/// callers get the same "quit the app first" refusal as the GUI.
 enum OphanimError: Error {
     case infoPlistNotFound
     case waitInstallation

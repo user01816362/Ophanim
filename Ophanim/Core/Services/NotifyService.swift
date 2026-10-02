@@ -1,6 +1,8 @@
 //
-//  NotificationService.swift
+//  NotifyService.swift
 //  Ophanim
+//
+//  User-notification center delegate: permission + notify.
 //
 
 import Foundation

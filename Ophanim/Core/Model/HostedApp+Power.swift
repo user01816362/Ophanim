@@ -2,6 +2,8 @@
 //  HostedApp+Power.swift
 //  Ophanim
 //
+//  HostedApp power management: display-sleep assertion while running.
+//
 
 import Foundation
 import IOKit.pwr_mgt

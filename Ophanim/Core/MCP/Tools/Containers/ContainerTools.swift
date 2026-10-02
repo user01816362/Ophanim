@@ -1,3 +1,11 @@
+//
+//  ContainerTools.swift
+//  Ophanim
+//
+//  Container/log/profile/data tools. Finder reveal has no headless meaning and
+//  stays GUI-only.
+//
+
 import Foundation
 
 /// Container/log/profile/data tools. Finder reveal has no headless meaning and
@@ -6,6 +14,10 @@ enum ContainerTools {
 
     // MARK: - Logs
 
+    /// Reports capture-log locations and ndjson files with sizes.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: JSON with the primary `path`, scanned dirs, `files`, and `count`.
     static func getLogPath(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let dirs = ReportBuilder.logDirs(bid)
@@ -23,6 +35,12 @@ enum ContainerTools {
                              "files": files, "count": files.count])
     }
 
+    /// Deletes an app's capture logs, byte-counted. Destructive (idempotent):
+    /// dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `dryRun: false` deletes.
+    /// - Returns: Dry-run JSON with `wouldRemove` + `bytes`, or the result with
+    ///   `removed` + `count` + `bytes`.
     static func clearLogs(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         var candidates: [URL] = []
@@ -45,6 +63,10 @@ enum ContainerTools {
         return try ToolRouter.json(["bundleID": bid, "removed": removed, "count": removed.count, "bytes": bytes])
     }
 
+    /// Resolves and reports an app's data container (real path, not composed).
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: The `ContainerService.containerReport` JSON.
     static func containerInfo(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         return try ToolRouter.json(ContainerService.containerReport(bid))
@@ -52,6 +74,10 @@ enum ContainerTools {
 
     // MARK: - Profiles
 
+    /// Lists an app's container profiles plus the active one and a live check.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: JSON with `active`, `profiles`, and `liveExists`.
     static func listProfiles(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         return try ToolRouter.json([
@@ -63,6 +89,12 @@ enum ContainerTools {
         ])
     }
 
+    /// Snapshots the live container into a named profile. Destructive: dryRun
+    /// previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `name` (required); `dryRun: false` creates.
+    /// - Returns: Dry-run JSON with `wouldCopyLive`, or confirmation with `created`.
+    /// - Throws: `ToolRouter.bail` when `name` is missing (create errors propagate).
     static func createProfile(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
@@ -76,6 +108,14 @@ enum ContainerTools {
         return try ToolRouter.json(["bundleID": bid, "created": name, "copiedLive": liveExists])
     }
 
+    /// Swaps the live container to a profile. Refuses while the app runs.
+    /// Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `name` (required); `dryRun: false` switches.
+    /// - Returns: Dry-run JSON with `active`/`appRunning`/`wouldRefuse`, or
+    ///   confirmation with the new `active` profile.
+    /// - Throws: `ToolRouter.bail` when `name` is missing, or the switch refuses
+    ///   (active profile, app running).
     static func switchProfile(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
@@ -90,6 +130,11 @@ enum ContainerTools {
         return try ToolRouter.json(["bundleID": bid, "active": name])
     }
 
+    /// Deletes a container profile. Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `name` (required); `dryRun: false` deletes.
+    /// - Returns: Dry-run JSON with `isActive`, or confirmation with `removed`.
+    /// - Throws: `ToolRouter.bail` when `name` is missing (remove errors propagate).
     static func removeProfile(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["name"] as? String, !name.isEmpty else { throw ToolRouter.bail("name is required") }
@@ -103,6 +148,17 @@ enum ContainerTools {
 
     // MARK: - Destructive container reset
 
+    /// Wipes one container scope: caches, data, keychain, or the single
+    /// preferences plist. The data scope also wipes snapshots + bookmarks (marks
+    /// outliving a data wipe would point at a UI that no longer exists).
+    /// Destructive (idempotent): dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `scope` (required: `caches`,
+    ///   `data`, `keychain`, `preferences`); `dryRun: false` wipes.
+    /// - Returns: Dry-run JSON with `targets` + `bytes`, or the result with
+    ///   `removed` + `bytes`.
+    /// - Throws: `ToolRouter.bail` when `scope` is missing/invalid or no data
+    ///   container resolves.
     static func clearContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let scope = args["scope"] as? String,
@@ -188,6 +244,15 @@ enum ContainerTools {
 
     // MARK: - Backup and restore
 
+    /// Archives the live container to a zip (`ditto -c -k`). Destructive:
+    /// dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `destPath` (required); `dryRun: false`
+    ///   archives.
+    /// - Returns: Dry-run JSON with `source`/`destination`/`wouldOverwrite`, or
+    ///   confirmation with `source`/`destination`/`bytes`.
+    /// - Throws: `ToolRouter.bail` when `destPath` is missing or no data
+    ///   container resolves.
     static func backupContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let dest = args["destPath"] as? String, !dest.isEmpty else { throw ToolRouter.bail("destPath is required") }
@@ -209,6 +274,15 @@ enum ContainerTools {
                              "destination": destURL.path, "bytes": bytes])
     }
 
+    /// Restores the live container from a zip archive. Refuses while the app
+    /// runs. Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `archivePath` (required); `dryRun: false`
+    ///   restores.
+    /// - Returns: Dry-run JSON with `archive`/`destination`/`liveExists`, or
+    ///   confirmation with `archive`/`destination`.
+    /// - Throws: `ToolRouter.bail` when `archivePath` is missing or names no
+    ///   archive, or `OphanimError.containerRunning` while the app runs.
     static func restoreContainer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let archive = args["archivePath"] as? String, !archive.isEmpty else { throw ToolRouter.bail("archivePath is required") }

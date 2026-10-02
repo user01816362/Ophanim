@@ -1,3 +1,10 @@
+//
+//  MCPTimeouts.swift
+//  Ophanim
+//
+//  Shared timeouts/budgets for MCP operations. One place so tools agree.
+//
+
 import Foundation
 
 /// Shared timeouts/budgets for MCP operations. One place so tools agree.

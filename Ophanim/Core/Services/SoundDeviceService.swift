@@ -2,6 +2,8 @@
 //  SoundDeviceService.swift
 //  Ophanim
 //
+//  Audio-device preparation (sample-rate setup) for hosted apps.
+//
 
 import CoreAudio
 import SwiftUI

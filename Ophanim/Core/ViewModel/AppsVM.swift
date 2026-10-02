@@ -1,6 +1,8 @@
 //
-//  AppViewModel.swift
+//  AppsVM.swift
 //  Ophanim
+//
+//  App-library view model: installed-app list + fetch.
 //
 
 import Foundation

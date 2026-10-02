@@ -2,10 +2,20 @@
 //  Macho.swift
 //  Ophanim
 //
+//  Mach-O conversion for Catalyst: strip fat binaries to the arm64 slice, rewrite
+//  the version command, redirect @rpath Swift libs; plus encryption/arch queries
+//  and a loadability inspector sharing the engine's own command iterator.
+//
 
 import Foundation
 
+/// Mach-O rewriter: fat→arm64 strip, Catalyst version command, @rpath Swift-lib
+/// redirect. Operates on Data in memory; the caller replaces the file on success.
 class Macho {
+    /// Keeps only the arm64 slice of a fat binary (in place).
+    ///
+    /// - Parameter binary: The Mach-O bytes; replaced with the arm64 slice.
+    /// - Throws: `OphanimError.failedToStripBinary` when no arm64 slice exists.
     static func stripBinary(_ binary: inout Data) throws {
         var header = binary.extract(fat_header.self)
         var offset = MemoryLayout.size(ofValue: header)
@@ -39,6 +49,10 @@ class Macho {
         }
     }
 
+    /// Full conversion for one Mach-O on disk: strip, version command, library paths.
+    ///
+    /// - Parameter macho: The file to convert (replaced atomically via remove+write).
+    /// - Throws: Strip/rewrite errors or file I/O failures.
     static func convertMacho(_ macho: URL) throws {
         print("Converting MachO at \(macho.path)")
 
@@ -56,6 +70,10 @@ class Macho {
         try binary.write(to: macho)
     }
 
+    /// Redirects iOS-only @rpath Swift libs (libswiftUIKit) at their Mac Catalyst paths.
+    ///
+    /// - Parameter binary: The Mach-O bytes to rewrite.
+    /// - Throws: Load-command rewrite failures.
     static func replaceLibraries(_ binary: inout Data) throws {
         let dylibsToReplace = ["libswiftUIKit"]
 
@@ -71,6 +89,13 @@ class Macho {
         }
     }
 
+    /// Swaps one load command's dylib path, keeping size accounting exact (8-byte
+    /// aligned, NUL-terminated) so later commands are not shifted.
+    ///
+    /// - Parameter binary: The Mach-O bytes to rewrite.
+    /// - Parameter rpath: The @rpath to find.
+    /// - Parameter lib: The absolute replacement path.
+    /// - Throws: Load-command rewrite failures.
     static func replaceLibrary(_ binary: inout Data, _ rpath: String, _ lib: String) throws {
         var dylibCommandType: UInt32 = 0
         var oldDylib: dylib?
@@ -129,6 +154,11 @@ class Macho {
         }, atEnd: false)
     }
 
+    /// Replaces the iOS/macOS version command with a Mac Catalyst build-version
+    /// command (minOS 11, SDK 14), appended at the end of the command list.
+    ///
+    /// - Parameter binary: The Mach-O bytes to rewrite.
+    /// - Throws: Load-command rewrite failures.
     static func replaceVersionCommand(_ binary: inout Data) throws {
 
         var macCatalystCommand = build_version_command(cmd: UInt32(LC_BUILD_VERSION),
@@ -155,6 +185,14 @@ class Macho {
         }, atEnd: true)
     }
 
+    /// Replaces the last matching load command and rebalances sizeofcmds, shifting the
+    /// following commands (zero-fill when shrinking; overlap check when growing).
+    ///
+    /// - Parameter binary: The Mach-O bytes to rewrite.
+    /// - Parameter isTargetCommand: Matches the command bytes to replace.
+    /// - Parameter getNewCommandData: Builds the replacement for the matched command.
+    /// - Parameter shouldAppend: When true the replacement goes last, else first.
+    /// - Throws: `OphanimError.appCorrupted` when the command table is inconsistent.
     static func replaceLastCommand(_ binary: inout Data,
                                    satisfy isTargetCommand: (Data, Bool) -> Bool,
                                    with getNewCommandData: (Bool) -> Data?,
@@ -213,6 +251,13 @@ class Macho {
         binary.replaceSubrange(0..<headerSize, with: newHeaderData)
     }
 
+    /// Walks the load-command table, evaluating each entry. Stops early when the
+    /// closure returns true.
+    ///
+    /// - Parameter binary: The (already slim) Mach-O bytes.
+    /// - Parameter evaluate: Per-command check (offset, byte-swapped flag); true stops.
+    /// - Returns: The offset just past the last visited command.
+    /// - Throws: `OphanimError.appCorrupted` when the table overruns the file.
     static func iterateLoadCommands(binary: Data, _ evaluate: (Int, Bool) -> Bool) throws -> Int {
         let headerSize = MemoryLayout<mach_header_64>.size
         var header = binary.extract(mach_header_64.self)
@@ -266,6 +311,11 @@ class Macho {
         return result
     }
 
+    /// True when the LC_ENCRYPTION_INFO_64 cryptid is set (FairPlay still on).
+    ///
+    /// - Parameter url: The Mach-O file.
+    /// - Returns: Whether the binary is encrypted.
+    /// - Throws: Read/strip/iteration failures.
     static func isMachoEncrypted(atURL url: URL) throws -> Bool {
         try firstLoadCommand(atURL: url, command: UInt32(LC_ENCRYPTION_INFO_64)) { binary, offset, shouldSwap in
             let infoCommand = binary.extract(encryption_info_command_64.self,
@@ -275,6 +325,12 @@ class Macho {
         }
     }
 
+    /// True when a Catalyst platform marker is present (same any-match rule as
+    /// launch: converted binaries carry iOS first, Catalyst second).
+    ///
+    /// - Parameter url: The Mach-O file.
+    /// - Returns: Whether the binary has a Catalyst slice.
+    /// - Throws: Read/strip/iteration failures.
     static func isMachoValidArch(_ url: URL) throws -> Bool {
         try firstLoadCommand(atURL: url, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
             let versionCommand = binary.extract(build_version_command.self,
@@ -285,6 +341,13 @@ class Macho {
     }
 
     // MARK: - Inspect
+
+    /// Reports whether a dylib/framework file is installable: Mach-O check, FairPlay
+    /// flag, Catalyst slice, and blocker summary. Read-only; never throws.
+    ///
+    /// - Parameter url: The file to inspect.
+    /// - Returns: Report dict (loadable, reason, encrypted, validArchitecture, ...).
+    /// - Throws: Nothing (all failures fold into the report); `throws` stays for `try?` callers.
     static func inspect(_ url: URL) throws -> [String: Any] {
         var report: [String: Any] = ["path": url.path]
 
@@ -334,13 +397,14 @@ class Macho {
         }
 
         // The load commands are walked with the engine's own iterator, so a change to what the
-        // loader looks for cannot leave this reporting something different.
-        var dependencies: [String] = []
-        _ = try? iterateLoadCommands(binary: data) { _, isDylib in
-            dependencies.append(isDylib ? "dylib" : "command")
-            return true
+        // loader looks for cannot leave this reporting something different. The iterator
+        // stops when the closure returns true, so the counter returns false to visit all.
+        var commandCount = 0
+        _ = try? iterateLoadCommands(binary: data) { _, _ in
+            commandCount += 1
+            return false
         }
-        report["loadCommandCount"] = dependencies.count
+        report["loadCommandCount"] = commandCount
 
         // The decision the caller actually needs.
         var blockers: [String] = []

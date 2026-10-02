@@ -2,6 +2,7 @@
 //  UpdateScheme.swift
 //  Ophanim
 //
+//  Update checks + settings-schema migrations (v2→v3→v3.1).
 //  Created by TheMoonThatRises on 7/6/24.
 //
 

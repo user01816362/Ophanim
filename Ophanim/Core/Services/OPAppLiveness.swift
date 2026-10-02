@@ -28,12 +28,19 @@ enum OPAppLiveness {
         var at: Date
     }
 
+    /// Marks a launch (pid-bound, so a stale exit cannot shadow a relaunch).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter pid: The launched process id.
     static func markLaunched(bundleID bid: String, pid: Int32) {
         write(bundleID: bid, mark: Mark(pid: pid, alive: true, at: Date()))
     }
 
     /// Record an exit only when it matches the currently recorded launch: a stale death
     /// (e.g. for a pid from before a relaunch) must never overwrite a newer alive mark.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter pid: The exiting process id (must match the recorded launch).
     static func markExited(bundleID bid: String, pid: Int32) {
         guard let current = read(bundleID: bid), current.pid == pid, current.alive else { return }
         write(bundleID: bid, mark: Mark(pid: pid, alive: false, at: Date()))
@@ -42,6 +49,9 @@ enum OPAppLiveness {
     /// The authoritative verdict when one exists: false on a recorded exit, true on a
     /// fresh launch mark. Nil when there is no usable mark (never launched, or the GUI
     /// restarted without remarking) - callers fall through to heartbeat/log evidence.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Returns: The verdict, or nil when no mark decides.
     static func authoritativeState(bundleID bid: String) -> Bool? {
         guard let current = read(bundleID: bid) else { return nil }
         // Defense in depth: marks with impossible pids (written before the

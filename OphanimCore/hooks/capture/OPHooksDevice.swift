@@ -16,6 +16,7 @@ import Foundation
 import ObjectiveC.runtime
 
 enum OPDeviceHooks {
+    /// Installs device-identity (.device) and privacy (.privacy) swizzles for active categories.
     static func install() {
         if OPAgent.shared.isActive(.device) {
             swizzleObjectGetter("UIDevice", "identifierForVendor", category: .device,
@@ -55,7 +56,7 @@ enum OPDeviceHooks {
         }
     }
 
-    // MARK: helpers
+// MARK: - Helpers
 
     /// Swizzle an instance getter returning an object (id). Observe, and optionally replace the
     /// returned value when a rule yields a cannedReturnValue (UUID or string fake).
@@ -184,6 +185,10 @@ enum OPDeviceHooks {
     }
 
     /// Shared observe path for the simple "log this call" swizzles.
+    ///
+    /// - Parameter category: Capture category gating this emit.
+    /// - Parameter api: API name for the event.
+    /// - Parameter arg: First object argument, rendered into fields when non-nil.
     private static func observeCall(category: OPCategory, api: String, arg: AnyObject?) {
         let ctx = OPCallContext(category: category, layer: .objc, api: api,
                                 fields: arg != nil ? ["arg": describe(arg)] : [:])
@@ -210,6 +215,7 @@ enum OPDeviceHooks {
 /// app hangs on its splash screen waiting on a handoff that never returns. Safe ObjC swizzles
 /// (main-thread, high-level); a rule can block a launch or fake a `canOpenURL` result.
 enum OPLaunchHooks {
+    /// Installs the inter-app launch swizzles (openURL/canOpenURL). Gated on .process.
     static func install() {
         guard OPAgent.shared.isActive(.process) else { return }
         swizzleOpenURLCompletion()
@@ -217,6 +223,10 @@ enum OPLaunchHooks {
         swizzleCanOpenURL()
     }
 
+    /// Renders a URL argument as a string ("?" when absent/wrong type).
+    ///
+    /// - Parameter url: URL argument from the swizzled call.
+    /// - Returns: Absolute string.
     private static func urlString(_ url: AnyObject?) -> String {
         if let u = url as? NSURL { return u.absoluteString ?? "?" }
         if let s = url as? NSString { return s as String }

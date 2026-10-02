@@ -2,6 +2,9 @@
 //  HostedApp.swift
 //  Ophanim
 //
+//  Hosted iOS app: launch/lifecycle over BaseApp. GUI + MCP share this path
+//  (launch_app drives HostedApp.launch headless).
+//
 
 import Cocoa
 import Foundation
@@ -60,6 +63,12 @@ class HostedApp: BaseApp, @unchecked Sendable {
     lazy var container = AppContainer(bundleId: info.bundleIdentifier)
 
     // MARK: - Launch
+    /// Launches the app with its current settings. Fail-loud on prohibited/
+    /// malicious builds (cache cleared, malicious deleted); crash summary, log
+    /// sweep, and snapshot sweep run before the engine starts.
+    ///
+    /// Non-throwing by contract: failures go to the Log, so headless callers
+    /// bound the wait (semaphore) instead of catching.
     func launch() async {
         do {
             isStarting = true

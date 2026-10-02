@@ -23,7 +23,18 @@ import Foundation
         case pinning
     }
 
-    /// Called only from the ring's single consumer thread.
+    /// Maps one drained ring record to an OPCallContext, consults policy, and emits the event.
+    ///
+    /// Called only from the ring's single consumer thread: a normal thread where allocation
+    /// is safe. Nothing here runs in the hostile interpose context — that's all in op_ring_emit.
+    ///
+    /// - Parameter kind: Record kind, mirroring op_kind_t in OPRing.h.
+    /// - Parameter flags: Kind-specific flags (crypto op, pinning verdict bits).
+    /// - Parameter arg: Kind-specific integer (oflag, port, length, OSStatus).
+    /// - Parameter str: Kind-specific string (path, host, function name). Null becomes "".
+    /// - Parameter blob: TLS payload bytes, when present.
+    /// - Parameter blobLen: Byte count of `blob`.
+    /// - Parameter tid: Originating thread id, carried into the event fields.
     @objc public static func emitKind(_ kind: Int32, flags: Int32, arg: Int32,
                                       str: UnsafePointer<CChar>?, blob: UnsafeRawPointer?,
                                       blobLen: Int32, tid: UInt64) {
@@ -84,6 +95,8 @@ import Foundation
     /// Emitted by the ring consumer when records were dropped because the ring was full. Surfaces
     /// the running total as an event so truncation is visible rather than silent. observe() is a
     /// no-op when the agent isn't capturing (sinks nil).
+    ///
+    /// - Parameter total: Running total of dropped records.
     @objc public static func emitDropped(_ total: UInt64) {
         OPAgent.shared.observe(OPEvent(category: .process, layer: .interpose,
                                        api: "ophanim.ring.dropped",
@@ -91,6 +104,10 @@ import Foundation
                                        fields: ["dropped": String(total)]))
     }
 
+    /// Routes a record kind to its capture category, API name, and capture layer.
+    ///
+    /// - Parameter k: Record kind to route.
+    /// - Returns: Category, base API name, and layer for the event context.
     private static func route(_ k: Kind) -> (OPCategory, String, OPCaptureLayer) {
         switch k {
         case .fsOpen:        return (.filesystem, "open", .interpose)

@@ -2,12 +2,15 @@
 //  Keymapping.swift
 //  Ophanim
 //
-//  Created by TheMoonThatRises on 9/15/25.
+//  Per-app keymap store: plist persistence under the Keymapping container, order
+//  cache, import/export panels, and validated headless writes for MCP callers.
 //
 
 import Foundation
 import UniformTypeIdentifiers
 
+/// Per-app keymap store (directory per bundle id + .config order file). Corrupt or
+/// missing files reset to a blank default rather than failing.
 class Keymapping {
     static var keymappingDir: URL {
         let keymappingFolder = Galgal.ophanimContainer.appendingPathComponent("Keymapping")
@@ -29,6 +32,8 @@ class Keymapping {
 
     let encoder: PropertyListEncoder
 
+    /// The persisted keymap order: decoded from disk, reset to a lone default on
+    /// any corruption (never throws; the app must always open).
     var keymapConfig: KeymapConfig {
         get {
             do {
@@ -76,6 +81,8 @@ class Keymapping {
         baseKeymapURL.appendingPathComponent(name).appendingPathExtension("plist")
     }
 
+    /// Reconciles the directory with the order cache: indexes untracked plists, drops
+    /// nothing (missing files heal on next read). Seeds a blank default when empty.
     public func reloadKeymapCache() {
         guard FileManager.default.fileExists(atPath: baseKeymapURL.path) else {
             return
@@ -111,6 +118,10 @@ class Keymapping {
         reloadKeymapCache()
     }
 
+    /// Reads a keymap by name, resetting to blank on corrupt data (never throws).
+    ///
+    /// - Parameter name: The keymap name (filename without extension).
+    /// - Returns: The decoded keymap, or a fresh blank one.
     public func getKeymap(name: String) -> Keymap {
         do {
             let data = try Data(contentsOf: constructKeymapPath(name: name))
@@ -122,12 +133,20 @@ class Keymapping {
         }
     }
 
+    /// Creates a blank keymap under a name.
+    ///
+    /// - Parameter name: The keymap name.
+    /// - Returns: Whether the keymap exists afterwards.
     public func createEmptyKeymap(name: String) -> Bool {
         setKeymap(name: name, map: Keymap(bundleIdentifier: info.bundleIdentifier))
 
         return hasKeymap(name: name)
     }
 
+    /// Atomically writes a keymap plist and appends it to the order (no-op if known).
+    ///
+    /// - Parameter name: The keymap name.
+    /// - Parameter map: The keymap to persist.
     private func setKeymap(name: String, map: Keymap) {
         let keymapPath = constructKeymapPath(name: name)
 
@@ -203,6 +222,11 @@ class Keymapping {
                                     wouldOverwrite: wouldOverwrite, backupURL: backup)
     }
 
+    /// Moves a keymap file and its order entry (identity follows the new name).
+    ///
+    /// - Parameter prevName: The current keymap name.
+    /// - Parameter newName: The new keymap name.
+    /// - Returns: Whether the rename succeeded.
     public func renameKeymap(prevName: String, newName: String) -> Bool {
         let oldPath = constructKeymapPath(name: prevName)
         let newPath = constructKeymapPath(name: newName)
@@ -224,6 +248,10 @@ class Keymapping {
         }
     }
 
+    /// Trashes a keymap file and drops its order entry.
+    ///
+    /// - Parameter name: The keymap name.
+    /// - Returns: Whether the delete succeeded.
     public func deleteKeymap(name: String) -> Bool {
         let keymapURL = constructKeymapPath(name: name)
 
@@ -244,10 +272,18 @@ class Keymapping {
         }
     }
 
+    /// Whether a keymap exists under a name (order-cache membership, not disk scan).
+    ///
+    /// - Parameter name: The keymap name.
+    /// - Returns: Whether the keymap exists.
     public func hasKeymap(name: String) -> Bool {
         keymapConfig.keymapOrder.contains(constructKeymapPath(name: name))
     }
 
+    /// Resets a keymap to blank (overwrites, then re-reads).
+    ///
+    /// - Parameter name: The keymap name.
+    /// - Returns: The fresh blank keymap.
     @discardableResult
     public func reset(name: String) -> Keymap {
         setKeymap(name: name, map: Keymap(bundleIdentifier: info.bundleIdentifier))
@@ -264,6 +300,11 @@ class Keymapping {
         return keymapConfig
     }
 
+    /// Imports a keymap via modal open panel (legacy files convert on the fly).
+    /// Bundle-mismatched imports need explicit confirmation, not silent filing.
+    ///
+    /// - Parameter name: The name to file the import under.
+    /// - Parameter success: Whether the import landed.
     @MainActor
     public func importKeymap(name: String, success: @escaping (Bool) -> Void) {
         let openPanel = NSOpenPanel()
@@ -315,6 +356,9 @@ class Keymapping {
         }
     }
 
+    /// Exports a keymap via modal save panel (reveals the file on success).
+    ///
+    /// - Parameter name: The keymap name to export.
     @MainActor
     public func exportKeymap(name: String) {
         let savePanel = NSSavePanel()

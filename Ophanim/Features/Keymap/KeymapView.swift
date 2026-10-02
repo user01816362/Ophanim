@@ -2,15 +2,20 @@
 //  KeymapView.swift
 //  Ophanim
 //
-//  Created by TheMoonThatRises on 7/6/24.
+//  Keymap manager sheet: keymap list with default marking and reorder, plus
+//  create/rename/import/export through KeymapNamerView's validated name field.
 //
 
 import SwiftUI
 
+/// Keymap name validation for the namer sheet: escaped (non-plain) names reject,
+/// existing names collide, empty names wait.
 enum KeymapNameValidation {
     case malformed, duplicate, empty, valid
 }
 
+/// Keymap manager sheet: list (default badge, reorder, per-row menu) plus the
+/// create/rename/import/export flows. Import/export run on main (modal panels).
 struct KeymapView: View {
 
     @Binding var showKeymapSheet: Bool
@@ -89,6 +94,7 @@ struct KeymapView: View {
                                    action: {viewModel.app.keymapping.reset(name: viewModel.kmName)}
                             )
                         }
+                        // Right-click doesn't select the row, so adopt it for the menu actions.
                         .onAppear {
                             viewModel.selectedKeymap = keymap
                         }
@@ -186,6 +192,8 @@ struct KeymapView: View {
 
 }
 
+/// Validated name field for create/rename/import: Proceed stays disabled until the
+/// name is non-empty, plain (unescaped-equal), and unused.
 struct KeymapNamerView: View {
 
     let app: HostedApp

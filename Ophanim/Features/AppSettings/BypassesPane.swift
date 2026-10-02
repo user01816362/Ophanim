@@ -2,9 +2,16 @@
 //  BypassesPane.swift
 //  Ophanim
 //
+//  Bypasses settings pane: application category (re-signs on change), per-SDK
+//  jailbreak-bypass allowlist, ChainGuard toggles, pinning bypass, injected-library
+//  DYLD paths, custom tweaks, and compatibility flags.
+//
 
 import SwiftUI
 
+/// Bypasses pane: app category, jailbreak-detector allowlist, ChainGuard, pinning
+/// bypass, and injected libraries. DYLD-path flips run detached (slow re-sign) with
+/// the shared blocking-task state; category changes re-sign the executable.
 struct BypassesView: View {
     @Bindable var settings: AppSettings
     @Binding var hasGalgal: Bool?
@@ -18,6 +25,8 @@ struct BypassesView: View {
 
     var app: HostedApp
 
+    /// Seeds the injected-library toggles from the app's current DYLD path (read-only
+    /// until flipped; flipping rewrites the path asynchronously).
     init(settings: AppSettings,
          hasGalgal: Binding<Bool?>,
          task: Binding<BlockingTask>,
@@ -67,6 +76,8 @@ struct BypassesView: View {
                         }
                         .frame(width: 250)
                         .help("settings.applicationCategoryType.help")
+                        // Re-sign is slow: detach so the pane stays responsive; the spinner
+                        // clears back on main when signing finishes.
                         .onChange(of: appCategory) { _, _ in
                             signingCategory = true
                             app.info.applicationCategoryType = appCategory

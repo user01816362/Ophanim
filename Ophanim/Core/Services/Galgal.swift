@@ -2,10 +2,14 @@
 //  Galgal.swift
 //  Ophanim
 //
+//  Galgal runtime + tweak-store wiring: framework install, dylib injection,
+//  and the tweak library pane's statics (also driven headless by TweakTools).
+//
 
 import Foundation
 import injection
 
+/// One tweak-store row: a dylib, framework, or folder with its enabled state.
 public struct TweakItem: Hashable, Identifiable, Sendable {
     public var id: URL { fileUrl }
     public let fileUrl: URL
@@ -273,6 +277,11 @@ class Galgal {
     }
 
     /// Add a 2nd LC_LOAD_DYLIB pointing at the agent, then re-sign. Used for the .sibling strategy.
+    ///
+    /// Fire-and-forget injection + sign (errors log): callers poll
+    /// `agentInstalledInExec` to confirm the load command landed.
+    ///
+    /// - Parameter exec: The app executable to patch.
     static func installAgentInIPA(_ exec: URL) {
         installAgentOnSystem()
         Inject.injectMachO(machoPath: exec.path,
@@ -287,6 +296,10 @@ class Galgal {
     }
 
     /// Remove the agent load command (when switching back to embedded), then re-sign.
+    ///
+    /// Fire-and-forget like the install path: callers poll `agentInstalledInExec`.
+    ///
+    /// - Parameter exec: The app executable to patch.
     static func removeAgentFromApp(_ exec: URL) {
         Inject.removeMachO(machoPath: exec.path,
                            cmdType: .loadDylib,
@@ -299,6 +312,12 @@ class Galgal {
         })
     }
 
+    /// Whether the agent load command is present in an executable.
+    ///
+    /// - Parameter url: The app executable to inspect.
+    /// - Returns: True when the agent dylib is linked.
+    /// - Throws: When the binary cannot even be read (itself an answer: the
+    ///   desired state is unreachable/unreached).
     static func agentInstalledInExec(atURL url: URL) throws -> Bool {
         try execLinksDylib(atURL: url, dylibPath: agentPath.esc)
     }
@@ -321,8 +340,13 @@ class Galgal {
 
     // MARK: - User custom plugins & tweak folders
 
+    /// Suffix marking a disabled tweak (file stays in the store, loader skips it).
     public static let disabledSuffix = ".disabled"
 
+    /// The default per-app tweak store (no custom folder).
+    ///
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Returns: The store URL (may not exist yet).
     public static func defaultTweakStore(bundleIdentifier: String) -> URL {
         tweakStoresRoot.appendingPathComponent(bundleIdentifier)
     }
@@ -336,6 +360,13 @@ class Galgal {
             .appendingPathComponent("UserPlugins")
     }
 
+    /// Resolves the store an app actually uses: the custom folder when set and a
+    /// directory, else the default store.
+    ///
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter customPath: The custom tweak folder override (nil/empty/missing
+    ///   falls back to default).
+    /// - Returns: The effective store URL.
     public static func effectiveTweakStore(bundleIdentifier: String, customPath: String?) -> URL {
         if let customPath = customPath, !customPath.isEmpty {
             let customURL = URL(fileURLWithPath: customPath)
@@ -377,6 +408,15 @@ class Galgal {
         return items.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
+    /// Toggles a tweak via the `.disabled` rename, then re-syncs the app.
+    /// Idempotent: an already-correct suffix is a no-op rename, sync still runs.
+    ///
+    /// - Parameter item: The tweak row (suffix-insensitive; see `TweakTools.setTweakEnabled`).
+    /// - Parameter enabled: The desired state.
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter appExecutable: The app executable to re-sync into.
+    /// - Parameter customPath: The custom tweak folder override.
+    /// - Throws: Filesystem errors; sync failures propagate.
     public static func setTweakEnabled(item: TweakItem,
                                        enabled: Bool,
                                        bundleIdentifier: String,
@@ -396,6 +436,16 @@ class Galgal {
         try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
     }
 
+    /// Copies a tweak into the store (arch-checked + converted for dylibs),
+    /// then re-syncs the app. Non-tweak files (bare Mach-Os, text, aliases)
+    /// are rejected: they would list but never load.
+    ///
+    /// - Parameter sourceURL: The file to copy in.
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter appExecutable: The app executable to re-sync into.
+    /// - Parameter customPath: The custom tweak folder override.
+    /// - Throws: `OphanimError.invalidUserDylib` for rejected files or bad-arch
+    ///   dylibs (partial copy removed); sync failures propagate.
     public static func addTweakItem(at sourceURL: URL,
                                     bundleIdentifier: String,
                                     appExecutable: URL,
@@ -438,6 +488,12 @@ class Galgal {
         try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
     }
 
+    /// Creates a tweak subfolder (same name rules as container profiles).
+    ///
+    /// - Parameter name: The folder name (no separators/traversal).
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter customPath: The custom tweak folder override.
+    /// - Throws: `OphanimError.invalidFolderName` on bad names.
     public static func createNewSubfolder(named name: String,
                                           bundleIdentifier: String,
                                           customPath: String?) throws {
@@ -455,6 +511,14 @@ class Galgal {
         try FileManager.default.createDirectory(at: subfolder, withIntermediateDirectories: false)
     }
 
+    /// Removes a tweak from the store, then re-syncs the app. Missing files are
+    /// tolerated (sync still runs, converging the binary to the store).
+    ///
+    /// - Parameter item: The tweak row to remove.
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter appExecutable: The app executable to re-sync into.
+    /// - Parameter customPath: The custom tweak folder override.
+    /// - Throws: Sync failures propagate.
     public static func removeTweakItem(item: TweakItem,
                                        bundleIdentifier: String,
                                        appExecutable: URL,
@@ -465,7 +529,15 @@ class Galgal {
         try syncUserDylibs(bundleIdentifier: bundleIdentifier, into: appExecutable, customPath: customPath)
     }
 
-    // Resync user dylibs into the app's Frameworks/UserPlugins directory and sign them
+    /// Resync user dylibs into the app's Frameworks/UserPlugins directory and sign them.
+    /// Rebuilds the target dir from the store (enabled dylibs/frameworks only,
+    /// folders scanned recursively to depth 8); a missing store converges to empty.
+    ///
+    /// - Parameter bundleIdentifier: The app's bundle identifier.
+    /// - Parameter appExecutable: The app executable whose sibling Frameworks dir
+    ///   receives the synced libraries.
+    /// - Parameter customPath: The custom tweak folder override.
+    /// - Throws: Filesystem/sign failures propagate.
     public static func syncUserDylibs(bundleIdentifier: String,
                                       into appExecutable: URL,
                                       customPath: String? = nil) throws {

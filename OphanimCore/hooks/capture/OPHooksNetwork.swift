@@ -16,6 +16,7 @@
 import Foundation
 
 enum OPNetworkHooks {
+    /// Installs the URLProtocol + session-config + WebSocket swizzles. Gated on the .network category.
     static func install() {
         guard OPAgent.shared.isActive(.network) else { return }
         URLProtocol.registerClass(OPURLProtocol.self)          // covers URLSession.shared
@@ -81,7 +82,9 @@ enum OPNetworkHooks {
                                                     summary: "WebSocket \(dir) \(data?.count ?? 0) bytes"))
     }
 
-    /// Swizzle a URLSessionConfiguration class getter to prepend our protocol to protocolClasses.
+    /// Swizzles a URLSessionConfiguration class getter to prepend our protocol to protocolClasses.
+    ///
+    /// - Parameter name: Configuration getter selector name (default/ephemeral).
     private static func swizzleSessionConfig(_ name: String) {
         let sel = NSSelectorFromString(name)
         guard let m = class_getClassMethod(URLSessionConfiguration.self, sel) else { return }
@@ -117,6 +120,9 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
+    /// Starts intercepting a request: consults policy (block/replace/passthrough) and proxies it.
+    /// Caller attribution is captured here at load start, never at completion (which runs on the
+    /// session delegate queue and would attribute the loader instead of the originator).
     override func startLoading() {
         let req = request
         var fields: [String: String] = ["method": req.httpMethod ?? "GET"]
@@ -176,6 +182,7 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
         }
     }
 
+    /// Cancels the proxied task and tears down the private session.
     override func stopLoading() {
         proxyTask?.cancel()
         session?.invalidateAndCancel()

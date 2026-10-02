@@ -1,12 +1,15 @@
 //
-//  SignSetupView.swift
+//  SigningSetupView.swift
 //  Ophanim
 //
-//  Created by Venti on 08/09/2022.
+//  First-run signing setup: SIP/AMFI status, disable instructions (shutdown,
+//  nvram command copy, reboot), and the troubleshooting help link.
 //
 
 import SwiftUI
 
+/// Signing setup sheet: SIP/AMFI state machine guiding the user to the disabled
+/// state installs require. Shutdown/restart go through AppleScript (Finder).
 struct SignSetupView: View {
     @State var commandCopiedAlert = false
 

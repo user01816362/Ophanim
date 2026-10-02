@@ -2,10 +2,18 @@
 //  HostedApp+Tools.swift
 //  Ophanim
 //
+//  HostedApp tool surface: Galgal/DYLD checks + mutations shared by GUI and MCP.
+//
 
 import Foundation
 // MARK: - Tools
 extension HostedApp {
+    /// Whether the Galgal runtime load command is present in the executable.
+    ///
+    /// Fail-open: a read error counts as present (logs), so an unreadable
+    /// binary never triggers a redundant reinstall.
+    ///
+    /// - Returns: True when Galgal is injected or the check failed.
     func hasGalgal() -> Bool {
         do {
             return try Galgal.installedInExec(atURL: url.appendingEscapedPathComponent(info.executableName))

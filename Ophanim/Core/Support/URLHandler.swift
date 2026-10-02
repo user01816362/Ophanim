@@ -1,7 +1,8 @@
 //
-//  URIHandler.swift
+//  URLHandler.swift
 //  Ophanim
 //
+//  Custom URL-scheme dispatch (install/open actions).
 //  Created by Venti on 14/02/2023.
 //
 

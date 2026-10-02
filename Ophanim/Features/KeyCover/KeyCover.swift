@@ -2,7 +2,8 @@
 //  KeyCover.swift
 //  Ophanim
 //
-//  Created by Venti on 31/01/2023.
+//  At-rest keychain (ChainGuard) encryption state. HARD-DISABLED in Ophanim (see
+//  below): keychain data stays visible for instrumentation, never encrypted.
 //
 
 import Foundation
@@ -10,8 +11,11 @@ import CryptoKit
 import SwiftUI
 import Security
 
+/// At-rest ChainGuard keychain encryption. Hard-disabled: isKeyCoverEnabled is
+/// pinned false so nothing reads/writes the macOS login keychain or encrypts.
 struct KeyCover {
     nonisolated(unsafe) static var shared = KeyCover()
+    /// ChainGuard store dir, created on first access.
     static var chainGuardPath: URL {
         let chainGuardDir = Galgal.ophanimContainer.appendingPathComponent("ChainGuard")
 
@@ -32,10 +36,17 @@ struct KeyCover {
     // previously-persisted preference. Remove these overrides to restore the upstream behavior.
     var keyCoverPlainTextKey: String?
 
+    /// Hard-off: always false (see the file header). Keeps the emulated keychain
+    /// visible for instrumentation and avoids the login-keychain prompt.
+    ///
+    /// - Returns: False, always.
     func isKeyCoverEnabled() -> Bool {
         return false
     }
 
+    /// All ChainGuard keychains on disk (one per hosted app that touched keychain).
+    ///
+    /// - Returns: Key handles for every chain file found.
     func listKeychains() -> [KeyCoverKey] {
         // Enumerate all the keychains
         let keychains = try? FileManager.default
@@ -51,6 +62,9 @@ struct KeyCover {
         return keychainList
     }
 
+    /// Number of currently unencrypted chains (for the status line).
+    ///
+    /// - Returns: The unlocked count.
     func unlockedCount() -> Int {
         var count = 0
         for keychain in listKeychains() where !keychain.chainEncryptionStatus {
@@ -59,6 +73,11 @@ struct KeyCover {
         return count
     }
 
+    /// Decrypts one chain, prompting for the master password when none is in memory.
+    /// Blocks on the prompt: the prompt is the sole producer of the in-memory key.
+    ///
+    /// - Parameter keychain: The chain to unlock.
+    /// - Throws: Decryption failures from the key DB.
     func unlockChain(_ keychain: KeyCoverKey) async throws {
         if keyCoverPlainTextKey == nil {
             let task = Task {@MainActor in
@@ -74,6 +93,10 @@ struct KeyCover {
         }
     }
 
+    /// Encrypts one unlocked chain (no-op without an in-memory key).
+    ///
+    /// - Parameter keychain: The chain to lock.
+    /// - Throws: Encryption failures from the key DB.
     func lockChain(_ keychain: KeyCoverKey) throws {
         if keyCoverPlainTextKey == nil {
             return
@@ -83,6 +106,7 @@ struct KeyCover {
         }
     }
 
+    /// Encrypts every unlocked chain in the background (best-effort per chain).
     func lockAllChainsAsync() {
         Task {
             for keychain in KeyCover.shared.listKeychains() where !keychain.chainEncryptionStatus {
@@ -92,6 +116,8 @@ struct KeyCover {
     }
 }
 
+/// Observable KeyCover snapshot for the (hidden) settings UI. All reads bottom out
+/// at isKeyCoverEnabled, so everything reports disabled while hard-off.
 @Observable class KeyCoverObservable {
     nonisolated(unsafe) static let shared = KeyCoverObservable()
 
@@ -110,6 +136,8 @@ struct KeyCover {
     }
 }
 
+/// One app's ChainGuard key files: the legacy bare file plus the decrypted (.db)
+/// and encrypted (.keyCover) variants. Uninstall sweeps all three via allFiles.
 struct KeyCoverKey {
     static let encryptedKeyExtension = "keyCover"
     static let decryptedKeyExtension = "db"
@@ -131,10 +159,14 @@ struct KeyCoverKey {
             .appendingPathExtension(KeyCoverKey.encryptedKeyExtension)
     }
 
+    /// Encrypted iff the .keyCover ciphertext exists (plaintext .db means unlocked).
     var chainEncryptionStatus: Bool {
         return FileManager.default.fileExists(atPath: encryptedKeyDB.path)
     }
 
+    /// Encrypts the .db via openssl AES-256-CBC, deletes the plaintext, refreshes UI.
+    ///
+    /// - Throws: Process/file failures.
     func encryptKeyDB() throws {
         if let plainTextKey = KeyCover.shared.keyCoverPlainTextKey {
             // encrypt the db file
@@ -157,6 +189,9 @@ struct KeyCoverKey {
         }
     }
 
+    /// Decrypts the .keyCover back to .db, deletes the ciphertext, refreshes UI.
+    ///
+    /// - Throws: Process/file failures.
     func decryptKeyDB() throws {
         if let plainTextKey = KeyCover.shared.keyCoverPlainTextKey {
             // decrypt the zip file
@@ -185,11 +220,17 @@ struct KeyCoverKey {
     }
 }
 
+/// Master-password store (macOS login keychain). Rotating the password re-encrypts
+/// every chain under the new key; removal decrypts everything first.
 class KeyCoverPassword {
     nonisolated(unsafe) static let shared = KeyCoverPassword()
 
     let tag = "be.ophanim.masterkey"
 
+    /// Stores a new master key: decrypts under the old key, replaces it in the login
+    /// keychain, then re-encrypts all chains under the new key.
+    ///
+    /// - Parameter key: The new master password (plaintext, kept in memory).
     func setKeyCoverPassword(_ key: String) {
         // swiftlint: disable force_unwrapping
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
@@ -231,6 +272,9 @@ class KeyCoverPassword {
         }
     }
 
+    /// Reads the master key from the login keychain.
+    ///
+    /// - Returns: The stored password, or nil when absent/undecodable.
     func getKeyCoverPassword() -> String? {
         // Get the master key from macOS keychain
         let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
@@ -249,6 +293,7 @@ class KeyCoverPassword {
         return nil
     }
 
+    /// Removes KeyCover: decrypts everything, deletes the login-keychain entry.
     func removeKeyCoverPassword() {
         // Decrypt all key dbs
         for chain in KeyCover.shared.listKeychains() where chain.chainEncryptionStatus {
@@ -275,6 +320,9 @@ class KeyCoverPassword {
         }
     }
 
+    /// Force-resets when the password is lost: deletes the keychain entry and nukes
+    /// every encrypted chain (ciphertext without a key is useless). Refuses while a
+    /// key is in memory (nothing is lost, so refuse rather than destroy).
     func forceResetKeyCoverPassword() {
         // If a key is in memory, don't do anything (prevent accidental deletion)
         if KeyCover.shared.keyCoverPlainTextKey != nil {
@@ -303,10 +351,17 @@ class KeyCoverPassword {
         }
     }
 
+    /// Checks a candidate against the stored master key.
+    ///
+    /// - Parameter key: The candidate password.
+    /// - Returns: Whether it matches.
     func validatePassword(_ key: String) -> Bool {
         return key == getKeyCoverPassword()
     }
 
+    /// Generates a 32-char random password for the managed-key flow.
+    ///
+    /// - Returns: The generated password.
     func generateVerySecurePassword() -> String {
         // oh my god
         let length = 32

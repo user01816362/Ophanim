@@ -2,6 +2,7 @@
 //  SandboxRules.swift
 //  Ophanim
 //
+//  Sandbox rule lists (blocklist/greenlist) + rule-template rendering.
 //  Created by lucus lee on 2022/07/10.
 //
 

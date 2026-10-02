@@ -1,13 +1,34 @@
+//
+//  TweakStoreService.swift
+//  Ophanim
+//
+//  Tweak-store reads: store resolution + entry inventory. Pure filesystem
+//  reads behind injectable statics for tests.
+//
+
 import Foundation
 
 /// Tweak-store reads: store resolution + entry inventory. Pure filesystem
 /// reads behind injectable statics for tests.
 enum TweakStoreService {
+    /// Resolves an app's tweak store (custom folder when set, else the default).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Returns: The store URL plus the custom path override (nil when default).
     static func store(bundleID bid: String) -> (store: URL, custom: String?) {
         let custom = SettingsStore.appSettings(bid)?.customTweakFolder
         return (Galgal.effectiveTweakStore(bundleIdentifier: bid, customPath: custom), custom)
     }
 
+    /// Inventories a tweak store directory. Dotfiles are skipped; anything that
+    /// is not a `.dylib`/`.framework` is reported with `willLoad: false` (the
+    /// loader `dlopen`s only those two, so the rest is present but inert).
+    ///
+    /// - Parameter dir: The store (or subfolder) to list.
+    /// - Parameter recursive: Whether to descend into subfolders.
+    /// - Parameter prefix: The display-name prefix for recursion.
+    /// - Returns: The entry dicts (`name`, `path`, `isFolder`, `isEnabled`,
+    ///   `isFramework`, `isDylib`, `willLoad`).
     static func tweakEntries(in dir: URL, recursive: Bool, prefix: String) throws -> [[String: Any]] {
         guard let items = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: [.isDirectoryKey]) else { return [] }

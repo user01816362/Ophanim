@@ -1,3 +1,10 @@
+//
+//  JBBypassCatalog.swift
+//  Ophanim
+//
+//  Per-SDK jailbreak/root-detector bypass catalog (ids drive GalgalShadow gates).
+//
+
 import Foundation
 
 /// Catalog of per-SDK jailbreak/root detectors that Galgal's GalgalShadow can bypass. The `id` is

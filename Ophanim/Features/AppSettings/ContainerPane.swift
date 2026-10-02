@@ -1,5 +1,5 @@
 //
-//  ContainerView.swift
+//  ContainerPane.swift
 //  Ophanim
 //
 
@@ -243,6 +243,8 @@ struct ContainerView: View {
             }
     }
 
+    /// Re-scans the container size (utility-priority walk, containers can be huge) and
+    /// reloads profiles + active name back on the main actor.
     private func refreshContainer() async {
         let url = container.containerUrl
         let exists = FileManager.default.fileExists(atPath: url.path)
@@ -288,6 +290,10 @@ struct ContainerView: View {
         }
     }
 
+    /// Parks the live container and moves the chosen profile into place (off-main;
+    /// errors surface as notices). Refused while the app runs (row disables).
+    ///
+    /// - Parameter name: The profile to switch to.
     private func switchProfile(to name: String) {
         busy = true
         let bid = app.info.bundleIdentifier
@@ -305,6 +311,9 @@ struct ContainerView: View {
         }
     }
 
+    /// Deletes a non-active profile (off-main; errors surface as notices).
+    ///
+    /// - Parameter name: The profile to delete.
     private func deleteProfile(name: String) {
         busy = true
         let bid = app.info.bundleIdentifier
@@ -322,6 +331,8 @@ struct ContainerView: View {
         }
     }
 
+    /// Zips the live container via ditto (destination picked by save panel; the busy
+    /// guard blocks overlapping runs).
     private func backupContainer() {
         guard let dest = NSSavePanel.saveZip(
             suggestedName: "\(app.info.bundleIdentifier)-container.zip") else { return }
@@ -354,6 +365,10 @@ struct ContainerView: View {
         restoreCandidate = archive
     }
 
+    /// Restores a zipped snapshot over the live container (refuses while running;
+    /// the picker gates that before this is ever staged).
+    ///
+    /// - Parameter archive: The ditto-created zip to expand into the container.
     private func restoreContainer(from archive: URL) {
         busy = true
         let target = container.containerUrl
@@ -375,6 +390,7 @@ struct ContainerView: View {
         }
     }
 
+    /// Deletes only the container's Caches tree (preferences, data, keychain stay).
     private func clearCaches() {
         busy = true
         let caches = container.containerUrl

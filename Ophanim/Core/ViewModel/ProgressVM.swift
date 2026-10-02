@@ -2,6 +2,7 @@
 //  ProgressVM.swift
 //  Ophanim
 //
+//  Generic stepped-progress view model (install flows).
 //  Created by TheMoonThatRises on 1/13/23.
 //
 

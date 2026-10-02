@@ -2,9 +2,13 @@
 //  KeymappingPane.swift
 //  Ophanim
 //
+//  Keymapping toggles pane: keymapping enable, auto-KM on text input, scroll wheel,
+//  builtin mouse, and sensitivity. The full keymap manager lives in KeymapView.
+//
 
 import SwiftUI
 
+/// Keymapping toggles for one app (enable, auto-KM, scroll, mouse, sensitivity).
 struct KeymappingView: View {
     @Bindable var settings: AppSettings
     @AppStorage("settings.settings.keymapping") private var keymapping = false

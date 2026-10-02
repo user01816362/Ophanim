@@ -15,10 +15,19 @@ import Foundation
 public enum OPCrashWriter {
     /// run-<stamp>.ndjson  ->  run-<stamp>-<pid>.crashreason.json. Lexical order is
     /// chronological, same as run files (keep/prune rely on it).
+    ///
+    /// - Parameter stamp: Per-launch stamp shared with the NDJSON run file.
+    /// - Parameter pid: Process id disambiguating same-stamp runs.
+    /// - Parameter dir: Log directory holding the run file.
+    /// - Returns: Crash-file URL beside the run file.
     public static func fileURL(stamp: String, pid: Int, in dir: URL) -> URL {
         dir.appendingPathComponent("run-\(stamp)-\(pid).crashreason.json")
     }
 
+    /// Whether a URL is a crash-cause file (vs NDJSON logs or other files in the dir).
+    ///
+    /// - Parameter url: Candidate file URL.
+    /// - Returns: True for run-*.crashreason.json files.
     public static func isCrashFile(_ url: URL) -> Bool {
         url.pathExtension == "json"
             && url.deletingPathExtension().lastPathComponent.hasPrefix("run-")
@@ -27,6 +36,12 @@ public enum OPCrashWriter {
 
     /// Atomic write; silent on failure (a crash writer that throws is a second crash).
     /// Returns the file URL on success for chaining.
+    ///
+    /// - Parameter record: Record to encode.
+    /// - Parameter stamp: Per-launch stamp shared with the NDJSON run file.
+    /// - Parameter pid: Process id disambiguating same-stamp runs.
+    /// - Parameter dir: Log directory holding the run file.
+    /// - Returns: File URL on success, nil on any failure.
     @discardableResult
     public static func write(_ record: OPCrashRecord, stamp: String, pid: Int, in dir: URL) -> URL? {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -37,6 +52,9 @@ public enum OPCrashWriter {
     }
 
     /// All decodable records, oldest first. Undecodable files are skipped, never fatal.
+    ///
+    /// - Parameter dir: Log directory to scan.
+    /// - Returns: Decoded records in lexical (chronological) order.
     public static func records(in dir: URL) -> [OPCrashRecord] {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil) else { return [] }
@@ -52,6 +70,9 @@ public enum OPCrashWriter {
 
     /// Delete every crash file (launch sweep). Host-side files alongside guest-written
     /// ones share the namespace; the guest never depends on their presence.
+    ///
+    /// - Parameter dir: Log directory to sweep.
+    /// - Returns: Number of files removed.
     @discardableResult
     public static func sweep(in dir: URL) -> Int {
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -64,6 +85,9 @@ public enum OPCrashWriter {
     }
 
     /// Keep the newest `keep` crash files (pairs with pruneRuns keep-N on the NDJSON side).
+    ///
+    /// - Parameter dir: Log directory to prune.
+    /// - Parameter keep: Number of newest files to keep.
     public static func prune(in dir: URL, keep: Int = 3) {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: dir, includingPropertiesForKeys: nil) else { return }

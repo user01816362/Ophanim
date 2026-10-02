@@ -1,3 +1,10 @@
+//
+//  ResolutionMath.swift
+//  Ophanim
+//
+//  Pure resolution/aspect math for the graphics pane.
+//
+
 import Foundation
 
 /// Pure resolution/aspect math for the graphics pane. Value-in/value-out;

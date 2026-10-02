@@ -1,8 +1,19 @@
 import Foundation
 
 /// The single liveness + Agent-Mode gate every inspect-family entry passes through.
+///
+/// Liveness is the shared definition (`InspectControl.isAppRunning`), never a bare
+/// workspace check: a client-spawned `--mcp` child can see an empty
+/// `runningApplications` list while the app runs fine.
 enum InspectGate {
-    /// Returns the per-app config plus the effective redaction flag.
+    /// Requires the app installed, alive, and Agent-Mode armed. Returns the
+    /// per-app instrumentation config plus the effective redaction flag.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier (from `list_apps`).
+    /// - Returns: The app's `OPConfig` and whether tree/snapshot text stays redacted.
+    /// - Throws: `ToolRouter.bail` when the app is not installed, not running,
+    ///   or Agent Mode is off (each naming its fix: install, `launch_app`, or
+    ///   enable Agent Mode and relaunch).
     static func requireLive(bundleID bid: String) throws -> (ophanim: OPConfig, redacted: Bool) {
         guard AppQueryService.appURL(bid) != nil else {
             throw ToolRouter.bail("app not installed: \(bid)")

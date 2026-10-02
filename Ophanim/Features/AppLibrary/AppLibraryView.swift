@@ -2,9 +2,15 @@
 //  AppLibraryView.swift
 //  Ophanim
 //
+//  Installed-app library window: grid/list of hosted apps with search, drag-and-drop
+//  IPA import, and the legacy-settings migration prompt. Installs route through
+//  AppInstalls; the Sources window opens from the toolbar.
+//
 
 import SwiftUI
 
+/// Installed-app library: grid/list of hosted apps with search, file import, and
+/// drop import. Guards every entry point while an install is already in progress.
 struct AppLibraryView: View {
     @Environment(AppsVM.self) var appsVM
     @Environment(InstallVM.self) var installVM
@@ -130,6 +136,7 @@ struct AppLibraryView: View {
             showLegacyConvertAlert = LegacySettings.doesMonolithExist
         }
         .onDrop(of: ["public.url", "public.file-url"], isTargeted: nil) { (items) -> Bool in
+            // loadItem calls back off-main; hop to @MainActor for the install + alert state.
             if installVM.inProgress {
                 Log.shared.error(OphanimError.waitInstallation)
                 return false
@@ -189,6 +196,8 @@ struct AppLibraryView: View {
     }
 }
 
+/// Grid/list body that preserves per-app row state (running flags, progress) across
+/// layout switches by caching one view model per app URL.
 struct AppDisplayView: View {
     var apps: [HostedApp]
     @Binding var selectedBackgroundColor: Color

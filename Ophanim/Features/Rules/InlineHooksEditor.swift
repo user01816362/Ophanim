@@ -2,6 +2,10 @@
 //  InlineHooksEditor.swift
 //  Ophanim
 //
+//  Visual editor for OPConfig.inlineHooks: index-keyed list, target form (first
+//  non-empty field wins: address / symbol / module+offset / signature), and
+//  register-render pickers. Requires the inline-hooks gate to arm.
+//
 
 import SwiftUI
 import AppKit
@@ -121,7 +125,7 @@ struct InlineHooksEditorView: View {
         ForEach(OPArgRender.allCases, id: \.self) { Text($0.rawValue).tag(OPArgRender?.some($0)) }
     }
 
-    // MARK: index-safe mutate/persist helpers
+    // MARK: - Helpers (index-keyed mutate/persist; selection cleared before removal)
 
     private func add() {
         var a = settings.settings.ophanim.inlineHooks

@@ -2,12 +2,16 @@
 //  AppSettingsView.swift
 //  Ophanim
 //
-//  Created by Isaac Marovitz on 14/08/2022.
+//  Per-app settings content: icon header plus the toolbar-driven panes. Owns Galgal
+//  install/remove, settings reset, and the keymap-sheet handoff; closes through
+//  AppSettingsWindowManager so the window registry stays in sync.
 //
 
 import SwiftUI
 import DataCache
 
+/// Per-app settings content hosted in the settings window. Panes switch from the
+/// window toolbar; the Galgal toggle rewrites the binary and closes the window.
 struct AppSettingsView: View {
     @Environment(\.dismiss) var dismiss
 
@@ -111,6 +115,8 @@ struct AppSettingsView: View {
                                 Log.shared.error(error)
                             }
                         }
+                        // Drop the list first so the refetch visibly rebuilds after the
+                        // binary changed underneath it.
                         Task { @MainActor in
                             AppsVM.shared.filteredApps = []
                             AppsVM.shared.fetchApps()

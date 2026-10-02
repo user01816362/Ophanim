@@ -2,6 +2,7 @@
 //  ToastVM.swift
 //  Ophanim
 //
+//  Toast notification view model (surfaces OphanimError cases to GUI).
 //  Created by Isaac Marovitz on 08/08/2022.
 //
 

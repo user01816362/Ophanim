@@ -2,17 +2,21 @@
 //  KeyCoverSettings.swift
 //  Ophanim
 //
-//  Created by Venti on 31/01/2023.
+//  KeyCover settings tab (legacy, hidden while KeyCover is hard-disabled): status,
+//  enable/reset, lock-all, password change, startup prompt.
 //
 
 import SwiftUI
 
+/// KeyCover master-key mode: off, app-generated password, or user-provided password.
 enum KeyCoverStatus: String, Codable, Hashable {
     case disabled
     case selfGeneratedPassword
     case userProvidedPassword
 }
 
+/// Persisted KeyCover prefs (mode + startup prompt). First access may be off-main
+/// (MCP transport), so the shared init hops to main for @AppStorage.
 class KeyCoverPreferences: NSObject, ObservableObject {
     nonisolated(unsafe) static var shared: KeyCoverPreferences = {
         // @AppStorage init is MainActor-isolated; first access may come from a
@@ -24,6 +28,8 @@ class KeyCoverPreferences: NSObject, ObservableObject {
     @AppStorage("promptForKeyCoverPasswordAtLaunch") var promptForKeyCoverPasswordAtLaunch = true
 }
 
+/// KeyCover settings form (legacy, hidden): status, enable/reset (Option = force
+/// reset), lock-all, password change, startup prompt.
 struct KeyCoverSettings: View {
 
     @State private var keyCoverInitialSetupShown = false

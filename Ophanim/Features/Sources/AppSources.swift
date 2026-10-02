@@ -141,7 +141,14 @@ private struct SourceFeedNewsResponse: Decodable {
     let appID: String?
 }
 
+/// Fetches and decodes a feed: HTTP-status-checked download plus lenient decode
+/// (malformed apps/news skip, never fail the feed; a nameless feed fails at add).
 enum AppSourceLoader {
+    /// Downloads a feed and returns the decoded source plus raw bytes (for caching).
+    ///
+    /// - Parameter url: The feed URL.
+    /// - Returns: The decoded source and the raw feed data.
+    /// - Throws: Network/HTTP errors or decode failures (nameless feed, bad JSON).
     static func load(from url: URL) async throws -> (AppSource, Data) {
         let (data, response) = try await URLSession.shared.data(from: url)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
@@ -151,6 +158,13 @@ enum AppSourceLoader {
         return (try decode(from: data, baseURL: url), data)
     }
 
+    /// Decodes feed JSON against a base URL (relative download/icon URLs resolve
+    /// against the feed location).
+    ///
+    /// - Parameter data: The raw feed JSON.
+    /// - Parameter baseURL: The feed URL for relative resolution.
+    /// - Returns: The decoded source.
+    /// - Throws: Decoding errors (nameless feed) or malformed JSON.
     static func decode(from data: Data, baseURL: URL) throws -> AppSource {
         let response = try JSONDecoder().decode(SourceFeedResponse.self, from: data)
         guard let name = response.name, !name.isEmpty else {
@@ -301,6 +315,9 @@ final class AppSourcesStore: @unchecked Sendable {
         return nil
     }
 
+    /// Removes a feed, its cache, and its row (in-flight refresh for it no-ops).
+    ///
+    /// - Parameter item: The subscribed feed to remove.
     func removeSource(_ item: SourceItem) {
         sources.removeAll { $0.id == item.id }
         persistSources()
@@ -326,6 +343,10 @@ final class AppSourcesStore: @unchecked Sendable {
         return nil
     }
 
+    /// Renames a feed's display alias only (no fetch; empty clears the alias).
+    ///
+    /// - Parameter item: The subscribed feed to rename.
+    /// - Parameter name: The new alias (empty clears it).
     func renameSource(_ item: SourceItem, to name: String) {
         guard let index = sources.firstIndex(where: { $0.id == item.id }) else { return }
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -344,10 +365,14 @@ final class AppSourcesStore: @unchecked Sendable {
             .appendingPathComponent("AppSources/Resume"))
     }
 
+    /// Re-fetches one feed by row (error renders inline; last-good state stays).
+    ///
+    /// - Parameter item: The subscribed feed to refresh.
     func refreshSource(_ item: SourceItem) async {
         await refreshSource(url: item.url)
     }
 
+    /// Re-fetches every feed in order (no-op when none are subscribed).
     func refreshAll() async {
         guard !sources.isEmpty else { return }
         isRefreshingAll = true
@@ -449,6 +474,10 @@ final class AppSourcesStore: @unchecked Sendable {
             .map { String(format: "%02x", $0) }.joined() + ".json"
     }
 
+    /// Accepts absolute URLs, file paths, and bare hosts (https assumed); trims.
+    ///
+    /// - Parameter rawValue: The user-typed source location.
+    /// - Returns: The normalized URL, or nil when empty.
     private func normalizeURL(from rawValue: String) -> URL? {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

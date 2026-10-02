@@ -1,3 +1,12 @@
+//
+//  AppSettingsWindow.swift
+//  Ophanim
+//
+//  Per-app settings window (HIG Settings style): toolbar pane switching, fixed 840x640
+//  size, one window per hosted app with last-pane restore. Content is SwiftUI hosted
+//  in AppKit (macOS 12 has no SwiftUI openWindow(for:)).
+//
+
 import SwiftUI
 import AppKit
 
@@ -8,6 +17,7 @@ import AppKit
 // the window title reflects the visible pane; minimize/maximize are dimmed; the last viewed
 // pane is restored. One real NSWindow per hosted app, so panes get full window width.
 
+/// Settings panes, in toolbar order. Raw toolbar item IDs are the persistence format.
 enum SettingsTab: Hashable {
     case graphics
     case bypasses
@@ -95,7 +105,8 @@ private struct AppSettingsWindowRoot: View {
     }
 }
 
-/// @MainActor: toolbar/window/delegate work is AppKit main-thread only.
+/// One window per hosted app (keyed by bundle id). Re-showing brings the existing
+/// window forward; closing unregisters it via the window delegate.
 @MainActor
 final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDelegate, @unchecked Sendable {
     static let shared = AppSettingsWindowManager()
@@ -113,6 +124,9 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         return pane
     }
 
+    /// Shows the settings window for an app, restoring its last-viewed pane.
+    ///
+    /// - Parameter app: The hosted app to show settings for.
     func show(app: HostedApp) {
         let bid = app.info.bundleIdentifier
         if let existing = windows[bid] {
@@ -180,7 +194,7 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         }
     }
 
-    // MARK: NSToolbarDelegate
+    // MARK: - NSToolbarDelegate
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         AppSettingsPaneCoordinator.orderedPanes.map { AppSettingsPaneCoordinator.itemID(for: $0) }
@@ -217,7 +231,7 @@ final class AppSettingsWindowManager: NSObject, NSToolbarDelegate, NSWindowDeleg
         }
     }
 
-    // MARK: NSWindowDelegate
+    // MARK: - NSWindowDelegate
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }

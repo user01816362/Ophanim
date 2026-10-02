@@ -1,12 +1,15 @@
 //
-//  SettingsView.swift
+//  OphanimSettingsView.swift
 //  Ophanim
 //
-//  Created by Andrew Glaze on 7/16/22.
+//  App-level Settings window: uninstall preferences plus MCP automation (loopback
+//  HTTP endpoint + headless stdio config for AI clients).
 //
 
 import SwiftUI
 
+/// App-level Settings content: uninstall prefs plus the MCP automation tab.
+/// The KeyCover/Install tabs are intentionally absent (see the inline whys).
 struct OphanimSettingsView: View {
     private enum Tabs: Hashable {
         case keyCover, install, uninstall, mcp

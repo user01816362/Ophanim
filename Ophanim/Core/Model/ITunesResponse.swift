@@ -2,6 +2,7 @@
 //  ITunesResponse.swift
 //  Ophanim
 //
+//  iTunes lookup API models (source-feed metadata).
 //  Created by Isaac Marovitz on 23/08/2022.
 //
 
@@ -59,6 +60,10 @@ struct ITunesResponse: Codable {
     let results: [ITunesResult]
 }
 
+/// iTunes lookup for source-feed metadata. Nil on any failure (feed rows cope).
+///
+/// - Parameter itunesLookup: The lookup URL string.
+/// - Returns: The parsed response, or nil.
 func getITunesData(_ itunesLookup: String) async -> ITunesResponse? {
     guard NetworkVM.isConnectedToNetwork(), let url = URL(string: itunesLookup) else {
         return nil

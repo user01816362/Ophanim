@@ -1,6 +1,8 @@
 //
-//  InstallSteps.swift
+//  InstallVM.swift
 //  Ophanim
+//
+//  Install-flow view model: native install steps over ProgressVM.
 //
 
 import Foundation

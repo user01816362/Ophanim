@@ -17,6 +17,11 @@ enum InspectorScreenshot {
     /// Longest edge cap: keeps the JPEG near the ~1MB transport ceiling without a second pass.
     static let maxEdge: CGFloat = 1280
 
+    /// Captures the key window at 1x, downscales to the maxEdge cap, redacts secure frames,
+    /// and JPEG-encodes. The downscale and the redaction share one pass.
+    ///
+    /// - Parameter redact: Black out secure-field frames before encoding.
+    /// - Returns: JPEG data plus pixel size, or nil when no window is capturable.
     static func capture(redact: Bool) -> (data: Data, width: Int, height: Int)? {
         guard let window = Inspector.keyWindow() else { return nil }
         let bounds = window.bounds

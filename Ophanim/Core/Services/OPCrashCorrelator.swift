@@ -27,12 +27,18 @@ struct OPLastCrash: Codable {
 }
 
 enum OPCrashCorrelator {
+    /// Per-app previous-run summary file.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The `last-crash.json` URL (may not exist yet).
     static func fileURL(bundleID: String) -> URL {
         OPPaths.logDirectory(forBundleID: bundleID).appendingPathComponent("last-crash.json")
     }
 
     /// Summarize the previous run into last-crash.json. Call at launch, before any sweep.
     /// Silent on failure (a missing summary is itself "no evidence").
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
     static func summarizePreviousRun(bundleID: String) {
         let dir = OPPaths.logDirectory(forBundleID: bundleID)
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -62,6 +68,11 @@ enum OPCrashCorrelator {
         }
     }
 
+    /// Loads the previous-run summary. Missing/corrupt files read as nil (itself
+    /// "no evidence").
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The summary, or nil when absent.
     static func load(bundleID: String) -> OPLastCrash? {
         guard let data = try? Data(contentsOf: fileURL(bundleID: bundleID)),
               let summary = try? JSONDecoder().decode(OPLastCrash.self, from: data) else { return nil }

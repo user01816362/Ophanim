@@ -2,9 +2,14 @@
 //  MainView.swift
 //  Ophanim
 //
+//  Root window content. Hosts the app library directly (no sidebar) plus toasts,
+//  the relocate-to-Applications alert, and the signing / KeyCover sheets.
+//
 
 import SwiftUI
 
+/// Root window content: the app library plus overlays (toasts, integrity alert,
+/// signing and KeyCover sheets). Selection-chip colors track scheme and key state.
 struct MainView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.controlActiveState) var controlActiveState
@@ -20,13 +25,14 @@ struct MainView: View {
     @State private var selectedTextColor: Color = Color.black
 
     var body: some View {
-        // The app library is the whole window: with IPA sources removed there is nothing else to
-        // navigate to, so the sidebar is gone and the library renders directly.
+        // The app library is the whole window: the library renders directly and
+        // feed sources open in their own window from the toolbar.
         AppLibraryView(selectedBackgroundColor: $selectedBackgroundColor,
                        selectedTextColor: $selectedTextColor)
             .onChange(of: colorScheme) { _, scheme in
                 updateSelectionColors(scheme: scheme)
             }
+            // Match AppKit convention: selection chips grey out while the window is inactive.
             .onChange(of: controlActiveState) { _, state in
                 if state == .inactive {
                     if colorScheme == .light {

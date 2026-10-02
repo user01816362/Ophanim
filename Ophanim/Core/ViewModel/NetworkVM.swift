@@ -2,6 +2,7 @@
 //  NetworkVM.swift
 //  Ophanim
 //
+//  Network reachability view model.
 //  Created by Isaac Marovitz on 09/10/2022.
 //
 

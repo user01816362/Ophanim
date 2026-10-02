@@ -2,6 +2,7 @@
 //  AssetsExtractor.swift
 //  Ophanim
 //
+//  Asset-catalog icon extraction (CUI images → NSImage).
 //  Created by 이승윤 on 2022/09/07.
 //
 

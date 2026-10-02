@@ -2,6 +2,10 @@
 //  OphanimApp.swift
 //  Ophanim
 //
+//  App entry + headless MCP launch. `--mcp` runs the stdio/HTTP server instead of
+//  SwiftUI; otherwise boots the GUI app, its menu commands, Settings, and the local
+//  MCP endpoint.
+//
 
 import SwiftUI
 
@@ -42,6 +46,8 @@ enum OphanimMain {
     }
 }
 
+/// GUI-app delegate: background-download drain, local MCP endpoint, low-power notice,
+/// first-launch defaults. Headless `--mcp` never reaches here (OphanimMain exits first).
 class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     @AppStorage("ShowLowPowerModeAlert") var showLowPowerModeAlert = true
 
@@ -61,6 +67,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         backgroundSessionCompletion = completionHandler
     }
 
+    /// Launches the app GUI-side: local MCP endpoint (when enabled), crash-on-exception
+    /// default, power noticer, icon-cache flush, and first-launch KeyCover note.
     func applicationDidFinishLaunching(_ notification: Notification) {
         UpdateScheme.checkForUpdate()
 
@@ -109,6 +117,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         }
     }
 
+    /// Warns on entering Low Power Mode (once; suppression-checked).
     @MainActor
     func powerModal() {
         if showLowPowerModeAlert {
@@ -125,6 +134,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 }
 
+/// GUI app scene: library window, menu commands, Settings. Signing-sheet state lives
+/// here so both the main view and the menu bar can present it.
 struct OphanimApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 

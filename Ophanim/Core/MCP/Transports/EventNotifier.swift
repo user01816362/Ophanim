@@ -1,3 +1,11 @@
+//
+//  EventNotifier.swift
+//  Ophanim
+//
+//  Best-effort server→client push for stdio `--mcp` children. Cursor+count
+//  notifications only (bodies via tail_events); HTTP stays poll-only.
+//
+
 import Foundation
 
 /// Best-effort server→client push for stdio `--mcp` children. One emitter thread per
@@ -15,6 +23,12 @@ enum EventNotifier {
     nonisolated(unsafe) private static var running = false
 
     /// Register (or move) a subscription. Refuses outside a stdio child.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter since: The cursor (epoch ms) to notify after.
+    /// - Returns: The cursor the subscription starts from.
+    /// - Throws: `ToolRouter.bail` outside a stdio `--mcp` child (HTTP uses
+    ///   `tail_events waitMs` instead).
     static func subscribe(bundleID bid: String, since: Double) throws -> Double {
         guard MCPStdioTransport.notifierActive else {
             throw ToolRouter.bail("subscriptions need a stdio --mcp child; over HTTP use tail_events waitMs")
@@ -30,6 +44,11 @@ enum EventNotifier {
         return since
     }
 
+    /// Removes one subscription (or all when nil). The emitter parks when the
+    /// last subscriber leaves; the next subscribe restarts it.
+    ///
+    /// - Parameter bid: The bundle ID to drop, or nil for all.
+    /// - Returns: True when no subscriptions remain (thread parked).
     static func unsubscribe(bundleID bid: String?) -> Bool {
         lock.lock()
         if let bid {
@@ -42,6 +61,9 @@ enum EventNotifier {
         return remaining == 0
     }
 
+    /// Currently subscribed bundle IDs.
+    ///
+    /// - Returns: The subscription keys.
     static func active() -> [String] {
         lock.lock()
         defer { lock.unlock() }

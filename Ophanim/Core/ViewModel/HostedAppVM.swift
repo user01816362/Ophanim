@@ -2,6 +2,7 @@
 //  HostedAppVM.swift
 //  Ophanim
 //
+//  Per-app view model (running state, settings binding).
 //  Created by Adam Chen JingFan on 4/7/24.
 //
 

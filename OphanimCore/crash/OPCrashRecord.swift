@@ -27,6 +27,11 @@ public enum OPCrashKind: String, Codable {
     case cleanExit = "clean-exit"
 }
 
+/// One crash-cause record: every writer (guest exception/signal recorders, host kill-silent
+/// correlator) and every reader (LogViewer, analyze_app) shares this schema.
+///
+/// Forward/backward tolerant: all fields defaulted with lenient decode, so old readers skip
+/// new fields and new readers accept old files.
 public struct OPCrashRecord: Codable {
     public var version: Int = 1
     /// Run identity, shared with the NDJSON run file stem: "<stamp>-<pid>".

@@ -22,6 +22,9 @@ enum OPConfigurableHooks {
     private static var originals = [String: (m: Method, imp: IMP)]()
 
     /// Stable install key (also the removal-diff identity).
+    ///
+    /// - Parameter h: Configured ObjC hook.
+    /// - Returns: "+/- [class selector]" identity string.
     private static func key(_ h: OPObjCHook) -> String {
         "\(h.classMethod ? "+" : "-")[\(h.className) \(h.selector)]"
     }
@@ -46,6 +49,8 @@ enum OPConfigurableHooks {
         }
     }
 
+    /// Installs every configured ObjC boundary hook for active categories. Idempotent: re-runs
+    /// on live reload pick up new hooks without re-installing (or re-logging) existing ones.
     static func install() {
         let hooks = OPAgent.shared.config.objcHooks
         guard !hooks.isEmpty else { return }
@@ -69,6 +74,10 @@ enum OPConfigurableHooks {
         }
     }
 
+    /// Swizzles one configured (class, selector) to a logging block. Void methods only.
+    ///
+    /// - Parameter h: Configured ObjC hook.
+    /// - Returns: "ok" on success, "already-installed" on re-run, otherwise a stable failure reason.
     @discardableResult
     private static func swizzle(_ h: OPObjCHook) -> String {
         let key = self.key(h)
@@ -93,7 +102,14 @@ enum OPConfigurableHooks {
         return "ok"
     }
 
-    /// Build a void block of the requested object-arg arity that logs then forwards to the original.
+    /// Builds a void block of the requested object-arg arity that logs then forwards to the original.
+    ///
+    /// - Parameter argc: Object-arg count (clamped to 0...3 by the caller).
+    /// - Parameter m: Method being swizzled (supplies the original IMP).
+    /// - Parameter sel: Selector forwarded to the original.
+    /// - Parameter api: API name for the event.
+    /// - Parameter cat: Capture category gating the emit.
+    /// - Returns: Block object installed as the new IMP.
     private static func makeBlock(_ argc: Int, _ m: Method, _ sel: Selector,
                                   _ api: String, _ cat: OPCategory) -> Any {
         switch argc {
@@ -128,13 +144,18 @@ enum OPConfigurableHooks {
         }
     }
 
-    /// Log the call and apply the rule decision. Returns true if the original should be SUPPRESSED
+    /// Logs the call and applies the rule decision. Returns true if the original should be SUPPRESSED
     /// (a `.blocked` rule); a `.delayed` rule sleeps first. (Void methods → no return to replace.)
     ///
     /// Hook bodies touch app objects (arg rendering above, KVC in rules below): an ObjC exception
     /// must fail open (disable the hook, note it for the crash record, log, run the original)
     /// instead of propagating into the app. Swift cannot catch ObjC exceptions, so the body runs
     /// through the ObjC wrapper.
+    ///
+    /// - Parameter api: API name for the event and fail-open identity.
+    /// - Parameter cat: Capture category gating the emit.
+    /// - Parameter args: Object arguments to render into fields.
+    /// - Returns: True when the original call must be suppressed.
     @discardableResult
     private static func emit(_ api: String, _ cat: OPCategory, _ args: [AnyObject?]) -> Bool {
         guardLock.lock()

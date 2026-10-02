@@ -2,6 +2,8 @@
 //  AppIntegrity.swift
 //  Ophanim
 //
+//  Install integrity: verification + move-to-Apps.
+//
 
 import Foundation
 

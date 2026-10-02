@@ -32,6 +32,9 @@ final class SourcesWindowManager: NSObject, @unchecked Sendable {
     }
 }
 
+/// Sources browser: subscribed feeds with per-app install/update affordances,
+/// search (forces every group open so matches show), and the manage sheet.
+/// Transfers live in SourceInstalls, so closing this window never interrupts one.
 struct AppSourcesView: View {
     @Bindable private var store = AppSourcesStore.shared
     @Bindable private var installs = SourceInstalls.shared
@@ -151,6 +154,8 @@ struct AppSourcesView: View {
     }
 
     private func binding(for url: URL) -> Binding<Bool> {
+        // While filtering, force every group open so matches are visible without
+        // expanding each feed by hand.
         Binding(
             get: { isFiltering || expandedSources.contains(url) },
             set: { expanded in
@@ -196,6 +201,8 @@ struct AppSourcesView: View {
         }
     }
 
+    /// Merges same-bundle feed duplicates into one row (first entry wins the name;
+    /// versions union, latest kept): feeds list one bundle under several names.
     private func filteredApps(in source: AppSource) -> [SourceApp] {
         let query = searchString.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let base = query.isEmpty ? source.apps : source.apps.filter {
@@ -241,6 +248,9 @@ struct AppSourcesView: View {
 
 // MARK: - Rows and sheets
 
+/// One source app row: icon, badges (beta/update), install/update affordance state
+/// machine, expandable version list with per-version install, and failure text.
+/// All transfer actions delegate to SourceInstalls; the view owns no state.
 private struct SourceAppRow: View {
     let app: SourceApp
     let feedName: String
@@ -478,6 +488,7 @@ private struct SourceAppRow: View {
     }
 }
 
+/// Feed/app icon with a placeholder glyph while loading or when URL-less.
 private struct SourceFeedIcon: View {
     let url: URL?
 
@@ -506,6 +517,9 @@ private struct SourceFeedIcon: View {
     }
 }
 
+/// Add/edit/remove/reset sheet for subscribed feeds. Add/edit validate (bad URL or
+/// duplicate states the error inline); rename applies before the URL change so the
+/// row is found by its stable pre-edit identity.
 private struct ManageSourcesSheet: View {
     @Bindable var store: AppSourcesStore
     @Environment(\.dismiss) private var dismiss

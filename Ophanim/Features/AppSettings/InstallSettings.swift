@@ -2,14 +2,14 @@
 //  InstallSettings.swift
 //  Ophanim
 //
-//  Created by TheMoonThatRises on 10/9/22.
+//  Install-flow preferences (Galgal default, install popup). Driven by the install
+//  dialog and headless callers; no dedicated settings tab.
 //
 
 import SwiftUI
 
-/// Install-flow preferences. The dedicated Install settings tab was removed; these are driven by
-/// the install dialog (and sensible defaults). The per-app "Application Type" now lives on each
-/// app's Application settings tab instead of a global default.
+/// Install-flow preferences (no dedicated tab; the install dialog + defaults drive
+/// these). The per-app Application Type lives on each app's settings instead.
 class InstallPreferences: NSObject, ObservableObject {
     nonisolated(unsafe) static var shared: InstallPreferences = {
         // @AppStorage init is MainActor-isolated; first access may come from a

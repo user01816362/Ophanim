@@ -2,6 +2,7 @@
 //  LegacySettings.swift
 //  Ophanim
 //
+//  One-way migration from legacy monolith/dict/array settings to AppSettingsData.
 //  Created by Isaac Marovitz on 07/09/2022.
 //
 

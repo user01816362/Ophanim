@@ -1,8 +1,25 @@
+//
+//  ReportBuilder.swift
+//  Ophanim
+//
+//  Pure aggregation over decoded OPEvents: NDJSON scan + behavior/privacy
+//  report. Read-only; log aggregation lives here, settings in SettingsStore.
+//
+
 import Foundation
 
 /// Pure aggregation over decoded OPEvents: NDJSON scan + behavior/privacy report.
 enum ReportBuilder {
     /// Load captured events for an app, newest last, optionally filtered, capped to `limit`.
+    ///
+    /// Both log dirs are scanned (current shared container + legacy data-container
+    /// path, so pre-shared-dir logs stay readable). Corrupt lines are skipped.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter category: Optional category filter (raw value match).
+    /// - Parameter search: Optional case-insensitive substring over api/summary/fields.
+    /// - Parameter limit: Max events kept (`0` = all).
+    /// - Returns: The events, oldest first.
     static func events(_ bundleID: String, category: String?, search: String?, limit: Int) -> [OPEvent] {
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
         var all: [OPEvent] = []
@@ -32,6 +49,9 @@ enum ReportBuilder {
     /// Where capture NDJSON lives. The current path is Ophanim's shared container keyed by bundle id
     /// (`OPPaths.logDirectory`); the legacy path is the app's own data container, kept so logs written
     /// before the shared-dir fix stay readable. Both are scanned by `events`.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The current dir first, then the legacy dir.
     static func logDirs(_ bundleID: String) -> [URL] {
         [OPPaths.logDirectory(forBundleID: bundleID),
          OPPaths.legacyLogDirectory(forBundleID: bundleID)]
@@ -92,11 +112,14 @@ enum ReportBuilder {
         "omtrdc.net": "Adobe Analytics (analytics)"
     ]
 
-    /// Summarize a run into a behavior/privacy picture: who it talked to, what it accessed, etc.
     /// Previous-run crash explanation for analyze_app. Reads last-crash.json (written at
     /// launch before the sweep) plus any crash files the current run already holds. Absent
     /// everything: "no-crash-file" - clean quit and silent kill stay indistinguishable,
     /// stated once here instead of guessed per question.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The crash payload (previous-run correlation, current-run record,
+    ///   or the explicit no-crash-file note).
     static func crashSection(_ bundleID: String) -> [String: Any] {
         if let last = OPCrashCorrelator.load(bundleID: bundleID) {
             var d: [String: Any] = ["runId": last.runId,
@@ -117,6 +140,12 @@ enum ReportBuilder {
                 "note": "no-crash-file: clean quit or silent kill (indistinguishable)"]
     }
 
+    /// Summarize a run into a behavior/privacy picture: who it talked to, what it accessed, etc.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The full report (per-category counts, network/hosts/trackers,
+    ///   identifiers, privacy APIs, keychain, crypto, jailbreak, pinning, crash,
+    ///   process).
     static func report(_ bundleID: String) -> [String: Any] {
         let events = self.events(bundleID, category: nil, search: nil, limit: 0)
         var byCat: [String: Int] = [:]
@@ -200,6 +229,16 @@ enum ReportBuilder {
     }
 
     // MARK: - Static inventory
+    /// Static class/selector inventory from binary strings (`/usr/bin/strings`).
+    /// Misses generated classes and plain ObjC classes — the live list (Agent
+    /// Mode) covers those; see `InspectTools.classInventory`.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter filter: Optional case-insensitive substring.
+    /// - Parameter limit: Max rows per list (callers cap at 2000).
+    /// - Returns: The executable path plus the filtered `classes` and `selectors`.
+    /// - Throws: `ToolRouter.ToolError` when the app is not installed or the
+    ///   binary cannot be read.
     static func staticClassInventory(_ bundleID: String, filter: String?, limit: Int) throws -> (executable: String, classes: [String], selectors: [String]) {
         guard let exe = AppQueryService.appExecutable(bundleID) else {
             throw ToolRouter.ToolError(message: "app not installed: \(bundleID)")

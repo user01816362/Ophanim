@@ -2,11 +2,14 @@
 //  ToastView.swift
 //  Ophanim
 //
-//  Created by Isaac Marovitz on 07/08/2022.
+//  Overlay toasts + install progress. Each toast auto-dismisses after its own
+//  interval; the install bar mirrors InstallVM while a transfer/install runs.
 //
 
 import SwiftUI
 
+/// Overlay toast stack (notice / error / network) plus the install progress bar.
+/// Dismissal is per-toast timing; the next removal is always the oldest toast.
 struct ToastView: View {
     public static let toastGlassPadding: CGFloat = 8
 

@@ -18,6 +18,7 @@ import Foundation
 import ObjectiveC.runtime
 
 enum OPFilesystemHooks {
+    /// Installs the NSFileManager swizzles (sibling-mode filesystem fallback). Gated on .filesystem.
     static func install() {
         guard OPAgent.shared.isActive(.filesystem) else { return }
         guard let cls = NSClassFromString("NSFileManager") else { return }
@@ -28,6 +29,10 @@ enum OPFilesystemHooks {
         swizzleCreateFile(cls)
     }
 
+    /// Renders an AnyObject path argument as a string ("?" when absent/wrong type).
+    ///
+    /// - Parameter obj: Path argument from the swizzled call.
+    /// - Returns: Path string.
     private static func pathString(_ obj: AnyObject?) -> String {
         if let s = obj as? NSString { return s as String }
         return "?"

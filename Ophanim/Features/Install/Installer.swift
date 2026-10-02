@@ -2,13 +2,21 @@
 //  Installer.swift
 //  Ophanim
 //
-//  Created by Александр Дорофеев on 24.11.2021.
+//  IPA install pipeline: unzip, entitlements save, Mach-O convert + sign, Galgal
+//  inject, wrapper bundle, re-sign. Runs on a user-initiated Task; the Galgal prompt
+//  hops to main synchronously (a modal cannot take an async hop).
 //
 
 import Foundation
 
+/// IPA install pipeline (frozen, proven working): unzip → convert/sign → inject →
+/// wrap → re-sign. Headless callers force the Galgal decision via `injectGalgal`
+/// (no modal); GUI callers get the prompt unless Option is held.
 class Installer {
 
+    /// Asks whether to inject Galgal, honoring the "don't ask again" suppression.
+    ///
+    /// - Returns: True when Galgal should be injected.
     @MainActor
     static func installGalgalPopup() -> Bool {
         let (response, suppressed) = Log.modal(
@@ -28,6 +36,11 @@ class Installer {
         return response == .alertFirstButtonReturn
     }
 
+    /// Maps install failures to user-facing strings (disk-full / quota-page /
+    /// corrupted-IPA all surface as generic errors from the pipeline).
+    ///
+    /// - Parameter error: The pipeline error.
+    /// - Returns: The localized message to log.
     static private func returnErrorString(error: Error) -> String {
         switch error.localizedDescription {
         case let str where str.contains("(disk full?)"): NSLocalizedString("alert.notSpace", comment: "")
@@ -45,6 +58,13 @@ class Installer {
     }
 
     // swiftlint:disable:next function_body_length
+    /// Runs the full install pipeline on a user-initiated Task; completion fires with
+    /// the installed app URL (nil on failure, after the error is already logged).
+    ///
+    /// - Parameter ipaUrl: The IPA file to install.
+    /// - Parameter export: When true, re-injects and repacks an IPA instead of wrapping.
+    /// - Parameter injectGalgal: Forced Galgal decision for headless callers (nil = prompt per prefs).
+    /// - Parameter returnCompletion: Verdict callback (installed URL, or nil on failure).
     static func install(ipaUrl: URL, export: Bool, injectGalgal: Bool? = nil,
                         returnCompletion: @escaping (URL?) -> Void) {
         // If (the option key is held or the install galgal popup settings is true) and its not an export,
@@ -136,6 +156,11 @@ class Installer {
         }
     }
 
+    /// Finds the .app inside an unzipped Payload dir (first .app directory wins).
+    ///
+    /// - Parameter folderURL: The Payload directory.
+    /// - Returns: The app handle.
+    /// - Throws: `OphanimError.infoPlistNotFound` when no .app directory exists.
     static func fromIPA(detectingAppNameInFolder folderURL: URL) throws -> BaseApp {
         let contents = try FileManager.default.contentsOfDirectory(atPath: folderURL.path)
 
@@ -175,6 +200,8 @@ class Installer {
         let serialQueue = DispatchQueue(label: "baseAppUrlResolver")
 
         baseApp.url.enumerateContents { url, attributes in
+            // Mach-O magic scan: only regular files with a dylib-or-bare extension can be
+            // images; the 4-byte magic check below is the real gate.
             guard attributes.isRegularFile == true, let fileSize = attributes.fileSize, fileSize > 4 else {
                 return
             }
@@ -209,12 +236,16 @@ class Installer {
         return resolved
     }
 
-    /// Wrapper for codesign, applies the given entitlements to the application and all of its contents
+    /// Dumps the executable's entitlements and stores them for the later re-sign step.
     static func saveEntitlements(_ baseApp: BaseApp) throws {
         let toSave = try Entitlements.dumpEntitlements(exec: baseApp.executable)
         try toSave.store(baseApp.entitlements)
     }
 
+    /// Removes the iOS provisioning profile (invalid on macOS; re-sign replaces it).
+    ///
+    /// - Parameter baseApp: The unzipped app.
+    /// - Throws: File removal failures.
     static func removeMobileProvision(_ baseApp: BaseApp) throws {
         let provision = baseApp.url.appendingPathComponent("embedded.mobileprovision")
         if FileManager.default.fileExists(atPath: provision.path) {

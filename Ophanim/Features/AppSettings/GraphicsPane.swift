@@ -2,9 +2,15 @@
 //  GraphicsPane.swift
 //  Ophanim
 //
+//  Graphics / device-spoofing pane: iOS device model, adaptive resolution math (via
+//  ResolutionMath), window fixes, rotation, floating window, and the Metal HUD.
+//
 
 import SwiftUI
 
+/// Graphics pane: device model, resolution/aspect/scaler, window fixes, rotation.
+/// Every control funnels into setResolution (ResolutionMath owns the math); custom
+/// width/height/scaler seed from settings on appear.
 struct GraphicsView: View {
     @Bindable var settings: AppSettings
     var app: HostedApp
@@ -263,6 +269,9 @@ Spacer()
         }
     }
 
+    /// Recomputes window size + scaler from the picker state via ResolutionMath.
+    /// Called by every resolution-related control; warns when the result exceeds
+    /// the physical screen.
     func setResolution() {
         let screenW = Int(NSScreen.main?.frame.width ?? 1920)
         let screenH = Int(NSScreen.main?.frame.height ?? 1080)
@@ -278,14 +287,24 @@ Spacer()
         showResolutionWarning = r.warn
     }
 
+    /// Width for a height under the current fixed aspect ratio (ResolutionMath owns it).
+    ///
+    /// - Parameter height: The height to convert.
+    /// - Returns: The matching width.
     func getWidthFromAspectRatio(_ height: Int) -> Int {
         ResolutionMath.widthFromAspectRatio(height: height, aspectRatio: settings.settings.aspectRatio)
     }
 
+    /// Usable height for the detected screen width, discounting the notch when present.
+    ///
+    /// - Parameter width: The detected screen width.
+    /// - Parameter height: The detected screen height.
+    /// - Returns: The height minus the notch reserve (or `height` notch-less).
     func getHeightForNotch(_ width: Int, _ height: Int) -> Int {
         ResolutionMath.heightForNotch(width: width, height: height, hasNotch: NSScreen.hasNotch())
     }
 
+    /// Applies the resizable-window ratio preset to settings (ResolutionMath owns it).
     func setAspectRatioForResizableWindow() {
         let (w, h) = ResolutionMath.resizableRatio(type: settings.settings.resizableAspectRatioType,
                                                    customWidth: settings.settings.resizableAspectRatioWidth,

@@ -2,6 +2,7 @@
 //  AppContainer.swift
 //  Ophanim
 //
+//  Per-app data-container paths (container dir, prefs plist) + existence/clear.
 //  Created by Александр Дорофеев on 07.12.2021.
 //
 
@@ -14,10 +15,17 @@ struct AppContainer {
         .appendingPathComponent("Containers")
 
     let bundleId: String
+    /// The OS-owned data-container path for an app.
+    ///
+    /// - Returns: The `~/Library/Containers/<bid>` URL (may not exist yet).
     var containerUrl: URL {
         AppContainer.containersURL.appendingPathComponent(bundleId)
     }
 
+    /// The app's preferences plist. Same path the Container pane shows and the
+    /// library menu deletes — agents use ContainerTools instead of rebuilding it.
+    ///
+    /// - Returns: The `.../Preferences/<bid>.plist` URL (may not exist yet).
     var userPrefsUrl: URL {
         containerUrl.appendingPathComponent("Data")
             .appendingPathComponent("Library")

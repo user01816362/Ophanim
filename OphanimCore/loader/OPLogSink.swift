@@ -10,12 +10,16 @@ import Foundation
 import os
 
 /// A destination for events.
+///
+/// Guest-only: sinks run in the injected agent, never in the host app.
 public protocol OPLogSink: AnyObject {
     func write(_ event: OPEvent)
     func flush()
 }
 
 /// Fan-out to multiple sinks behind one serial queue.
+///
+/// - Parameter event: Event to write (redacted per sink config first).
 public final class OPSinkMultiplexer: @unchecked Sendable {
     private let sinks: [OPLogSink]
     private let queue = DispatchQueue(label: "be.ophanim.sink", qos: .utility)
@@ -32,11 +36,16 @@ public final class OPSinkMultiplexer: @unchecked Sendable {
         }
     }
 
+    /// Flushes every sink synchronously on the multiplexer queue.
     public func flush() {
         queue.sync { for s in sinks { s.flush() } }
     }
 
-    /// Build the active sink set from config, resolving the log directory.
+    /// Builds the active sink set from config, resolving the log directory.
+    ///
+    /// - Parameter config: Active agent config (selects sinks + redaction keys).
+    /// - Parameter logDirectory: Directory the file sinks write into (created if missing).
+    /// - Returns: Multiplexer over the enabled sinks.
     public static func make(config: OPConfig, logDirectory: URL) -> OPSinkMultiplexer {
         var sinks: [OPLogSink] = []
         try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
@@ -78,6 +87,11 @@ public final class OPFileSink: OPLogSink {
     private let encoder: JSONEncoder
     private let iso = ISO8601DateFormatter()
 
+    /// Opens (or creates) the append-only log file and seeks to its end.
+    ///
+    /// - Parameter url: File to append to.
+    /// - Parameter format: NDJSON or plain-text line format.
+    /// - Parameter redactionKeys: Field names replaced with ‹redacted› before writing.
     public init(url: URL, format: Format, redactionKeys: [String]) {
         self.format = format
         self.redactionKeys = redactionKeys
@@ -95,6 +109,9 @@ public final class OPFileSink: OPLogSink {
         self.handle = h
     }
 
+    /// Encodes one event (redacted) and appends it as a single line.
+    ///
+    /// - Parameter event: Event to write.
     public func write(_ event: OPEvent) {
         let e = redacted(event, keys: redactionKeys)
         let line: Data
@@ -132,6 +149,9 @@ public final class OPOsLogSink: OPLogSink {
     private let iso = ISO8601DateFormatter()
     private let loggers: [OPCategory: Logger]
 
+    /// Stands up one os_log logger per capture category.
+    ///
+    /// - Parameter redactionKeys: Field names replaced with ‹redacted› before writing.
     public init(redactionKeys: [String]) {
         self.redactionKeys = redactionKeys
         var map: [OPCategory: Logger] = [:]
@@ -141,6 +161,9 @@ public final class OPOsLogSink: OPLogSink {
         self.loggers = map
     }
 
+    /// Logs one redacted event line to its category logger.
+    ///
+    /// - Parameter event: Event to write.
     public func write(_ event: OPEvent) {
         let e = redacted(event, keys: redactionKeys)
         let line = e.plainTextLine(iso: iso)

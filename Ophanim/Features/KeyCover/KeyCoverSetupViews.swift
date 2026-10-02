@@ -1,13 +1,16 @@
 //
-//  KeyCoverViews.swift
+//  KeyCoverSetupViews.swift
 //  Ophanim
 //
-//  Created by Venti on 31/01/2023.
+//  KeyCover setup / password-change / removal sheets: generated-vs-user master-key
+//  flows with validation. All inert while KeyCover is hard-disabled.
 //
 
 import Foundation
 import SwiftUI
 
+/// First-time KeyCover setup: generated key (stored for the user) or user-provided
+/// key with confirmation. Encrypts under the chosen key on confirm.
 struct KeyCoverInitialSetupView: View {
     @Binding var isPresented: Bool
 
@@ -106,6 +109,8 @@ struct KeyCoverInitialSetupView: View {
     }
 }
 
+/// KeyCover password rotation: verifies the old key, then applies the new
+/// generated-or-user key via setKeyCoverPassword (re-encrypts every chain).
 struct KeyCoverUpdatePasswordView: View {
     @Binding var isPresented: Bool
 
@@ -221,6 +226,8 @@ struct KeyCoverUpdatePasswordView: View {
     }
 }
 
+/// KeyCover removal: verifies the master password, then decrypts everything and
+/// drops the login-keychain entry.
 struct KeyCoverRemovalView: View {
     @Binding var isPresented: Bool
 

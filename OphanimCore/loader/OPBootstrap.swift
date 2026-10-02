@@ -16,6 +16,9 @@ import Foundation
 
 /// Shared engine start/hook logic. Not @objc-named, so each image gets its own symbol and there's
 /// no cross-image duplicate-class warning.
+///
+/// Guest-only: compiled into the embedded Galgal runtime and the standalone sibling agent dylib,
+/// never into the host app.
 enum OPBootstrapCore {
     /// Unconditional start - the sibling agent uses this. The agent only loads when the app is set
     /// to sibling injection, so it always owns the engine.
@@ -43,6 +46,9 @@ enum OPBootstrapCore {
 
     /// Called from GalgalShadow's jailbreak-bypass stubs when a detector is invoked and we return a
     /// safe value. Logged under the .jailbreak category (no-op when that category isn't active).
+    ///
+    /// - Parameter cls: Class owning the bypassed detector.
+    /// - Parameter selector: Selector that was bypassed.
     static func logJailbreakBypass(cls: String, selector: String) {
         guard OPAgent.shared.isActive(.jailbreak) else { return }
         OPAgent.shared.observe(OPEvent(category: .jailbreak, layer: .objc,
@@ -53,6 +59,8 @@ enum OPBootstrapCore {
 
     private static var hooksInstalled = false
 
+    /// One-time base hook setup (ring drain, image-retry arm, built-in capture, user hooks).
+    /// Idempotent: live reload may re-invoke.
     static func installHooks() {
         guard !hooksInstalled else { return }   // idempotent (live reload may re-invoke)
         hooksInstalled = true

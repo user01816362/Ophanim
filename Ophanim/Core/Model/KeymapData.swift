@@ -1,7 +1,9 @@
 //
-//  Keymapping.swift
+//  KeymapData.swift
 //  Ophanim
 //
+//  Key-mapping models (buttons, joysticks, mouse areas, full Keymap blob).
+//  Decoded by GUI and headless set_keymap alike; validated on write.
 //  Created by Isaac Marovitz on 23/08/2022.
 //
 

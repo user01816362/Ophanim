@@ -29,9 +29,14 @@ final class LogWindowManager: NSObject {
     }
 }
 
+/// Live hacking-log table for one app: NDJSON tail with category/search filters,
+/// consecutive-duplicate collapsing, hook-failure + ring-drop badges, and the crash
+/// explanation for the previous run. Selection pins the detail pane (auto-refresh
+/// replaces rows underneath without losing the inspected event).
 struct LogViewerView: View {
     let bundleID: String
 
+    /// One table row: an event plus its collapsed-duplicate count.
     struct Row: Identifiable { let id: Int; let event: OPEvent; var count: Int = 1 }
 
     @State private var events: [OPEvent] = []
@@ -219,6 +224,7 @@ struct LogViewerView: View {
         .onReceive(refreshTimer) { _ in if autoRefresh { load() } }
     }
 
+    /// Detail line for the table: summary plus the identifying fields worth scanning.
     private func detail(_ e: OPEvent) -> String {
         var s = e.summary
         let keys = ["host", "url", "path", "status", "value", "detail", "account", "service"]
@@ -226,6 +232,9 @@ struct LogViewerView: View {
         return s.trimmingCharacters(in: .whitespaces)
     }
 
+    /// Re-scans the log dirs, skipping the full read+parse when the file signature
+    /// is unchanged (the 2s tail hits the idle path). Only reassigns events when
+    /// the run actually grew, so Table selection survives refreshes.
     private func load() {
         // Collect the .ndjson files and a cheap change-signature (path+size+mtime) first. While the log
         // is idle the 2s auto-refresh hits this and returns without re-reading/parsing the whole log.
@@ -276,6 +285,8 @@ struct LogViewerView: View {
          OPPaths.legacyLogDirectory(forBundleID: bundleID)]
     }
 
+    /// Deletes every NDJSON/log file in both log dirs (plus the crash sweep) and
+    /// forces the next load to re-scan even within the same second.
     private func clearLogs() {
         for dir in logDirectories() {
             guard let files = try? FileManager.default.contentsOfDirectory(
@@ -290,6 +301,7 @@ struct LogViewerView: View {
         load()
     }
 
+    /// Reveals the first existing log dir in Finder (current shared dir preferred).
     private func revealInFinder() {
         if let dir = logDirectories().first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
             NSWorkspace.shared.activateFileViewerSelecting([dir])

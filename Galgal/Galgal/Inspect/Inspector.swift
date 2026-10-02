@@ -34,6 +34,9 @@ enum Inspector {
         return windows.first(where: { $0.isKeyWindow }) ?? windows.first
     }
 
+    /// Every window sorted for deterministic ids: key window first, then by level.
+    ///
+    /// - Returns: Visible-scene windows in id order (index = first path component).
     static func sortedWindows() -> [UIWindow] {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         var windows = scenes.flatMap { $0.windows }
@@ -109,6 +112,13 @@ enum Inspector {
     /// the guest clamps, never raises. Also reports instance-proven frameworks (union of
     /// per-node verdicts + evidence), the RN arch from sentinel presence, and the key
     /// window's scene (so diffs can refuse cross-scene pairs stated).
+    ///
+    /// - Parameter redact: Mask secure-field text (secure entry renders as •••).
+    /// - Parameter mode: Tree density (full walks everything, compact collapses scaffolding).
+    /// - Parameter filter: Case-insensitive substring kept (ancestors of matches kept).
+    /// - Parameter maxDepth: Depth ceiling (clamped to the hard 24).
+    /// - Parameter maxNodes: Node budget ceiling (clamped to the hard 2000).
+    /// - Returns: Forest nodes plus truncation flags, framework verdicts, RN arch, scene, and VCs.
     static func snapshot(redact: Bool, mode: InspectMode, filter: String?,
                          maxDepth: Int = maxDepth, maxNodes: Int = maxNodes)
     -> (nodes: [InspectNode], truncated: Bool, truncatedBy: [String],
@@ -223,6 +233,13 @@ enum Inspector {
     /// (collapse, visibleChildren, web opacity, leaf drops), so the returned id
     /// re-resolves in the same mode. Unfiltered walk assumed: ids index the full
     /// forest, like a filter-less uiTree read.
+    /// Geometric pick: frontmost view at normalized x/y (hitTest-independent, so
+    /// interaction-disabled views resolve). Returns elementId + class + VC.
+    ///
+    /// - Parameter x: Normalized horizontal position in 0...1.
+    /// - Parameter y: Normalized vertical position in 0...1.
+    /// - Parameter mode: Tree mode whose ids the result resolves against.
+    /// - Returns: Positional id, class, owning VC, and role — nil when nothing hittable.
     static func pick(x: Double, y: Double, mode: InspectMode)
     -> (id: String, cls: String, vc: String?, role: String)? {
         guard (0...1).contains(x), (0...1).contains(y) else { return nil }
@@ -262,6 +279,10 @@ enum Inspector {
     /// Resolve a positional id ("0.2.1") by re-walking IN THE SAME MODE. ids are only meaningful
     /// against a snapshot taken in that mode; mixing modes fails stated. A view that moved or
     /// vanished resolves to nil, reported, never guessed.
+    ///
+    /// - Parameter elementId: Positional index path from a tree read.
+    /// - Parameter mode: Mode whose walk produced the id.
+    /// - Returns: View, owning window, and class — nil when unresolvable.
     static func resolve(elementId: String, mode: InspectMode) -> (view: UIView, window: UIWindow, cls: String)? {
         let parts = elementId.split(separator: ".").compactMap { Int($0) }
         guard !parts.isEmpty else { return nil }
@@ -332,6 +353,10 @@ enum Inspector {
     }
 
     /// Superclass chain, nearest first, capped. Public runtime API.
+    /// Superclass chain (nearest first, capped at 8) for framework verdicts and element detail.
+    ///
+    /// - Parameter view: View whose class chain to read.
+    /// - Returns: Superclass names, nearest first.
     static func superclasses(of view: UIView) -> [String] {
         var out: [String] = []
         var cls: AnyClass? = class_getSuperclass(type(of: view))
@@ -343,6 +368,9 @@ enum Inspector {
     }
 
     /// Owning view controller via the public responder chain. Nil for window-level views.
+    ///
+    /// - Parameter view: View whose responder chain to walk.
+    /// - Returns: Owning view controller class name, when any.
     static func viewController(of view: UIView) -> String? {
         var next: UIResponder? = view.next
         while let r = next {
@@ -356,6 +384,10 @@ enum Inspector {
     /// (InspectCopyLoadedClassNames): Swift must never malloc/free the class-list buffer.
     /// Thousands of system classes are normal - filter first. Autorelease-pooled: tens of
     /// thousands of temporary names would otherwise sit until the runloop drains.
+    ///
+    /// - Parameter filter: Case-insensitive substring filter (nil/empty means all).
+    /// - Parameter limit: Max names returned (hard-capped at maxClassNames).
+    /// - Returns: Sorted matching names plus the total loaded count (before filter).
     static func runtimeClasses(filter: String?, limit: Int) -> (names: [String], total: Int) {
         let all: [String] = autoreleasepool {
             (InspectCopyLoadedClassNames() as [String]?) ?? []
@@ -373,6 +405,9 @@ enum Inspector {
     /// Foundation values (all copy/free pairs stay in C); the JSON round-trip lands them
     /// in the shared Codable shape. Everything happens inside the pool: the returned
     /// dictionary is autoreleased, and only Swift-owned decoded values leave it.
+    ///
+    /// - Parameter name: Exact runtime class name (from runtimeClasses).
+    /// - Returns: Method/ivar inventory, or nil when the class is not loaded.
     static func classDetail(name: String) -> InspectClassDetail? {
         autoreleasepool {
             guard let dict = InspectCopyClassDetail(name),
@@ -401,6 +436,13 @@ enum Inspector {
         return out
     }
 
+    /// Whether a view survives a filtered read: class, text, or ax label contains the filter.
+    ///
+    /// - Parameter view: View under test.
+    /// - Parameter cls: Runtime class name string.
+    /// - Parameter text: Extracted text, when any.
+    /// - Parameter filter: Case-insensitive substring (nil/empty keeps all).
+    /// - Returns: True when the view is kept.
     static func matches(_ view: UIView, cls: String, text: String?, filter: String?) -> Bool {
         guard let f = filter, !f.isEmpty else { return true }
         if cls.localizedCaseInsensitiveContains(f) { return true }
@@ -410,9 +452,24 @@ enum Inspector {
         return false
     }
 
+    /// Walks one view subtree into an InspectNode. The shared read primitive behind snapshot,
+    /// subtree reads, element detail, and screenshot redaction — all classify identically.
+    ///
     /// Returns the node (nil when over budget, dropped, or filtered), units consumed,
     /// and the two cut flags separately: depth-driven vs node-budget-driven. Callers OR
     /// them up; a subtree can carry both, and inference from one bool would lose that.
+    ///
+    /// - Parameter view: Subtree root.
+    /// - Parameter id: Positional id for the root (descendants append ".i").
+    /// - Parameter window: Owning window (frames are converted into its coordinates).
+    /// - Parameter depth: Current depth (cut when it exceeds maxDepth).
+    /// - Parameter budget: Remaining node budget (cut at zero).
+    /// - Parameter redact: Mask secure-field text.
+    /// - Parameter mode: Full or compact density.
+    /// - Parameter filter: Case-insensitive substring kept (nil/empty keeps all).
+    /// - Parameter maxDepth: Depth ceiling.
+    /// - Parameter inherited: Framework verdict inherited from the ancestor.
+    /// - Returns: Node (nil when cut/filtered), units consumed, depth-cut, node-cut.
     static func walk(_ view: UIView, id: String, window: UIWindow,
                      depth: Int, budget: Int, redact: Bool,
                      mode: InspectMode, filter: String?, maxDepth: Int = maxDepth,

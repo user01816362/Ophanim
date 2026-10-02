@@ -7,12 +7,16 @@
 //  guest addresses under ASLR are meaningless to the host, so read-time symbolication
 //  anywhere else would resolve garbage. Runs only when OPConfig.captureNetworkCallers is
 //  on (default off): dladdr takes the dyld lock per frame, unsuitable for hot paths at
-//  full depth, so capture is 8 frames and fields carry strings, never addresses.
+//  full depth, so capture is capped (maxFrames/maxAppFrames below) and fields carry
+//  strings, never addresses.
 //
 
 import Foundation
 
 /// Attributed caller material for one network event. All strings, all bounded.
+///
+/// Guest-only: symbolicated in-process because guest addresses under ASLR are
+/// meaningless to the host.
 struct OPCallerAttribution {
     var thread: String
     var classes: [String]
@@ -21,10 +25,12 @@ struct OPCallerAttribution {
     static let maxFrames = 32
     static let maxAppFrames = 4
 
-    /// Capture + symbolicate the current thread. Walks up to maxFrames deep (originator
+    /// Captures and symbolicates the current thread. Walks up to maxFrames deep (originator
     /// frames sit below loader machinery) but keeps only app-image frames: anything under
     /// /usr/ or /System/ is loader/system, not the app. Skip the first frames (this
     /// function and the event machinery above it - same 2-frame skip as the backtrace path).
+    ///
+    /// - Returns: Thread label plus bounded app-frame class/symbol strings.
     static func attribute() -> OPCallerAttribution {
         let thread = Thread.isMainThread ? "main"
             : Thread.current.name.map { "queue:\($0)" } ?? "queue:unnamed"
@@ -46,8 +52,11 @@ struct OPCallerAttribution {
         return OPCallerAttribution(thread: thread, classes: classes, symbols: symbols)
     }
 
-    /// "-[T1StatusCell layoutSubviews]" -> "T1StatusCell". Swift-mangled ($s/$S/_T) and C
-    /// symbols have no class to parse - they ride along raw in `symbols` instead.
+    /// Parses an ObjC symbol into its class name ("-[T1StatusCell layoutSubviews]" -> "T1StatusCell").
+    /// Swift-mangled ($s/$S/_T) and C symbols have no class to parse - they ride along raw in `symbols` instead.
+    ///
+    /// - Parameter symbol: dladdr symbol name.
+    /// - Returns: Class name, or nil when the symbol carries none.
     static func objcClass(from symbol: String) -> String? {
         guard symbol.hasPrefix("-[") || symbol.hasPrefix("+[") else { return nil }
         let inner = symbol.dropFirst(2)
@@ -56,8 +65,11 @@ struct OPCallerAttribution {
         return cls.isEmpty ? nil : cls
     }
 
-    /// Trim the noise dladdr prepends: leading underscores on C symbols are an ABI prefix,
+    /// Trims the noise dladdr prepends: leading underscores on C symbols are an ABI prefix,
     /// not part of the name. ObjC "-[...]"/"+[...]" forms pass through untouched.
+    ///
+    /// - Parameter symbol: Raw dladdr symbol name.
+    /// - Returns: Short display form.
     static func shortSymbol(_ symbol: String) -> String {
         symbol.hasPrefix("_") && !symbol.hasPrefix("_T") ? String(symbol.dropFirst()) : symbol
     }

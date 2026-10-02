@@ -2,6 +2,9 @@
 //  Entitlements.swift
 //  Ophanim
 //
+//  Entitlement composition for the seal (HostedApp.sign): base + sandbox
+//  rules + per-app needs. Read by install/launch.
+//
 
 import Foundation
 import Yams
@@ -66,6 +69,12 @@ class Entitlements {
     }
 
     // swiftlint:disable:next cyclomatic_complexity
+    /// Composes the sealing entitlements for an app: base + sandbox rules +
+    /// per-app needs. Read by `HostedApp.sign`.
+    ///
+    /// - Parameter app: The hosted app to compose for.
+    /// - Returns: The entitlement dictionary.
+    /// - Throws: Composition failures propagate (callers fail the install loudly).
     static func composeEntitlements(_ app: HostedApp) throws -> [String: Any] {
         var base = [String: Any]()
         let bundleID = app.info.bundleIdentifier

@@ -2,6 +2,9 @@
 //  Shell.swift
 //  Ophanim
 //
+//  Privileged/process runner: shell-outs, codesign, LLDB, Metal HUD.
+//  Failures throw the command's output as the error.
+//
 
 import Foundation
 
@@ -16,6 +19,14 @@ import Foundation
         func get() -> T { lock.lock(); defer { lock.unlock() }; return value }
     }
 
+    /// Runs a binary with separate argv (never a shell string: no injection
+    /// surface). Non-zero exit throws the command's combined output.
+    ///
+    /// - Parameter print: Whether to also mirror output to the Log.
+    /// - Parameter binary: The executable path.
+    /// - Parameter args: The argv entries.
+    /// - Returns: The combined stdout+stderr text.
+    /// - Throws: The command's output text on non-zero exit.
     @discardableResult
     static func run(print: Bool = true, _ binary: String, _ args: String...) throws -> String {
         let process = Process()

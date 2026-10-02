@@ -21,6 +21,14 @@ import UIKit
 
 enum InspectorActivator {
     /// Tap by window point in a key window. Returns whether the touch was dispatched and to what.
+    ///
+    /// Began runs now and ended queues on the next main turn (same-tick began+ended collapse,
+    /// so they must split across runloop turns). acted:true means "began accepted, ended
+    /// queued", not "delivered".
+    ///
+    /// - Parameter point: Window point to tap (must lie in bounds).
+    /// - Parameter window: Key window receiving the touch.
+    /// - Returns: Whether the touch dispatched, plus the hit-tested target class.
     static func tap(at point: CGPoint, in window: UIWindow) -> (acted: Bool, targetClass: String?) {
         guard window.isKeyWindow, window.bounds.contains(point) else { return (false, nil) }
         let target = window.hitTest(point, with: nil)
@@ -80,6 +88,10 @@ enum InspectorActivator {
     /// them. Works on secure fields; the text comes from the operator, so redaction (which
     /// guards what flows OUT) does not apply. Only UITextField/UITextView accept text;
     /// anything else fails stated.
+    ///
+    /// - Parameter text: Replacement text for the field.
+    /// - Parameter view: Target view (must be a text field or text view).
+    /// - Returns: True when the write landed.
     static func setText(_ text: String, in view: UIView) -> Bool {
         if let field = view as? UITextField {
             field.text = text

@@ -15,6 +15,11 @@ enum InspectControl {
     /// client at a time. Inspect calls are rare and seconds-long; coarse is correct here.
     static let slotLock = NSLock()
 
+    /// Inspect log-directory for an app (created on demand). Every inspect
+    /// transaction (command slot, responses, heartbeats, snapshots) lives here.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The directory URL.
     static func directory(for bundleID: String) -> URL {
         let dir = OPPaths.logDirectory(forBundleID: bundleID)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -79,6 +84,36 @@ enum InspectControl {
         }
     }
 
+    /// One synchronous inspect transaction through the single-slot command file.
+    ///
+    /// Writes the command atomically, polls for the id-matched response until
+    /// the bound, then withdraws the command so a late guest poll never runs a
+    /// stale op twice (a withdrawn tap cannot double-fire). Held under
+    /// `slotLock` for the whole transaction: concurrent hosts share one slot,
+    /// so the second call waits instead of overwriting the first.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter op: The inspect operation.
+    /// - Parameter elementId: Target element (element ops; mode-bound).
+    /// - Parameter x: Horizontal tap/pick point in 0...1 (gesture ops).
+    /// - Parameter y: Vertical tap/pick point in 0...1 (gesture ops).
+    /// - Parameter mode: Tree mode (element ids only resolve in their own mode).
+    /// - Parameter filter: Optional tree substring filter.
+    /// - Parameter limit: Class-list cap (class ops).
+    /// - Parameter x1: Swipe start x in 0...1.
+    /// - Parameter y1: Swipe start y in 0...1.
+    /// - Parameter x2: Swipe end x in 0...1.
+    /// - Parameter y2: Swipe end y in 0...1.
+    /// - Parameter steps: Swipe interpolation steps.
+    /// - Parameter text: Replacement text (set_text).
+    /// - Parameter depthLimit: Tree depth cap (agent-narrowable).
+    /// - Parameter nodeLimit: Tree node cap (agent-narrowable).
+    /// - Parameter className: Class name (class-detail op).
+    /// - Parameter timeout: Transaction bound (default `MCPTimeouts.inspect`).
+    /// - Returns: The guest's response.
+    /// - Throws: `ToolRouter.ToolError` when the guest answers failure, or on
+    ///   timeout — naming the pump silence (stale heartbeat vs never beat) and
+    ///   the relaunch fix.
     static func transact(bundleID bid: String, op: InspectOp,
                          elementId: String? = nil, x: Double? = nil, y: Double? = nil,
                          mode: InspectMode? = nil, filter: String? = nil, limit: Int? = nil,
@@ -140,6 +175,11 @@ enum SnapshotCaptureArg {
         "type": "string", "enum": ["none", "pre", "post", "both"],
         "description": "Pin UI snapshots around the op for flip analysis with inspect_diff "
             + "(pre/post/both; default none). Each leg costs a full tree transaction."]
+    /// Parses the `snapshot` arg (`none`/`pre`/`post`/`both`, default none).
+    ///
+    /// - Parameter args: The tool's `args` dict.
+    /// - Returns: The (pre, post) capture flags.
+    /// - Throws: `ToolRouter.bail` on any other value.
     static func parse(_ args: [String: Any]) throws -> (pre: Bool, post: Bool) {
         guard let raw = args[name] as? String else { return (false, false) }
         switch raw {

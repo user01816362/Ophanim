@@ -2,9 +2,13 @@
 //  InfoPane.swift
 //  Ophanim
 //
+//  Read-only app identity pane: bundle names/ids, versions, category, executable,
+//  minimum OS, Galgal presence, and install paths.
+//
 
 import SwiftUI
 
+/// Read-only identity sheet for one hosted app (Info.plist facts + install state).
 struct InfoView: View {
     @State var info: AppInfo
     @State var hasGalgal: Bool

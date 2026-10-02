@@ -1,5 +1,14 @@
+//
+//  KeyCodeNames.swift
+//  Ophanim
+//
+//  Key-code table for key mapping. Must match Galgal's copy exactly (see below).
+//
+
 // Should match https://github.com/Ophanim/Galgal/blob/master/Galgal/Keymap/KeyCodeNames.swift exactly
 
+/// Key-code table for key mapping. Must match Galgal's copy exactly (see above);
+/// divergence silently misbinds keys.
 class KeyCodeNames {
     public static let defaultCode = -10
 

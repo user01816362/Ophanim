@@ -2,6 +2,9 @@
 //  ObjCHooksEditor.swift
 //  Ophanim
 //
+//  Visual editor for OPConfig.objcHooks: index-keyed list plus the swizzle-target
+//  form (class + selector, class-vs-instance, object-arg count, category, label).
+//
 
 import SwiftUI
 import AppKit
@@ -84,7 +87,7 @@ struct ObjCHooksEditorView: View {
         }
     }
 
-    // MARK: index-safe mutate/persist helpers (selection cleared before removal)
+    // MARK: - Helpers (index-keyed mutate/persist; selection cleared before removal)
 
     private func add() {
         var a = settings.settings.ophanim.objcHooks

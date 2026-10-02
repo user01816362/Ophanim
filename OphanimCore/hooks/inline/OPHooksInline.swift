@@ -28,14 +28,22 @@ private struct OPInlineRec {
 /// Validation: non-null + 8-aligned, the isa word is readable, and the decoded class is a registered
 /// runtime class (cached). Only then is it bridged. Anything else returns nil → caller falls back to hex.
 enum OPObjc {
-    /// Bridge a register value to an ObjC object only after C-side validation (`op_inline_is_objc`
+    /// Bridges a register value to an ObjC object only after C-side validation (`op_inline_is_objc`
     /// does the readable + registered-class check with raw pointers - Swift cast machinery on raw class
     /// values crashes on pathological classes, so it stays in C).
+    ///
+    /// - Parameter raw: Register value to validate and bridge.
+    /// - Returns: Unretained object, or nil when the value is not a readable registered object.
     static func object(_ raw: UInt64) -> AnyObject? {
         guard op_inline_is_objc(UInt(raw)), let p = UnsafeRawPointer(bitPattern: UInt(raw)) else { return nil }
         return Unmanaged<AnyObject>.fromOpaque(p).takeUnretainedValue()
     }
 
+    /// Reads a NUL-terminated C string through the safe C reader, falling back to hex.
+    ///
+    /// - Parameter raw: Address to read from (0 reads as hex, never dereferenced).
+    /// - Parameter max: Maximum bytes to copy.
+    /// - Returns: String contents, or hex when unreadable.
     static func cString(_ raw: UInt64, max: Int = 1024) -> String {
         var buf = [CChar](repeating: 0, count: max)
         let n = op_inline_read_cstring(UInt(raw), &buf, max)
@@ -81,13 +89,19 @@ enum OPInlineHooks {
     }
 
     /// Stable identity of a configured hook across reloads.
+    ///
+    /// - Parameter h: Configured inline hook.
+    /// - Returns: api|module|symbol|address|offset|signature identity string.
     private static func key(_ h: OPInlineHook) -> String {
         "\(h.api)|\(h.module ?? "")|\(h.symbol ?? "")|\(h.address ?? "")|\(h.offset ?? "")|\(h.signature ?? "")"
     }
 
-    /// Install configured inline hooks (Phase 5 wires OPConfig.inlineHooks). For now this also runs a
-    /// dlsym self-test against `optest_inline_target` when present in the host, so the engine can be
-    /// validated end-to-end ahead of the config/MCP plumbing.
+    /// Installs configured inline hooks (OPConfig.inlineHooks, gated on enableInlineHooks), plus a
+    /// dlsym self-test against `optest_inline_target` when present in the host (validates the engine
+    /// end-to-end in harness builds).
+    ///
+    /// Settled hooks (installed or hard-failed) are never reattempted; transient unresolved hooks
+    /// retry on a future reload but log only once.
     static func install() {
         let cfg = OPAgent.shared.config
         guard cfg.enableInlineHooks else { return }
@@ -140,7 +154,10 @@ enum OPInlineHooks {
         }
     }
 
-    /// Parse a {"x2":"nsdata", …} map into {2: .nsdata, …}. Ignores malformed keys.
+    /// Parses a {"x2":"nsdata", …} map into {2: .nsdata, …}. Ignores malformed keys.
+    ///
+    /// - Parameter m: Raw register-name → renderer map from config.
+    /// - Returns: Register-index → renderer map (indices clamped to 0...7).
     private static func parseRenderArgs(_ m: [String: OPArgRender]?) -> [Int: OPArgRender] {
         guard let m = m else { return [:] }
         var out: [Int: OPArgRender] = [:]
@@ -150,8 +167,11 @@ enum OPInlineHooks {
         return out
     }
 
-    /// Resolve a hook's target address. Priority: absolute address, exported symbol, module+offset,
+    /// Resolves a hook's target address. Priority: absolute address, exported symbol, module+offset,
     /// module+signature. `followThunk` chases a leading unconditional B (common for exported Swift).
+    ///
+    /// - Parameter h: Configured inline hook.
+    /// - Returns: Resolved address, or 0 when unresolvable (retried on a future reload).
     private static func resolve(_ h: OPInlineHook) -> UInt {
         if let a = h.address, let v = parseUInt(a) { return UInt(v) }
         if let s = h.symbol, !s.isEmpty {
@@ -180,7 +200,10 @@ enum OPInlineHooks {
             fields: ["result": result, "target": "0x\(String(addr, radix: 16))", "label": api]))
     }
 
-    /// Parse a wildcard byte pattern ("1F 20 ?? D5") to ints; wildcard byte = 0x100 (matches any).
+    /// Parses a wildcard byte pattern ("1F 20 ?? D5") to ints; wildcard byte = 0x100 (matches any).
+    ///
+    /// - Parameter s: Space/comma-separated hex pattern.
+    /// - Returns: Parsed pattern, or empty when malformed.
     private static func parseSignature(_ s: String) -> [Int32] {
         var out: [Int32] = []
         for tok in s.split(whereSeparator: { $0 == " " || $0 == "," }) {
@@ -191,12 +214,24 @@ enum OPInlineHooks {
         return out
     }
 
+    /// Parses a decimal or 0x-prefixed address/offset string.
+    ///
+    /// - Parameter s: Raw string from config.
+    /// - Returns: Parsed value, or nil when malformed.
     private static func parseUInt(_ s: String) -> UInt64? {
         let t = s.trimmingCharacters(in: .whitespaces)
         if t.hasPrefix("0x") || t.hasPrefix("0X") { return UInt64(t.dropFirst(2), radix: 16) }
         return UInt64(t)
     }
 
+    /// Registers per-hook metadata and mints the id echoed through the C engine.
+    ///
+    /// - Parameter api: API name for the event.
+    /// - Parameter category: Capture category gating the emit.
+    /// - Parameter captureReturn: Whether the leave path runs to log the return value.
+    /// - Parameter renderArgs: Register-index → renderer map for entry args.
+    /// - Parameter renderReturn: Renderer for the x0 return value, when set.
+    /// - Returns: Hook id passed to op_inline_install.
     private static func register(api: String, category: OPCategory, captureReturn: Bool,
                                  renderArgs: [Int: OPArgRender], renderReturn: OPArgRender?) -> UInt32 {
         let id = nextID; nextID += 1
@@ -205,8 +240,14 @@ enum OPInlineHooks {
         return id
     }
 
-    /// Apply a register's renderer into the call context (deref as object → body/field, or C string).
+    /// Applies a register's renderer into the call context (deref as object → body/field, or C string).
     /// `into` distinguishes the request side (arg regs → requestBody) from the leave side (responseBody).
+    ///
+    /// - Parameter raw: Register value to render.
+    /// - Parameter r: Renderer to apply.
+    /// - Parameter key: Field key the rendered value lands under.
+    /// - Parameter cc: Context under construction.
+    /// - Parameter asResponse: True on the leave path (render into responseBody), false on entry.
     private static func render(_ raw: UInt64, _ r: OPArgRender, key: String,
                                cc: OPCallContext, asResponse: Bool) {
         switch r {
@@ -224,6 +265,10 @@ enum OPInlineHooks {
         }
     }
 
+    /// Maps a C engine status to its stable result string.
+    ///
+    /// - Parameter s: Status from op_inline_install/uninstall.
+    /// - Returns: Stable result string ("ok", "already-hooked", or a failure reason).
     private static func statusString(_ s: op_inline_status_t) -> String {
         switch s {
         case OP_INLINE_OK:              return "ok"
@@ -240,6 +285,10 @@ enum OPInlineHooks {
     /// Called from the shared entry thunk (via op_inline_dispatch). Returns OP_INLINE_RESUME(0) /
     /// OP_INLINE_REPLACE(1). modifyArgs edits land in x0–x7 before RESUME; REPLACE returns
     /// to the caller with x0 set, skipping the original entirely.
+    ///
+    /// - Parameter hookID: Id minted at register time.
+    /// - Parameter ctx: Saved CPU context (struct base aliases the x0–x30 register file).
+    /// - Returns: OP_INLINE_RESUME/RESUME_LEAVE (run original) or OP_INLINE_REPLACE (skip it).
     static func dispatch(_ hookID: UInt32, _ ctx: UnsafeMutablePointer<OPCpuContext>) -> Int32 {
         guard let rec = table[hookID] else { return Int32(OP_INLINE_RESUME) }
         // x[31] is the first field of OPCpuContext, so the struct base aliases the GP register file.
@@ -295,6 +344,9 @@ enum OPInlineHooks {
 
     /// Called after the original runs (RESUME_LEAVE). Logs its return value; a matching returnReplaced
     /// rule transforms it (here it applies AFTER observing the real result, unlike the entry REPLACE).
+    ///
+    /// - Parameter hookID: Id minted at register time.
+    /// - Parameter ctx: Saved CPU context (x0 holds the return value).
     static func dispatchLeave(_ hookID: UInt32, _ ctx: UnsafeMutablePointer<OPCpuContext>) {
         guard let rec = table[hookID] else { return }
         let regs = UnsafeMutableRawPointer(ctx).assumingMemoryBound(to: UInt64.self)

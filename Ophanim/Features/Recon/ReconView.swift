@@ -32,10 +32,14 @@ final class ReconWindowManager: NSObject {
     }
 }
 
+/// Binary recon for one hosted app: imports (interpose surface), linked libraries,
+/// ObjC classes (swizzle surface), text symbols (inline-hook surface), and a
+/// wildcard signature scanner. nm/otool run detached (synchronous, can be slow).
 struct ReconView: View {
     let executable: URL
     let appName: String
 
+    /// Recon tabs, one per hook tier (labels name the tier each surface feeds).
     enum Tab: String, CaseIterable, Identifiable {
         case imports    = "Imports (interpose)"
         case libraries  = "Libraries"
@@ -155,6 +159,8 @@ struct ReconView: View {
 
     // MARK: - Loading
 
+    /// Runs nm/otool detached and publishes the parsed surfaces on main. arm64-flagged
+    /// invocations fall back to unflagged (older nm); total failure states the cause.
     private func load() {
         loading = true
         loadError = nil
@@ -181,6 +187,8 @@ struct ReconView: View {
         }
     }
 
+    /// Validates the typed pattern and scans the binary detached; results + note
+    /// publish on main. Malformed patterns state it without scanning.
     private func runScan() {
         let bytes = Self.parsePattern(pattern)
         guard !bytes.isEmpty else { scanNote = "Malformed pattern."; scanResults = []; return }
@@ -199,6 +207,12 @@ struct ReconView: View {
 
     // MARK: - Tool runner + parsers (run off the main actor)
 
+    /// Runs one tool synchronously and returns stdout (nil when it cannot run or
+    /// exits non-zero; stderr goes to the null device per the note below).
+    ///
+    /// - Parameter launchPath: The tool path.
+    /// - Parameter args: The tool arguments.
+    /// - Returns: stdout, or nil on failure.
     private nonisolated static func runProcess(_ launchPath: String, _ args: [String]) -> String? {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
@@ -215,6 +229,7 @@ struct ReconView: View {
         return String(data: data, encoding: .utf8)
     }
 
+    /// otool -L paths (first line is the binary itself, skipped).
     private nonisolated static func parseLibraries(_ text: String?) -> [String] {
         guard let text else { return [] }
         // otool -L: first line is the binary path; each following line is "\t<path> (compat ...)".
@@ -225,6 +240,7 @@ struct ReconView: View {
         }
     }
 
+    /// nm -u undefined symbols, single leading underscore stripped, sorted.
     private nonisolated static func parseSymbols(_ text: String?) -> [String] {
         guard let text else { return [] }
         // nm -u: one undefined symbol per line (may be indented). Strip a single leading underscore.
@@ -235,6 +251,7 @@ struct ReconView: View {
         }.filter { !$0.isEmpty }.sorted()
     }
 
+    /// ObjC class names behind _OBJC_CLASS_$_ symbols, de-duplicated, sorted.
     private nonisolated static func parseObjCClasses(_ text: String?) -> [String] {
         guard let text else { return [] }
         let marker = "_OBJC_CLASS_$_"
@@ -247,6 +264,7 @@ struct ReconView: View {
         return set.sorted()
     }
 
+    /// Defined text symbols (type t/T) as "address  name", _OBJC_ excluded (ObjC tab).
     private nonisolated static func parseTextSymbols(_ text: String?) -> [String] {
         guard let text else { return [] }
         // nm lines: "<addr> <type> <name>". Text symbols have type t/T. Keep the address + name.

@@ -9,6 +9,10 @@
 
 import SwiftUI
 
+    /// Per-app instrumentation tab: master enable, injection method, capture
+    /// categories, output sinks, debugger flags, and the editor-window shortcuts.
+    /// Live-applied settings (categories, rules, sinks) vs launch-applied hooks —
+    /// the footer states which is which.
 struct InstrumentationView: View {
     @Bindable var settings: AppSettings
     let app: HostedApp
@@ -243,7 +247,7 @@ struct InstrumentationView: View {
         }
     }
 
-    // MARK: - Binding helpers (mutating settings.settings.* triggers didSet → encode())
+    // MARK: - Helpers (bindings mutate settings.settings.*; didSet persists)
 
     private func bind<T>(_ kp: WritableKeyPath<OPConfig, T>) -> Binding<T> {
         Binding(get: { settings.settings.ophanim[keyPath: kp] },

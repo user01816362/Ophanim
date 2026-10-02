@@ -45,6 +45,8 @@ final class InspectCommandPump: NSObject {
         return dir
     }
 
+    /// Starts the half-second main-runloop poll (common modes, so tracking never stalls it).
+    /// Idempotent: a second start is a no-op.
     func start() {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -141,6 +143,12 @@ final class InspectCommandPump: NSObject {
         return by.isEmpty ? nil : by
     }
 
+    /// Executes one claimed command against the live UI and builds its response.
+    /// Every op either answers or fails stated — never silent, never a guess.
+    ///
+    /// - Parameter cmd: Decoded host command.
+    /// - Parameter redacted: Whether secure-field text is masked (rides in from the poll's config read).
+    /// - Returns: Response written back to the shared log directory.
     private func execute(_ cmd: InspectCommand, redacted: Bool) -> InspectResponse {
         switch cmd.op {
         case .uiTree:
@@ -343,6 +351,12 @@ final class InspectCommandPump: NSObject {
         }
     }
 
+    /// Converts normalized 0...1 coordinates into window points. Out-of-range returns nil.
+    ///
+    /// - Parameter x: Normalized horizontal position.
+    /// - Parameter y: Normalized vertical position.
+    /// - Parameter window: Window whose bounds denormalize against.
+    /// - Returns: Window point, or nil when out of range.
     private func denormalize(x: Double, y: Double, in window: UIWindow) -> CGPoint? {
         let b = window.bounds
         guard (0...1).contains(x), (0...1).contains(y) else { return nil }

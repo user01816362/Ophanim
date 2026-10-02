@@ -2,6 +2,7 @@
 //  AppSettingsVM.swift
 //  Ophanim
 //
+//  App-settings editor view model.
 //  Created by 이승윤 on 2022/08/15.
 //
 

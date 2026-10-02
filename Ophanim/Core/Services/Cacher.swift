@@ -2,6 +2,7 @@
 //  Cacher.swift
 //  Ophanim
 //
+//  App icon cache: iTunes artwork + local icons, dimension-checked.
 //  Created by Amir Mohammadi on 10/2/1401 AP.
 //
 

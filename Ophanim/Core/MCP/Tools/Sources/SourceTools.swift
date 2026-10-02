@@ -1,3 +1,12 @@
+//
+//  SourceTools.swift
+//  Ophanim
+//
+//  App-Sources tools: list/add/remove feeds, install a feed app (optionally
+//  pinned to a version). The stores are synchronous, so handlers call them
+//  directly; only the async fetch and the install settle loop need bridging.
+//
+
 import Foundation
 
 /// App-Sources tools: list/add/remove feeds, install a feed app (optionally
@@ -7,6 +16,11 @@ enum SourceTools {
 
     // MARK: - Feed registry
 
+    /// Lists subscribed AltStore-format feeds with app counts and errors.
+    ///
+    /// - Parameter args: No arguments.
+    /// - Returns: JSON with `count` and the `sources` (`url`, `displayName`,
+    ///   `appCount`, plus `loading`/`error`/`news` when present).
     static func listSources(_ args: [String: Any]) throws -> String {
         let feeds: [[String: Any]] = AppSourcesStore.shared.sources.map { item in
             var feed: [String: Any] = [
@@ -26,6 +40,15 @@ enum SourceTools {
 
     // MARK: - Feed writes
 
+    /// Subscribes an app-source feed by URL. Destructive: dryRun previews by default.
+    ///
+    /// The async store fetch is bridged synchronously (semaphore): the caller
+    /// blocks until the feed resolves or fails.
+    ///
+    /// - Parameter args: `url` (required feed URL, AltStore format);
+    ///   `dryRun: false` subscribes.
+    /// - Returns: Dry-run JSON, or confirmation with the `subscribed` URL.
+    /// - Throws: `ToolRouter.bail` when `url` is missing or the fetch fails.
     static func addSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty else { throw ToolRouter.bail("url is required") }
         if ToolRouter.isDryRun(args) {
@@ -45,6 +68,14 @@ enum SourceTools {
         return try ToolRouter.json(["subscribed": raw])
     }
 
+    /// Unsubscribes an app-source feed by URL (or host). Destructive: dryRun
+    /// previews by default.
+    ///
+    /// - Parameter args: `url` (required; full URL or host, same match as
+    ///   `matchItem`); `dryRun: false` unsubscribes.
+    /// - Returns: Dry-run JSON, or confirmation with the `removed` URL.
+    /// - Throws: `ToolRouter.bail` when `url` is missing or matches no
+    ///   subscribed source.
     static func removeSource(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty else { throw ToolRouter.bail("url is required") }
         guard let target = AppSourcesStore.shared.sources.first(where: {
@@ -59,6 +90,15 @@ enum SourceTools {
 
     // MARK: - Install and lookup
 
+    /// Downloads and installs a feed app (optionally version-pinned), waiting
+    /// to idle. Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `version` (optional pinned
+    ///   version, default latest compatible); `dryRun: false` installs.
+    /// - Returns: Dry-run JSON with the picked `version`/`build`/`bytes`, or
+    ///   confirmation with the `installed` version (or a paused hint).
+    /// - Throws: `ToolRouter.bail` when no source lists the app/version, the
+    ///   install fails, or it stays in flight past `MCPTimeouts.install`.
     static func installSourceApp(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         let version = args["version"] as? String
@@ -87,6 +127,10 @@ enum SourceTools {
     // MARK: - Helpers
 
     /// Match a subscribed feed by full URL or host (same match as removeSource).
+    ///
+    /// - Parameter raw: The caller-supplied URL or host string.
+    /// - Returns: The matching subscribed feed.
+    /// - Throws: `ToolRouter.bail` when no subscribed source matches.
     static func matchItem(_ raw: String) throws -> SourceItem {
         guard let target = AppSourcesStore.shared.sources.first(where: {
             $0.url.absoluteString == raw || $0.url.host == raw
@@ -96,6 +140,10 @@ enum SourceTools {
 
     /// Refresh one feed (by URL) or all feeds — headless twin of the Sources
     /// toolbar refresh (AppSourcesView). Cache sync, not data loss: no dryRun gate.
+    ///
+    /// - Parameter args: `url` (optional; omit to refresh all).
+    /// - Returns: JSON with the `refreshed` URLs and `count`.
+    /// - Throws: `ToolRouter.bail` when the named feed matches no subscription.
     static func refreshSources(_ args: [String: Any]) throws -> String {
         final class Box: @unchecked Sendable {
             var refreshed: [String] = []
@@ -122,6 +170,11 @@ enum SourceTools {
     }
 
     /// Rename a feed's display name. Destructive (mutates subscription): dryRun previews.
+    ///
+    /// - Parameter args: `url` + `name` (required); `dryRun: false` renames.
+    /// - Returns: Dry-run JSON, or confirmation with `url` and `renamed`.
+    /// - Throws: `ToolRouter.bail` when `url`/`name` is missing or matches no
+    ///   subscribed source.
     // MARK: - Feed maintenance
 
     static func renameSource(_ args: [String: Any]) throws -> String {
@@ -139,6 +192,11 @@ enum SourceTools {
 
     /// Re-point a feed at a new URL (cache follows, old cache purged — same as the
     /// GUI edit sheet). Destructive: dryRun previews.
+    ///
+    /// - Parameter args: `url` + `newUrl` (required); `dryRun: false` re-points.
+    /// - Returns: Dry-run JSON, or confirmation with the new `url`.
+    /// - Throws: `ToolRouter.bail` when `url`/`newUrl` is missing, matches no
+    ///   subscribed source, or the update fails.
     static func editSourceURL(_ args: [String: Any]) throws -> String {
         guard let raw = args["url"] as? String, !raw.isEmpty,
               let newURL = args["newUrl"] as? String, !newURL.isEmpty else {
@@ -164,6 +222,9 @@ enum SourceTools {
 
     /// Drop every custom source + caches + resume data (shipped empty state).
     /// Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: No arguments; `dryRun: false` drops all.
+    /// - Returns: Dry-run JSON with `wouldRemove`, or confirmation with `removed`.
     static func resetSources(_ args: [String: Any]) throws -> String {
         let count = AppSourcesStore.shared.sources.count
         if ToolRouter.isDryRun(args) {
@@ -177,6 +238,12 @@ enum SourceTools {
     /// transfer ring menu (SourceInstalls.pause/resume/cancel). Resume reuses the
     /// pinned or latest-compatible version like install_source_app. Destructive
     /// (cancel drops resume data): dryRun previews.
+    ///
+    /// - Parameter args: `bundleID` (required); `action` (required: `pause`,
+    ///   `resume`, `cancel`); `version` (optional resume pin); `dryRun: false` acts.
+    /// - Returns: Dry-run JSON, or confirmation with `action` and the new `state`.
+    /// - Throws: `ToolRouter.bail` when `action` is missing/invalid or no source
+    ///   lists the app/version.
     static func sourceTransfer(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let action = args["action"] as? String,
@@ -203,6 +270,10 @@ enum SourceTools {
     /// Headless mirror of the Sources window search (AppSourcesView.filteredApps):
     /// substring match across name, bundleIdentifier, developerName, one row per
     /// app (bundleID-merged). Read-only; the GUI filter never had an MCP twin.
+    ///
+    /// - Parameter args: `query` (required case-insensitive substring).
+    /// - Returns: JSON with `query`, `count`, and the `apps` rows.
+    /// - Throws: `ToolRouter.bail` when `query` is missing.
     // MARK: - Search and settle
 
     static func searchSourceApps(_ args: [String: Any]) throws -> String {
@@ -230,6 +301,13 @@ enum SourceTools {
         return try ToolRouter.json(["query": query, "count": hits.count, "apps": hits])
     }
 
+    /// Resolves a feed app + version: the pinned version when named, else the
+    /// latest compatible one (same pick as resume).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter version: Optional pinned version (empty means latest compatible).
+    /// - Returns: The feed app and the picked version.
+    /// - Throws: `ToolRouter.bail` when no source lists the app (at that version).
     static func sourceApp(bundleID bid: String, version: String?) throws
         -> (app: SourceApp, picked: SourceAppVersion) {
         for item in AppSourcesStore.shared.sources {
@@ -250,6 +328,12 @@ enum SourceTools {
     }
 
     /// Wait until a source transfer leaves its active states, bounded.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter timeout: How long to wait before giving up.
+    /// - Returns: The settled state (`paused`, `idle`, or `failed` — active
+    ///   states keep sleeping until the bound).
+    /// - Throws: `ToolRouter.bail` when the transfer is still in flight at the bound.
     static func awaitSourceIdle(bundleID bid: String, timeout: TimeInterval) throws -> SourceInstallState {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {

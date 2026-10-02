@@ -89,6 +89,10 @@ struct SnapshotManifest: Codable {
 enum SnapshotStore {
     static let keepSnapshots = 20
 
+    /// Snapshot timeline directory (created on demand).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The `snapshots/` directory URL.
     static func snapshotsDir(bundleID: String) -> URL {
         let dir = OPPaths.logDirectory(forBundleID: bundleID)
             .appendingPathComponent("snapshots")
@@ -98,6 +102,27 @@ enum SnapshotStore {
 
     /// Write one snapshot (manifest + optional JPEG sidecar), prune beyond keep, return
     /// the manifest. Filenames are lexical-chronological; same-second captures bump seq.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter trigger: The trigger name (`pre-*`/`post-*`/manual).
+    /// - Parameter opRef: The bracketed hand op (nil for manual reads).
+    /// - Parameter mode: The tree mode.
+    /// - Parameter filter: The tree substring filter, if any.
+    /// - Parameter rootId: The subtree root, if any.
+    /// - Parameter depthLimit: The tree depth cap.
+    /// - Parameter nodeLimit: The tree node cap.
+    /// - Parameter redacted: The effective redaction flag (frozen on the snapshot).
+    /// - Parameter truncated: Whether the tree hit a cap.
+    /// - Parameter truncatedBy: Which caps truncated the tree.
+    /// - Parameter scene: The scene identifier, if reported.
+    /// - Parameter frameworks: The detected frameworks, if reported.
+    /// - Parameter vcs: The view controllers, if reported.
+    /// - Parameter tree: The captured tree.
+    /// - Parameter treeBytes: The encoded tree (hashed for `treeHash`).
+    /// - Parameter jpeg: Optional screenshot bytes (sidecar).
+    /// - Parameter width: Optional screenshot width.
+    /// - Parameter height: Optional screenshot height.
+    /// - Returns: The written manifest.
     static func capture(bundleID: String, trigger: String, opRef: SnapshotOpRef?,
                         mode: InspectMode, filter: String?, rootId: String? = nil,
                         depthLimit: Int = 24, nodeLimit: Int = 2000,
@@ -149,6 +174,9 @@ enum SnapshotStore {
 
     /// Manifests oldest-first (filenames sort chronologically). Trees included: callers
     /// that only list strip them.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The manifests, oldest first (corrupt files skipped).
     static func list(bundleID: String) -> [SnapshotManifest] {
         let dir = snapshotsDir(bundleID: bundleID)
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -165,6 +193,11 @@ enum SnapshotStore {
         return out
     }
 
+    /// Loads one snapshot manifest by id.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter id: The snapshot id.
+    /// - Returns: The manifest, or nil when missing/corrupt.
     static func load(bundleID: String, id: String) -> SnapshotManifest? {
         let url = snapshotsDir(bundleID: bundleID)
             .appendingPathComponent("snap-\(id).json")
@@ -179,6 +212,9 @@ enum SnapshotStore {
     /// BookmarkStore.maxPins, so sparing them cannot grow the timeline without bound.
     /// Host-side files only, same ordering-not-locking rationale as LogStore: capture runs
     /// when no guest writer holds these files (the guest never writes them at all).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter keep: How many newest unpinned snapshots survive.
     static func prune(bundleID: String, keep: Int = keepSnapshots) {
         let dir = snapshotsDir(bundleID: bundleID)
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -203,6 +239,8 @@ enum SnapshotStore {
     /// clean - except entries the agent pinned via bookmarks, which survive for later
     /// analysis. Host-side files the guest never writes: no live-writer hazard, so no
     /// running guard is needed (unlike the pre-stamp log sweep, which can orphan a writer).
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
     static func sweepUnpinned(bundleID: String) {
         let pinned = BookmarkStore.snapshotRefs(bundleID: bundleID)
         let (files, _) = inventory(bundleID: bundleID)
@@ -216,11 +254,18 @@ enum SnapshotStore {
     }
 
     /// snap-<id>.json -> <id>.
+    ///
+    /// - Parameter url: The snapshot file URL.
+    /// - Returns: The snapshot id.
     static func stemID(_ url: URL) -> String {
         let stem = url.deletingPathExtension().lastPathComponent
         return stem.hasPrefix("snap-") ? String(stem.dropFirst(5)) : stem
     }
 
+    /// Timeline file inventory (manifests + sidecars) with total bytes.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The `snap-*` files (sorted) and their total bytes.
     static func inventory(bundleID: String) -> (files: [URL], bytes: UInt64) {
         let dir = snapshotsDir(bundleID: bundleID)
         guard let entries = try? FileManager.default.contentsOfDirectory(
@@ -240,6 +285,9 @@ enum SnapshotStore {
 
     /// Delete the whole timeline. Returns removed count + bytes. Posts the reset
     /// notification so future GUI views drop removed snapshots instead of showing them.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The removed file count and the inventoried bytes.
     @discardableResult
     static func clear(bundleID: String) -> (removed: Int, bytes: UInt64) {
         let (files, bytes) = inventory(bundleID: bundleID)
@@ -253,10 +301,18 @@ enum SnapshotStore {
         return (removed, bytes)
     }
 
+    /// Node count including the node itself.
+    ///
+    /// - Parameter node: The tree to count.
+    /// - Returns: The total node count.
     static func nodeCount(_ node: InspectNode) -> Int {
         node.children.reduce(1) { $0 + nodeCount($1) }
     }
 
+    /// SHA-256 hex of bytes (tree identity for change detection).
+    ///
+    /// - Parameter bytes: The bytes to hash.
+    /// - Returns: The lowercase hex digest.
     static func hash(_ bytes: Data) -> String {
         SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
     }
@@ -312,6 +368,10 @@ enum SnapshotStore {
 
     /// Diff two snapshots into named events. Returns (events, partial, reason).
     /// Secure node text is never emitted - only `secure:true`.
+    ///
+    /// - Parameter a: The older snapshot.
+    /// - Parameter b: The newer snapshot.
+    /// - Returns: The named flip events, whether the diff is partial, and why.
     static func diff(from a: SnapshotManifest, to b: SnapshotManifest)
     -> (events: [[String: Any]], partial: Bool, reason: String?) {
         var events: [[String: Any]] = []

@@ -2,6 +2,7 @@
 //  KeymapViewVM.swift
 //  Ophanim
 //
+//  Keymap editor view model.
 //  Created by TheMoonThatRises on 6/20/25.
 //
 

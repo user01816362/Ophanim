@@ -119,6 +119,12 @@ struct InspectResponse: Codable {
     /// pick: positional id of the frontmost view at the point (same-mode resolvable).
     var elementId: String? = nil
 
+    /// Builds a failure response carrying the command id, so the host moves on instead of
+    /// burning its full timeout on silence.
+    ///
+    /// - Parameter id: Command id being answered.
+    /// - Parameter message: Stated failure reason.
+    /// - Returns: Not-ok response.
     static func failure(id: String, _ message: String) -> InspectResponse {
         InspectResponse(id: id, ok: false, error: message, truncated: nil, truncatedBy: nil, tree: nil, imageBase64: nil,
                         mimeType: nil, width: nil, height: nil, acted: nil, targetClass: nil)
@@ -192,6 +198,13 @@ enum InspectWire {
     static let responsePrefix = "inspect-rsp-"
     static let pumpAlive = "inspect-pump-alive"
     static let claimSuffix = ".processing"
+    /// Response filename for one command id (single-slot: one response file per command).
+    ///
+    /// - Parameter id: Command id being answered.
+    /// - Returns: Shared response filename.
     static func responseName(for id: String) -> String { "\(responsePrefix)\(id).json" }
+    /// Unique claim filename: claiming by atomic rename means a second pump loses the race.
+    ///
+    /// - Returns: Fresh claim filename.
     static func claimName() -> String { "\(command).\(UUID().uuidString)\(claimSuffix)" }
 }
