@@ -313,6 +313,23 @@ ship a dead app; the top-level seal covers their resources
   `tap`/`swipe` (`snapshot:both`) → `inspect_diff` → `bookmark_add`.
 - Container A/B: `list_profiles` → `create`/`switch` (quit the app first) →
   `clear_container` as needed.
+
+## Proven loops (device-tested)
+
+- Chat turn, no coordinates: fresh `uitree_read` → `find_element` (text) →
+  tap field (focus first on custom inputs — bare `set_text` lands invisibly
+  on delegate-gated fields) → `set_text` same id → tap Send id → screenshot
+  verify. Stale ids fail stated by design; re-read and retry.
+- Gated action: `find_element` → `tap_and_read` shows the resulting UI
+  (e.g. Follow → phone-verification gate) in one round trip.
+- Full app read: `launch_status` (workspace-blind but pump-live happens —
+  trust `agentLive`) → `container_info` (seal/entitlements/prefs path) →
+  `container_read` the prefs plist (use the ABSOLUTE path from
+  `container_info`; relative paths resolve against the wrong root) →
+  `keychain_items` → `sqlite_tables`/`sqlite_rows` on the app's databases.
+- Missing tooling found live: no `terminate_app` — restarting for
+  agentMode/config changes currently needs an external kill; `launch_app`
+  on a running app only activates.
 - Replay: `export_curl` → paste in Terminal, compare statuses.
 - Uninstall: `uninstall_app` dryRun → read preview → `dryRun:false`
   (+`purgeData` only deliberately).
