@@ -22,5 +22,9 @@ const char *OPWebSnapshot(void);
 /// The filled value is never echoed back.
 const char *OPWebAct(const char *cssPath, const char *action, const char *value);
 
+/// Precise reason the last webview lookup failed (malloc'd; free with OPWebFree):
+/// "webkit-not-loaded" | "no-key-window" | "no-webview-under-key-window".
+const char *OPWebDiagnose(void);
+
 /// Frees strings returned above.
 void OPWebFree(const char *s);

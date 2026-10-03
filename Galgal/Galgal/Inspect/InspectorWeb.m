@@ -70,6 +70,9 @@ static UIWindow *OPKeyWindow(void) {
 
 /// First WKWebView under the key window (depth-first). Nil class (app never
 /// loaded WebKit) or no webview on screen both mean nil: stated upstream.
+/// Eval capability is checked with respondsToSelector, not conformsToProtocol:
+/// a genuine WKWebView never adopts our local protocol (informal conformance
+/// only — that check would reject every real webview).
 static UIView<OPWebPageEvaluator> *OPFirstWebView(void) {
     Class WKWebViewClass = NSClassFromString(@"WKWebView");
     if (!WKWebViewClass) { return nil; }
@@ -80,7 +83,7 @@ static UIView<OPWebPageEvaluator> *OPFirstWebView(void) {
         UIView *v = stack.lastObject;
         [stack removeLastObject];
         if ([v isKindOfClass:WKWebViewClass] &&
-            [v conformsToProtocol:@protocol(OPWebPageEvaluator)]) {
+            [v respondsToSelector:@selector(evaluateJavaScript:completionHandler:)]) {
             return (UIView<OPWebPageEvaluator> *)v;
         }
         NSArray<UIView *> *subs = nil;
@@ -126,6 +129,15 @@ const char *OPWebSnapshot(void) {
     UIView<OPWebPageEvaluator> *webView = OPFirstWebView();
     if (!webView) { return NULL; }
     return OPDup(OPRunJS(webView, kSnapshotJS));
+}
+
+/// Precise reason the last lookup failed (malloc'd; caller frees with
+/// OPWebFree). Lets the operator distinguish "web not on screen" from
+/// "lookup itself broken" without a debugger.
+const char *OPWebDiagnose(void) {
+    if (!NSClassFromString(@"WKWebView")) { return OPDup(@"webkit-not-loaded"); }
+    if (!OPKeyWindow()) { return OPDup(@"no-key-window"); }
+    return OPDup(@"no-webview-under-key-window");
 }
 
 // JSON-encode a value string into a JS string literal (quoting safe by

@@ -298,7 +298,14 @@ final class InspectCommandPump: NSObject {
 
         case .webSnapshot:
             guard let cstr = OPWebSnapshot() else {
-                return .failure(id: cmd.id, "no WKWebView found - take a screenshot to confirm web content is on screen")
+                let reason: String
+                if let dstr = OPWebDiagnose() {
+                    defer { OPWebFree(dstr) }
+                    reason = String(cString: dstr)
+                } else {
+                    reason = "lookup failed"
+                }
+                return .failure(id: cmd.id, "no WKWebView found (\(reason)) - take a screenshot to confirm web content is on screen")
             }
             defer { OPWebFree(cstr) }
             var snap_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
