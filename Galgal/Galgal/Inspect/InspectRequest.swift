@@ -86,7 +86,7 @@ struct InspectCommand: Codable {
     var className: String?
     /// setText: replacement text for a field.
     var text: String?
-    /// webAct: CSS path recorded by web_snapshot (tag/nth-child chain).
+    /// webAct: CSS path recorded by web_snapshot (tag/nth-of-type chain).
     var cssPath: String?
     /// webAct: fill | click | select | submit.
     var webAction: String?
