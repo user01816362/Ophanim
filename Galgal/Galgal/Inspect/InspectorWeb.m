@@ -36,7 +36,10 @@ static NSString * const kSnapshotJS =
 @"while(el&&el.nodeType===1&&el!==document.body&&d<12){"
 @"var tag=el.tagName.toLowerCase(),idx=1,sib=el;"
 @"while((sib=sib.previousElementSibling)!=null){if(sib.tagName===el.tagName)idx++;}"
-@"parts.unshift(tag+(idx>1?':nth-child('+idx+')':''));"
+// cssPath() counts same-TAG siblings, so it must emit :nth-of-type (same-tag
+// index), not :nth-child (all-sibling index): the two disagree whenever tags
+// interleave, and the recorded path then matches nothing on replay.
+@"parts.unshift(tag+(idx>1?':nth-of-type('+idx+')':''));"
 @"el=el.parentElement;d++;}"
 @"parts.unshift('body');return parts.join(' > ');}"
 @"var els=document.querySelectorAll('input,textarea,select,button,a,[role=\"button\"],h1,h2,h3');"
@@ -158,7 +161,7 @@ const char *OPWebAct(const char *cssPath, const char *action, const char *value)
     NSString *path = [NSString stringWithUTF8String:cssPath];
     NSString *act = [NSString stringWithUTF8String:action];
     NSString *val = value ? OPJSLiteral([NSString stringWithUTF8String:value]) : @"\"\"";
-    // Single-quoted path: cssPath() emits tag/nth-child chains only (no quotes possible).
+    // Single-quoted path: cssPath() emits tag/nth-of-type chains only (no quotes possible).
     NSString *script = [NSString stringWithFormat:
         @"(function(){"
         @"var el=document.querySelector('%@');"
