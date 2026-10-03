@@ -16,7 +16,7 @@ class HostedApp: BaseApp, @unchecked Sendable {
 
     public static var bundleIDCache: [String] {
         get throws {
-            (try String(contentsOf: bundleIDCacheURL))
+            (try String(contentsOf: bundleIDCacheURL, encoding: .utf8))
                 .split(whereSeparator: \.isNewline)
                 .map { String($0) }
         }

@@ -235,10 +235,10 @@ class Galgal {
         var result = false
         try _ = Macho.iterateLoadCommands(binary: binary) { offset, shouldSwap in
             let loadCommand = binary.extract(load_command.self, offset: offset,
-                                             swap: shouldSwap ? swap_load_command:nil)
+                                             swap: shouldSwap ? { swapLoadCommand($0, $1) } : nil)
             if loadCommand.cmd == UInt32(LC_LOAD_DYLIB) {
                 let dylibCommand = binary.extract(dylib_command.self, offset: offset,
-                                                  swap: shouldSwap ? swap_dylib_command:nil)
+                                                  swap: shouldSwap ? { swapDylibCommand($0, $1) } : nil)
 
                 let dylibName = String(data: binary,
                                        offset: offset,
@@ -475,7 +475,7 @@ class Galgal {
         FileManager.default.fileExists(atPath: target.path, isDirectory: &isDir)
         if !isDir.boolValue && target.pathExtension == "dylib" {
             do {
-                if try !(try Macho.isMachoValidArch(target)) {
+                if !(try Macho.isMachoValidArch(target)) {
                     try Macho.convertMacho(target)
                 }
             } catch {

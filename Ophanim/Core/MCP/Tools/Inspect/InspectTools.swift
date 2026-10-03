@@ -99,7 +99,7 @@ enum InspectTools {
         // Single gate (InspectGate.requireLive): not-installed / not-running / host-setting
         // off, each naming its own fix; guest-pump silent stays at the timeout site.
         // Liveness comes from the shared definition, never a bare NSWorkspace check.
-        let (settings, redacted) = try InspectGate.requireLive(bundleID: bid)
+        let (_, redacted) = try InspectGate.requireLive(bundleID: bid)
 
         switch name {
         case "uitree_read":
@@ -255,7 +255,7 @@ enum InspectTools {
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw ToolRouter.bail("web_snapshot returned no DOM for \(bid) - is web content on screen?")
             }
-            var payload: [String: Any] = ["bundleID": bid,
+            let payload: [String: Any] = ["bundleID": bid,
                                    "url": obj["url"] ?? NSNull(),
                                    "title": obj["title"] ?? NSNull(),
                                    "count": obj["count"] ?? 0,

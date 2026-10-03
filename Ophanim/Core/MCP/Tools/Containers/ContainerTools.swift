@@ -299,7 +299,7 @@ enum ContainerTools {
                 at: dir, includingPropertiesForKeys: [.fileSizeKey]) else { continue }
             for f in entries where f.pathExtension == "ndjson" {
                 let size = (try? f.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
-                files.append(["path": f.path, "bytes": size ?? 0])
+                files.append(["path": f.path, "bytes": size])
             }
         }
         return try ToolRouter.json(["bundleID": bid, "path": primary.path, "alsoScanned": dirs.map(\.path),

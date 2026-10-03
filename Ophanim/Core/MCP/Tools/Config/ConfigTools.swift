@@ -226,7 +226,7 @@ enum ConfigTools {
             for f in entries where f.pathExtension == "plist" && f.lastPathComponent != ".config.plist" {
                 let size = (try? f.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
                 let name = f.deletingPathExtension().lastPathComponent
-                maps.append(["name": name, "bytes": size ?? 0, "default": name == def])
+                maps.append(["name": name, "bytes": size, "default": name == def])
             }
         }
         maps.sort { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }

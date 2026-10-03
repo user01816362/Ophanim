@@ -9,7 +9,7 @@
 class UpdateScheme {
     public static let versionsFile = Galgal.ophanimContainer.appendingPathComponent("VERSION")
     public static var currentVersion: String {
-        (try? String(contentsOf: UpdateScheme.versionsFile)) ?? "3.1"
+        (try? String(contentsOf: UpdateScheme.versionsFile, encoding: .utf8)) ?? "3.1"
     }
     struct Version: Hashable {
         let components: [Int]

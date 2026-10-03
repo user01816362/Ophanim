@@ -11,7 +11,7 @@ import Foundation
 
     public static let appDirectory = Galgal.ophanimContainer.appendingPathComponent("Applications")
 
-    nonisolated(unsafe) static let shared = AppsVM()
+    static let shared = AppsVM()
 
     private init() {
         try? AppsVM.ensureBaseDirectoriesExist()

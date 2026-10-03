@@ -18,7 +18,7 @@ enum InstallStepsNative: String {
          failed = "hostedapp.progress.failed"
 }
 
-class InstallVM: ProgressVM<InstallStepsNative> {
+class InstallVM: ProgressVM<InstallStepsNative>, @unchecked Sendable {
 
     static let shared = InstallVM()
 

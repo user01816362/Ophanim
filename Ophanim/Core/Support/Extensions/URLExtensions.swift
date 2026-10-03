@@ -90,10 +90,11 @@ extension URL {
         queue.qualityOfService = .userInitiated
         queue.maxConcurrentOperationCount = 15
 
+        let callbackBox = EnumerateCallbackBox(callback)
         for case let fileURL as URL in enumerator {
             queue.addOperation {
                 do {
-                    try callback(fileURL, fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]))
+                    try callbackBox.callback(fileURL, fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]))
                 } catch {
                     // Don't show error, as there could be many files within the folder
                     // that would fail the callback
@@ -121,5 +122,14 @@ extension URL {
 
     func setBinaryPosixPermissions(_ permissions: Int) throws {
         try FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: path)
+    }
+}
+
+/// Carries enumerateContents' (non-Sendable) callback across OperationQueue's
+/// @Sendable operation boundary (same Box pattern as the tweak/network VMs).
+private final class EnumerateCallbackBox: @unchecked Sendable {
+    let callback: (URL, URLResourceValues) throws -> Void
+    init(_ callback: @escaping (URL, URLResourceValues) throws -> Void) {
+        self.callback = callback
     }
 }

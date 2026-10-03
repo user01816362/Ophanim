@@ -210,8 +210,8 @@ extension NSScreen {
 
         if let modelData = IORegistryEntryCreateCFProperty(service, "model" as CFString, kCFAllocatorDefault, 0)
             .takeRetainedValue() as? Data {
-            if let modelIdentifierCString = String(data: modelData, encoding: .utf8)?.cString(using: .utf8) {
-                modelIdentifier = String(cString: modelIdentifierCString)
+            if let modelString = String(data: modelData, encoding: .utf8) {
+                modelIdentifier = String(modelString.prefix(while: { $0 != "\0" }))
             }
         }
         IOObjectRelease(service)

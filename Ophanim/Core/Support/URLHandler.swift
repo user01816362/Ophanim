@@ -30,11 +30,11 @@ enum URLAction: Int, Equatable {
 }
 
 struct URLHandler {
-    public nonisolated(unsafe) static let shared = URLHandler()
+    public static let shared = URLHandler()
 
     func processURL(url: URL) {
         guard let urlComponenents = NSURLComponents(url: url, resolvingAgainstBaseURL: false),
-              let uriHost = urlComponenents.host,
+              urlComponenents.host != nil,
               let params = urlComponenents.queryItems else {
                 // Fall back to old url handler (for files)
                 if url.pathExtension == "ipa" {

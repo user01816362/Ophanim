@@ -10,7 +10,7 @@ import SwiftUI
 
 class SoundDeviceService: @unchecked Sendable {
 
-    nonisolated(unsafe) static let shared = SoundDeviceService()
+    static let shared = SoundDeviceService()
 
     private init() { }
 
