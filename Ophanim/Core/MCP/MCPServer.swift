@@ -38,7 +38,8 @@ final class MCPServer {
     /// Tools that change no state. Everything else defaults to mutating.
     static let readOnlyTools: Set<String> = [
         "list_apps", "tool_matrix", "launch_status", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
-        "find_symbols", "list_libraries", "scan_signature",
+        "find_symbols", "list_libraries", "scan_signature", "diff_events", "hook_coverage",
+        "app_plist", "all_symbols", "list_protocols", "string_xrefs",
         "get_config", "get_hooks", "validate_rule_script",
         "list_jailbreak_detectors", "list_presets",
         "list_sources", "search_source_apps", "refresh_sources",
@@ -47,6 +48,7 @@ final class MCPServer {
         "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
         "list_classes", "uitree_read", "screenshot",
         "inspect_pick", "inspect_pasteboard", "inspect_focus", "find_element", "web_snapshot",
+        "await_ui",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -68,7 +70,7 @@ final class MCPServer {
         "set_pref",
         "inspect_clear_snapshots",
         "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
-        "tap_element", "swipe", "set_text", "tap_and_read", "web_act",
+        "tap_element", "swipe", "set_text", "tap_and_read", "web_act", "tap_and_observe",
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
@@ -101,7 +103,10 @@ final class MCPServer {
                 "ttlMs": 300000,
                 "instructions": "Ophanim instruments iOS apps running on macOS. Use list_apps to "
                     + "find a bundle ID, query_events to read captured behavior, get_config/set_config "
-                    + "to inspect and change what is captured, and launch_app to run one."
+                    + "to inspect and change what is captured, and launch_app to run one. "
+                    + "Golden path per app: launch_status (readiness) → uitree_read/find_element "
+                    + "(resolve ids) → tap_and_read (act+verify) → query_events (caused behavior). "
+                    + "Consult tool_matrix before mutating (dryRun families + destructive flags)."
             ])
         case "initialize":
             let pv = params["protocolVersion"] as? String ?? "2025-06-18"
@@ -111,7 +116,10 @@ final class MCPServer {
                 "serverInfo": ["name": serverName, "version": serverVersion],
                 "instructions": "Ophanim instruments iOS apps running on macOS. Use list_apps to "
                     + "find a bundle ID, query_events to read captured behavior, get_config/set_config "
-                    + "to inspect and change what is captured, and launch_app to run one."
+                    + "to inspect and change what is captured, and launch_app to run one. "
+                    + "Golden path per app: launch_status (readiness) → uitree_read/find_element "
+                    + "(resolve ids) → tap_and_read (act+verify) → query_events (caused behavior). "
+                    + "Consult tool_matrix before mutating (dryRun families + destructive flags)."
             ])
         case "ping":
             return Self.result(id, [:])
@@ -216,7 +224,12 @@ final class MCPServer {
     /// - Returns: The handler's JSON text (object payload or plain message).
     /// - Throws: `ToolRouter.bail` (`unknown tool: <name>`) for unregistered names.
     private func runTool(_ name: String, _ args: [String: Any]) throws -> String {
-        guard let handler = ToolRouter.handlers[name] else { throw ToolRouter.bail("unknown tool: \(name)") }
+        guard let handler = ToolRouter.handlers[name] else {
+            if let best = ToolRouter.suggestTool(name) {
+                throw ToolRouter.bail("unknown tool: \(name) - did you mean '\(best)'?")
+            }
+            throw ToolRouter.bail("unknown tool: \(name)")
+        }
         return try handler(args)
     }
 
@@ -395,7 +408,8 @@ final class MCPServer {
             "name": "apply_preset",
             "description": "Apply a named rule preset to an app (merges into existing rules, by id). "
                 + "block-trackers blocks known tracker/analytics/ad hosts; fake-idfv/fake-idfa return fixed fake identifiers; "
-                + "block-host takes parameters.host; fake-device-id takes parameters.value.",
+                + "block-host takes parameters.host; fake-device-id takes parameters.value. "
+                + "Omitted dryRun WRITES (explicit-true contract like set_rules); pass dryRun:true to preview.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -414,7 +428,9 @@ final class MCPServer {
                 + "For script rules set action.script to JS that reads/sets ctx (ctx.block=true, "
                 + "ctx.returnValue, ctx.replacementBody[base64], ctx.replacementStatus, ctx.x0-x7 inline arg edits, "
                 + "ctx.state.* per-rule persistent strings; reads ctx.method/ctx.statusCode). modifyArgs also accepts "
-                + "cannedArgs {x0:..} for inline register rewrites. Takes effect live on a running app.",
+                + "cannedArgs {x0:..} for inline register rewrites. Takes effect live on a running app. "
+                + "Mock-from-capture recipe: export_curl a request, then add a replaceReturn rule matching "
+                + "its host/url with replacementBody/replacementStatus to test client behavior.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -619,9 +635,9 @@ final class MCPServer {
         [
             "name": "set_config",
             "description": "Modify an app's per-app settings. Any omitted field is left unchanged. "
-                + "Changes persist to the per-app settings; capture categories, rules, sinks and pinning "
-                + "apply live to a running app (config is watched), while newly added hooks and the "
-                + "injection strategy take effect on next launch.",
+                + "Changes persist to the per-app settings; capture categories, rules, sinks, pinning "
+                + "and hooks apply live to a running app (config is watched, ~1 s poll — no relaunch "
+                + "needed for hook changes); only the injection strategy needs relaunch.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -988,7 +1004,7 @@ final class MCPServer {
         ],
         [
             "name": "tweak_folder",
-            "description": "Create/rename/remove a tweak subfolder.",
+            "description": "Create/rename/remove a tweak subfolder (action enum: create|rename|remove).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1003,7 +1019,7 @@ final class MCPServer {
         ],
         [
             "name": "resync_tweaks",
-            "description": "Re-sync the store into the app.",
+            "description": "Re-sync the tweak store into the running app (no relaunch; hook changes apply via config poll).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1102,7 +1118,7 @@ final class MCPServer {
         ],
         [
             "name": "container_info",
-            "description": "Resolved container report.",
+            "description": "Resolved container report: paths, entitlements composition, signature/seal check, sizes.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1113,7 +1129,7 @@ final class MCPServer {
         ],
         [
             "name": "list_profiles",
-            "description": "Container profiles + active + live check.",
+            "description": "Container profiles + active profile + live check (switch refuses while the app runs).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1237,6 +1253,54 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "app_plist",
+            "description": "Bundle Info.plist projection + semantic launch-planning checks (deep-link schemes, ATS exceptions, background modes, usage-description keys, version skew). Read-only over the installed .app.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "all_symbols",
+            "description": "Paged full symbol dump (no keyword guessing): same nm/demangle pipeline as find_symbols, sorted unique, sliced host-side.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "kind": ["type": "string", "description": "symbols (default) | classes | selectors."],
+                    "page": ["type": "integer", "description": "Zero-based page (default 0)."],
+                    "perPage": ["type": "integer", "description": "Rows per page (default 200, max 500)."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "list_protocols",
+            "description": "Raw protocol/conformance section dumps (ObjC protocol list + Swift conformance sections, bounded text). Delegate-shape hook prediction; typed parsing is a later step.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "string_xrefs",
+            "description": "Approximate string cross-refs: data-section pointer slots holding offsets into matching cstrings (8-byte scan, labeled approximate). string-to-hook-anchor derivation without disassembly.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "keyword": ["type": "string", "description": "Substring of the string (same allowlist as find_symbols)."]
+                ],
+                "required": ["bundleID", "keyword"]
+            ]
+        ],
+        [
             "name": "set_injection_strategy",
             "description": "Persist embedded/sibling strategy and settle load commands.",
             "inputSchema": [
@@ -1356,7 +1420,7 @@ final class MCPServer {
         ],
         [
             "name": "tap_element",
-            "description": "Tap by element id or x/y with optional snapshot pins.",
+            "description": "Tap by element id (preferred, same-mode resolvable) or x/y in 0...1, with optional snapshot pins. Returns acted + targetClass. Key-window taps only; ids are positional per walk. Example: tap_element {bundleID, elementId: '2.1'}.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1372,7 +1436,7 @@ final class MCPServer {
         ],
         [
             "name": "find_element",
-            "description": "Find nodes by text/label/class substring (case-insensitive) in a fresh tree. Returns matching ids for tap_element/set_text.",
+            "description": "Find nodes by text/label/class substring (case-insensitive) or exact ax identifier in a fresh tree. Returns matching ids for tap_element/set_text, plus treeHash. Example: find_element {bundleID, text: 'Log In'}.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1380,6 +1444,7 @@ final class MCPServer {
                     "text": ["type": "string"],
                     "label": ["type": "string"],
                     "class": ["type": "string"],
+                    "identifier": ["type": "string", "description": "Exact accessibility identifier (ranks first)."],
                     "mode": ["type": "string"],
                     "limit": ["type": "integer", "description": "Max matches (default 20, cap 100)."]
                 ],
@@ -1388,7 +1453,7 @@ final class MCPServer {
         ],
         [
             "name": "tap_and_read",
-            "description": "Tap (by id or x/y) then return a fresh tree nodes[] showing what changed. Fused act+verify, no snapshot pins (v1).",
+            "description": "Tap (by id or x/y) then return a fresh tree nodes[] showing what changed, plus treeHash. Fused act+verify, no snapshot pins (v1). Example: tap_and_read {bundleID, elementId: '2.1'}.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1397,6 +1462,41 @@ final class MCPServer {
                     "x": ["type": "number"],
                     "y": ["type": "number"],
                     "mode": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "await_ui",
+            "description": "Wait (bounded poll, max 30s) until a tree node matches text/label/class/identifier, then return it with treeHash and waitedMs. Ends uitree_read hot loops; timeout + unchanged hash = stuck verdict. Each poll costs one full tree transaction.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "text": ["type": "string"],
+                    "label": ["type": "string"],
+                    "class": ["type": "string"],
+                    "identifier": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "waitMs": ["type": "integer", "description": "Bound in ms (default 5000, max 30000)."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "tap_and_observe",
+            "description": "Tap (by id or x/y), wait briefly for background events, then return acted + fresh nodes[] + the caused events. 'This tap caused these 3 requests' in one call. Host-only composition; no guest change.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "x": ["type": "number"],
+                    "y": ["type": "number"],
+                    "mode": ["type": "string"],
+                    "category": ["type": "string", "description": "Event filter for the window."],
+                    "search": ["type": "string", "description": "Event substring filter for the window."],
+                    "waitMs": ["type": "integer", "description": "Post-tap event wait in ms (default 2000, max 30000)."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -1468,21 +1568,79 @@ final class MCPServer {
         ],
         [
             "name": "export_curl",
-            "description": "Render the newest matching recorded request as a replay-grade curl command.",
+            "description": "Render the newest matching recorded request as a replay-grade curl command. "
+                + "Header masking follows capture redactionKeys where applied at capture; treat rendered "
+                + "headers as potentially secret - never paste into shared contexts without checking.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
                     "url": ["type": "string", "description": "Substring filter."],
                     "host": ["type": "string", "description": "Substring filter."],
-                    "since": ["type": "number", "description": "Cursor (epoch ms)."]
+                    "since": ["type": "number", "description": "Cursor (epoch ms)."],
+                    "index": ["type": "integer", "description": "0 = newest (default), 1 = one before, ..."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "event_mark",
+            "description": "Pin the current newest-event cursor under a name for later events_since_mark windows. Host memory only. Example: event_mark {bundleID} before a tap, then events_since_mark after.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "name": ["type": "string", "description": "Mark name (default 'default')."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "events_since_mark",
+            "description": "Events after a named mark (exact-window causality without re-pulling full logs). Same filters as tail_events.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "mark": ["type": "string", "description": "Mark name (default 'default')."],
+                    "category": ["type": "string"],
+                    "search": ["type": "string"],
+                    "limit": ["type": "integer", "description": "Max events (default 100, newest)."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "diff_events",
+            "description": "Diff two capture cursors: group events in (sinceA, sinceB] by api with counts + first/last. The tap-to-traffic read: tail cursor, act, diff. Example: diff_events {bundleID, sinceA: cursorBeforeTap, sinceB: cursorAfter}.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "sinceA": ["type": "number", "description": "Window start (cursor epoch ms)."],
+                    "sinceB": ["type": "number", "description": "Window end (cursor epoch ms)."],
+                    "category": ["type": "string"],
+                    "search": ["type": "string"]
+                ],
+                "required": ["bundleID", "sinceA", "sinceB"]
+            ]
+        ],
+        [
+            "name": "hook_coverage",
+            "description": "Which instrumented apis fired since a cursor, with counts + first/last + dispositions (most-fired first). Flow map for 'did my hook fire during that tap'. Host-only aggregation, no guest change.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "since": ["type": "number", "description": "Cursor (epoch ms, default 0)."],
+                    "limit": ["type": "integer", "description": "Max apis (default 200, max 1000)."]
                 ],
                 "required": ["bundleID"]
             ]
         ],
         [
             "name": "swipe",
-            "description": "Swipe with optional snapshot pins.",
+            "description": "Swipe from (x1,y1) to (x2,y2) in 0...1 with optional step interpolation and snapshot pins. Example: swipe {bundleID, x1: 0.9, y1: 0.5, x2: 0.1, y2: 0.5} for back-navigation.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1569,7 +1727,7 @@ final class MCPServer {
         ],
         [
             "name": "inspect_timeline",
-            "description": "Timeline with latest-pair diff.",
+            "description": "Snapshot timeline with latest-pair auto-diff (before/after UI proof).",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1582,7 +1740,7 @@ final class MCPServer {
         ],
         [
             "name": "inspect_diff",
-            "description": "Diff two snapshots.",
+            "description": "Diff two snapshots by id (same walk/mode/filter required; mismatch names the repair).",
             "inputSchema": [
                 "type": "object",
                 "properties": [

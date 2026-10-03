@@ -81,12 +81,51 @@ enum InspectTools {
                                         "frame": n.frame, "enabled": n.enabled]
                 if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
                 if let l = n.axLabel, !l.isEmpty { d["label"] = l }
+                if let ident = n.axIdentifier, !ident.isEmpty { d["identifier"] = ident }
                 if flat.count < 100 { flat.append(d) }
             }
             for c in n.children { collect(c) }
         }
         collect(tree)
         return flat
+    }
+
+    /// Stable hash of a walked tree (FNV-1a over canonically-encoded JSON):
+    /// cheap screen-stability signal ("same screen 3 turns?") without
+    /// re-parsing full trees. Same screen + same caps = same hash.
+    ///
+    /// - Parameter tree: The walked tree.
+    /// - Returns: 16-hex-char hash (best-effort; "0" when unencodable).
+    static func hashTree(_ tree: InspectNode) -> String {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.sortedKeys]
+        guard let data = try? enc.encode(tree) else { return "0" }
+        var h: UInt64 = 14695981039346656037
+        for b in data { h ^= UInt64(b); h = h &* 1099511628211 }
+        return String(format: "%016llx", h)
+    }
+
+    /// Shared text/label/class/identifier predicate for find_element and
+    /// await_ui (one matcher, two callers — cannot drift). Identifier match
+    /// ranks first (exact, ax-identifier-first grounding); the rest are
+    /// case-insensitive substrings, any criterion matching.
+    ///
+    /// - Parameter d: A flat node dict.
+    /// - Parameter text: Optional text substring.
+    /// - Parameter label: Optional label substring.
+    /// - Parameter className: Optional class substring.
+    /// - Parameter identifier: Optional exact ax identifier.
+    /// - Returns: True when all supplied criteria match.
+    static func nodeMatches(_ d: [String: Any], text: String?, label: String?,
+                            className: String?, identifier: String?) -> Bool {
+        if let q = identifier, !q.isEmpty, (d["identifier"] as? String) != q { return false }
+        if let q = text, !q.isEmpty,
+           !((d["text"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+        if let q = label, !q.isEmpty,
+           !((d["label"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+        if let q = className, !q.isEmpty,
+           !((d["class"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+        return true
     }
 
     /// Tree-read arguments shared by uitree_read and inspect_snapshot (mode, substring
@@ -154,6 +193,7 @@ enum InspectTools {
             let flat = Self.flatNodes(tree)
             summary["nodes"] = flat
             summary["nodeCount"] = flat.count
+            summary["treeHash"] = Self.hashTree(tree)
             return MCPServer.result(id, [
                 "resultType": "complete",
                 "content": [["type": "text", "text": text]],
@@ -167,7 +207,9 @@ enum InspectTools {
                                                   elementId: shotElementId,
                                                   annotate: annotate ? true : nil)
             guard let b64 = rsp.imageBase64, !b64.isEmpty else {
-                throw ToolRouter.bail("screenshot captured nothing for \(bid) - is a window visible?")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "screenshot captured nothing for \(bid)",
+                    next: "launch_status {bundleID} to confirm a visible window, then retry",
+                    why: "no visible window to capture"))
             }
             let w = rsp.width ?? 0, h = rsp.height ?? 0
             return MCPServer.toolResultImage(id, base64: b64, mimeType: rsp.mimeType ?? "image/jpeg",
@@ -181,7 +223,9 @@ enum InspectTools {
             let x = ToolRouter.coerceDouble(args, "x")
             let y = ToolRouter.coerceDouble(args, "y")
             guard elementId != nil || (x != nil && y != nil) else {
-                throw ToolRouter.bail("tap_element needs elementId (preferred) or both x and y in 0...1")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "tap_element needs elementId or x and y",
+                    next: "find_element {text} (or uitree_read) to resolve the id, then retry",
+                    alt: "pass both x and y in 0...1 for a coordinate tap"))
             }
             if let x, let y, !(0...1).contains(x) || !(0...1).contains(y) {
                 throw ToolRouter.bail("x and y must each be in 0...1, got (\(x), \(y))")
@@ -209,26 +253,24 @@ enum InspectTools {
             let hasText = ((args["text"] as? String)?.isEmpty == false)
             let hasLabel = ((args["label"] as? String)?.isEmpty == false)
             let hasClass = ((args["class"] as? String)?.isEmpty == false)
-            guard hasText || hasLabel || hasClass else {
-                throw ToolRouter.bail("find_element needs at least one of text, label, class")
+            let hasIdentifier = ((args["identifier"] as? String)?.isEmpty == false)
+            guard hasText || hasLabel || hasClass || hasIdentifier else {
+                throw ToolRouter.bail(ToolRouter.recovery(what: "find_element needs a criterion",
+                    next: "pass at least one of text, label, class, identifier, then retry"))
             }
             let findRsp = try InspectControl.transact(bundleID: bid, op: .uiTree,
                                                       mode: mode)
             guard let findTree = findRsp.tree else {
                 throw ToolRouter.bail("find_element read no tree for \(bid)")
             }
-            func hit(_ d: [String: Any]) -> Bool {
-                if hasText, let q = args["text"] as? String,
-                   !((d["text"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
-                if hasLabel, let q = args["label"] as? String,
-                   !((d["label"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
-                if hasClass, let q = args["class"] as? String,
-                   !((d["class"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
-                return true
-            }
-            let matches = Self.flatNodes(findTree).filter(hit).prefix(limit)
+            let matches = Self.flatNodes(findTree).filter {
+                Self.nodeMatches($0, text: args["text"] as? String,
+                                 label: args["label"] as? String,
+                                 className: args["class"] as? String,
+                                 identifier: args["identifier"] as? String)
+            }.prefix(limit)
             return MCPServer.toolResult(id, ["bundleID": bid, "matches": Array(matches),
-                                      "count": matches.count])
+                                      "count": matches.count, "treeHash": Self.hashTree(findTree)])
 
         case "tap_and_read":
             // Fused act+verify: tap (by id or x/y), then a fresh tree in the same
@@ -237,7 +279,9 @@ enum InspectTools {
             let tapX = ToolRouter.coerceDouble(args, "x")
             let tapY = ToolRouter.coerceDouble(args, "y")
             guard tapId != nil || (tapX != nil && tapY != nil) else {
-                throw ToolRouter.bail("tap_and_read needs elementId or both x and y in 0...1")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "tap_and_read needs elementId or x and y",
+                    next: "find_element {text} (or uitree_read) to resolve the id, then retry",
+                    alt: "pass both x and y in 0...1 for a coordinate tap"))
             }
             let tapMode = try inspectMode(args)
             let tapRsp = try InspectControl.transact(bundleID: bid, op: .tap,
@@ -252,8 +296,101 @@ enum InspectTools {
                 let nodes = Self.flatNodes(after)
                 payload["nodes"] = nodes
                 payload["nodeCount"] = nodes.count
+                payload["treeHash"] = Self.hashTree(after)
             }
             return MCPServer.toolResult(id, payload)
+
+        case "await_ui":
+            // Bounded predicate wait: poll a fresh tree until a node matches
+            // (or timeout) instead of agent-side uitree_read hot loops. Each
+            // poll costs one full tree transaction under the serial slot (same
+            // honesty as snapshot pins). Timeout + same hash = stuck verdict.
+            let awaitMode = try inspectMode(args)
+            let waitMs = min(max(ToolRouter.coerceInt(args, "waitMs") ?? 5000, 0), 30000)
+            let qText = (args["text"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let qLabel = (args["label"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let qClass = (args["class"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let qId = (args["identifier"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            guard qText != nil || qLabel != nil || qClass != nil || qId != nil else {
+                throw ToolRouter.bail(ToolRouter.recovery(what: "await_ui needs a criterion",
+                    next: "pass at least one of text, label, class, identifier, then retry"))
+            }
+            let deadline = Date().addingTimeInterval(Double(waitMs) / 1000.0)
+            let started = Date()
+            var lastHash = "0"
+            var lastCount = 0
+            while true {
+                let poll = try InspectControl.transact(bundleID: bid, op: .uiTree, mode: awaitMode)
+                if let tree = poll.tree {
+                    lastHash = Self.hashTree(tree)
+                    let nodes = Self.flatNodes(tree)
+                    lastCount = nodes.count
+                    if let hit = nodes.first(where: {
+                        Self.nodeMatches($0, text: qText, label: qLabel, className: qClass, identifier: qId)
+                    }) {
+                        return MCPServer.toolResult(id, ["bundleID": bid, "matched": true,
+                                                 "node": hit, "treeHash": lastHash, "nodeCount": lastCount,
+                                                 "waitedMs": Int(Date().timeIntervalSince(started) * 1000)])
+                    }
+                }
+                if Date() >= deadline {
+                    return MCPServer.toolResult(id, ["bundleID": bid, "matched": false,
+                                             "treeHash": lastHash, "nodeCount": lastCount,
+                                             "waitedMs": Int(Date().timeIntervalSince(started) * 1000)])
+                }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+
+        case "tap_and_observe":
+            // Fused act + UI + event window: "this tap caused these requests"
+            // in one call. Cursor → tap → bounded event wait → post tree.
+            // Host-only composition of tap_and_read + tail_events; no guest change.
+            let obTapId = (args["elementId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let obX = ToolRouter.coerceDouble(args, "x")
+            let obY = ToolRouter.coerceDouble(args, "y")
+            guard obTapId != nil || (obX != nil && obY != nil) else {
+                throw ToolRouter.bail(ToolRouter.recovery(what: "tap_and_observe needs elementId or x and y",
+                    next: "find_element {text} (or uitree_read) to resolve the id, then retry",
+                    alt: "pass both x and y in 0...1 for a coordinate tap"))
+            }
+            let obMode = try inspectMode(args)
+            let obCategory = args["category"] as? String
+            let obSearch = (args["search"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let obWaitMs = min(max(ToolRouter.coerceInt(args, "waitMs") ?? 2000, 0), 30000)
+            let fence = ReportBuilder.events(bid, category: nil, search: nil, limit: 0)
+            let since = (fence.last?.timestamp.timeIntervalSince1970 ?? 0) * 1000
+            let obTap = try InspectControl.transact(bundleID: bid, op: .tap,
+                                                    elementId: obTapId, x: obX, y: obY,
+                                                    mode: obMode)
+            let obDeadline = Date().addingTimeInterval(Double(obWaitMs) / 1000.0)
+            var obEvents: [OPEvent] = []
+            while true {
+                let scan = ReportBuilder.events(bid, category: obCategory, search: nil, limit: 0)
+                obEvents = scan.filter { $0.timestamp.timeIntervalSince1970 * 1000 > since }
+                if let obSearch, !obSearch.isEmpty {
+                    obEvents = obEvents.filter {
+                        $0.api.localizedCaseInsensitiveContains(obSearch)
+                        || $0.summary.localizedCaseInsensitiveContains(obSearch)
+                        || $0.fields.contains { $0.value.localizedCaseInsensitiveContains(obSearch) }
+                    }
+                }
+                if !obEvents.isEmpty || Date() >= obDeadline { break }
+                Thread.sleep(forTimeInterval: 0.25)
+            }
+            let obAfter = try InspectControl.transact(bundleID: bid, op: .uiTree, mode: obMode)
+            var obPayload: [String: Any] = ["bundleID": bid,
+                                     "acted": obTap.acted ?? false,
+                                     "targetClass": obTap.targetClass ?? "unknown",
+                                     "eventCount": obEvents.count]
+            let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+            obPayload["events"] = (try? JSONSerialization.jsonObject(with: enc.encode(obEvents))) ?? []
+            if let tree = obAfter.tree {
+                let nodes = Self.flatNodes(tree)
+                obPayload["nodes"] = nodes
+                obPayload["nodeCount"] = nodes.count
+                obPayload["treeHash"] = Self.hashTree(tree)
+            }
+            return MCPServer.toolResult(id, obPayload)
 
         case "inspect_pick":
             func norm(_ key: String) throws -> Double {
@@ -268,7 +405,9 @@ enum InspectTools {
                                                   x: norm("x"), y: norm("y"),
                                                   mode: mode)
             guard let elementId = rsp.elementId else {
-                throw ToolRouter.bail("nothing hittable at the point - take a fresh tree")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "nothing hittable at the point",
+                    next: "uitree_read (same mode) for fresh ids, then retry",
+                    why: "element ids are positional per walk"))
             }
             var payload: [String: Any] = ["bundleID": bid, "elementId": elementId,
                                    "class": rsp.targetClass ?? "unknown"]
@@ -376,7 +515,8 @@ enum InspectTools {
 
         case "set_text":
             guard let elementId = (args["elementId"] as? String), !elementId.isEmpty else {
-                throw ToolRouter.bail("set_text needs elementId - take a tree, pick the field")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "set_text needs elementId",
+                    next: "find_element {text of the field} (or uitree_read) to resolve the id, then retry"))
             }
             guard let text = args["text"] as? String else {
                 throw ToolRouter.bail("set_text needs text")
@@ -412,7 +552,8 @@ enum InspectTools {
 
         case "inspect_element":
             guard let elementId = (args["elementId"] as? String), !elementId.isEmpty else {
-                throw ToolRouter.bail("inspect_element needs elementId - take a tree first")
+                throw ToolRouter.bail(ToolRouter.recovery(what: "inspect_element needs elementId",
+                    next: "find_element {text} (or uitree_read) to resolve the id, then retry"))
             }
             let rsp = try InspectControl.transact(bundleID: bid, op: .element,
                                                   elementId: elementId,
@@ -474,7 +615,8 @@ enum InspectTools {
                 let shot = try InspectControl.transact(bundleID: bid, op: .screenshot)
                 guard let b64 = shot.imageBase64, !b64.isEmpty,
                       let raw = Data(base64Encoded: b64) else {
-                    throw ToolRouter.bail("inspect_snapshot captured nothing - is a window visible?")
+                    throw ToolRouter.bail(ToolRouter.recovery(what: "inspect_snapshot captured nothing",
+                    next: "launch_status {bundleID} to confirm a visible window, then retry"))
                 }
                 jpeg = raw; w = shot.width; h = shot.height
             }
@@ -593,7 +735,8 @@ enum InspectTools {
                 if kind == "class" { target.className = name } else { target.symbol = name }
             default: // element
                 guard let eid = (args["elementId"] as? String), !eid.isEmpty else {
-                    throw ToolRouter.bail("bookmark_add kind element needs elementId - take a tree first")
+                    throw ToolRouter.bail(ToolRouter.recovery(what: "bookmark_add kind element needs elementId",
+                    next: "find_element {text} (or uitree_read) to resolve the id, then retry"))
                 }
                 let mode = try inspectMode(args)
                 target.elementId = eid
@@ -1011,7 +1154,7 @@ enum InspectTools {
     /// dispatcher forks on this (never its own copy) so the two cannot drift.
     static let inspectToolNames: Set<String> = [
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
-        "find_element", "tap_and_read",
+        "find_element", "tap_and_read", "await_ui", "tap_and_observe",
         "inspect_pick", "inspect_pasteboard", "inspect_focus",
         "web_snapshot", "web_act",
         "inspect_classes", "inspect_element", "inspect_class_detail",

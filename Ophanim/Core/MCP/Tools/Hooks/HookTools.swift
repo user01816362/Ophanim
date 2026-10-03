@@ -15,6 +15,42 @@ import Foundation
 /// the default would silently turn their writes into previews). Pass
 /// dryRun:true to preview counts/validation without persisting.
 enum HookTools {
+    /// Structural preflight shared by the three writers: within-batch
+    /// duplicates, cross-tier overlap against CURRENT settings, and malformed
+    /// shapes. Pure (no recon, no guest) so it runs identically in dryRun
+    /// previews and as a note on writes. Existence stays agent-side
+    /// (suggest_hooks + installSummary events); the write note points there.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter kind: Writer kind for the note text.
+    /// - Parameter keys: Normalized (identityKey, label) per new entry.
+    /// - Returns: Note strings (empty when clean).
+    private static func preflight(bid: String, kind: String,
+                                  keys: [(id: String, label: String)]) -> [String] {
+        var notes: [String] = []
+        var seen: Set<String> = []
+        for k in keys {
+            if k.id.isEmpty {
+                notes.append("\(kind): entry '\(k.label)' has an empty target - it will not install")
+            } else if !seen.insert(k.id).inserted {
+                notes.append("\(kind): duplicate target '\(k.id)' in this batch - installs once")
+            }
+        }
+        if let cur = SettingsStore.appSettings(bid)?.ophanim {
+            let live = Set(cur.objcHooks.map { "objc:\($0.className).\($0.selector)" })
+                .union(cur.swiftHooks.map { "swift:\($0.className).\($0.method)" })
+                .union(cur.inlineHooks.map { "inline:\($0.symbol ?? $0.address ?? $0.offset ?? $0.signature ?? $0.api)" })
+            for k in keys where live.contains(k.id) {
+                notes.append("\(kind): '\(k.id)' already installed - resend replaces in place")
+            }
+            let objcTargets = Set(cur.objcHooks.map { "\($0.className).\($0.selector)" })
+            for k in keys where k.id.hasPrefix("swift:") && objcTargets.contains(String(k.id.dropFirst(6))) {
+                notes.append("\(kind): '\(k.id)' overlaps an ObjC hook on the same method - expect double logging")
+            }
+        }
+        return notes
+    }
+
     /// Replaces the ObjC boundary hooks for an app.
     ///
     /// Swizzles (className, selector) pairs and logs the call plus its object
@@ -31,12 +67,17 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPObjCHook] = try ToolRouter.decode(hooksArg, label: "hooks")
+        let notes = preflight(bid: bid, kind: "objc",
+                              keys: hooks.map { ("objc:\($0.className).\($0.selector)", "\($0.className).\($0.selector)") })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
-                                 "wouldSet": hooks.count, "kind": "objc"])
+                                 "wouldSet": hooks.count, "kind": "objc",
+                                 "preflight": notes])
         }
         try SettingsStore.updateSettings(bid) { $0.ophanim.objcHooks = hooks }
-        return "Set \(hooks.count) ObjC boundary hook(s) for \(bid)."
+        var msg = "Set \(hooks.count) ObjC boundary hook(s) for \(bid)."
+        msg += notes.map { " NOTE: \($0)." }.joined()
+        return msg + " Verify: tail_events search installSummary after ~2 s."
     }
 
     /// Replaces the native-Swift vtable hooks for an app.
@@ -54,12 +95,17 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPSwiftHook] = try ToolRouter.decode(hooksArg, label: "hooks")
+        let notes = preflight(bid: bid, kind: "swift",
+                              keys: hooks.map { ("swift:\($0.className).\($0.method)", "\($0.className).\($0.method)") })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
-                                 "wouldSet": hooks.count, "kind": "swift"])
+                                 "wouldSet": hooks.count, "kind": "swift",
+                                 "preflight": notes])
         }
         try SettingsStore.updateSettings(bid) { $0.ophanim.swiftHooks = hooks }
-        return "Set \(hooks.count) native-Swift vtable hook(s) for \(bid)."
+        var msg = "Set \(hooks.count) native-Swift vtable hook(s) for \(bid)."
+        msg += notes.map { " NOTE: \($0)." }.joined()
+        return msg + " Verify: tail_events search installSummary after ~2 s."
     }
 
     /// Replaces the Tier-3 inline (machine-code) hooks for an app.
@@ -78,14 +124,20 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPInlineHook] = try ToolRouter.decode(hooksArg, label: "hooks")
+        let notes = preflight(bid: bid, kind: "inline",
+                              keys: hooks.map { ("inline:\($0.symbol ?? $0.address ?? $0.offset ?? $0.signature ?? $0.api)", $0.api) })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
                                  "wouldSet": hooks.count, "kind": "inline",
-                                 "gateOn": SettingsStore.appSettings(bid)?.ophanim.enableInlineHooks ?? false])
+                                 "gateOn": SettingsStore.appSettings(bid)?.ophanim.enableInlineHooks ?? false,
+                                 "preflight": notes])
         }
         try SettingsStore.updateSettings(bid) { $0.ophanim.inlineHooks = hooks }
         let gate = (SettingsStore.appSettings(bid)?.ophanim.enableInlineHooks ?? false)
-        return "Set \(hooks.count) inline hook(s) for \(bid)."
+        var msg = "Set \(hooks.count) inline hook(s) for \(bid)."
+        msg += notes.map { " NOTE: \($0)." }.joined()
+        msg += " Verify: tail_events search installSummary after ~2 s."
+        return msg
             + (gate ? "" : " NOTE: inline hooks are OFF - call set_config enableInlineHooks=true to arm them.")
     }
 

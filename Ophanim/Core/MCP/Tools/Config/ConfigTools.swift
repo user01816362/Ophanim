@@ -45,6 +45,18 @@ enum ConfigTools {
     static func setConfig(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         try ToolRouter.rejectUnknownKeys(args, allowed: SettingsStore.setConfigKeys, tool: "set_config")
+        // Redaction guardrail: flipping the global raw-capture posture bundled
+        // with routine tuning is the one unmask path without a confirming call.
+        // Require it standalone (one field per call).
+        if args["inspectDisableRedaction"] as? Bool == true {
+            let others = Set(args.keys).subtracting(["bundleID", "inspectDisableRedaction"])
+            guard others.isEmpty else {
+                throw ToolRouter.bail(ToolRouter.recovery(
+                    what: "inspectDisableRedaction:true bundled with \(others.sorted().joined(separator: ", "))",
+                    next: "set_config {bundleID, inspectDisableRedaction:true} alone as an explicit consent call, then retry",
+                    why: "global raw capture is a safety-posture change, never a side effect"))
+            }
+        }
         try SettingsStore.updateSettings(bid) { try SettingsStore.applyPatch(args, to: &$0) }
         let body = SettingsStore.configProjection(bid).flatMap { try? ToolRouter.json($0) } ?? "{}"
         return "Updated. New config:\n" + body

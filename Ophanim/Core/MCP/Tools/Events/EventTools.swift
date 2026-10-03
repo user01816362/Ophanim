@@ -15,6 +15,32 @@ enum EventTools {
 
     // MARK: - Reads
 
+    /// Named event cursors (fences): `event_mark` pins "now" per app so a
+    /// later `events_since_mark` (or `tap_and_observe`) returns exactly the
+    /// window — "these 3 requests were caused by this tap" without re-pulling
+    /// full logs. Host memory only; marks die with the process.
+    private final class MarkStore: @unchecked Sendable {
+        private let lock = NSLock()
+        private var marks: [String: Double] = [:]
+        func set(bundleID bid: String, name: String, cursor: Double) {
+            lock.withLock { marks["\(bid)::\(name)"] = cursor }
+        }
+        func get(bundleID bid: String, name: String) -> Double? {
+            lock.withLock { marks["\(bid)::\(name)"] }
+        }
+    }
+
+    private static let marks = MarkStore()
+
+    /// Newest-event cursor (epoch ms) for an app; 0 when no events yet.
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Returns: The newest event timestamp in ms, else 0.
+    private static func newestCursor(_ bid: String) -> Double {
+        let all = ReportBuilder.events(bid, category: nil, search: nil, limit: 0)
+        return (all.last?.timestamp.timeIntervalSince1970 ?? 0) * 1000
+    }
+
     /// Returns captured instrumentation events for an app, newest last.
     ///
     /// - Parameter args: `bundleID` (required); `category` (optional filter);
@@ -83,6 +109,135 @@ enum EventTools {
         }
     }
 
+    /// Pins the current newest-event cursor under a name for later
+    /// `events_since_mark` / `tap_and_observe` windows. Read-only against
+    /// capture (host-memory cursor only).
+    ///
+    /// - Parameter args: `bundleID` (required); `name` (optional, default
+    ///   "default").
+    /// - Returns: JSON with `mark`, `cursor`, and `bundleID`.
+    static func eventMark(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let name = ((args["name"] as? String)?.isEmpty == false) ? (args["name"] as? String)! : "default"
+        let cursor = newestCursor(bid)
+        marks.set(bundleID: bid, name: name, cursor: cursor)
+        return try ToolRouter.json(["bundleID": bid, "mark": name, "cursor": cursor])
+    }
+
+    /// Events after a named mark (exact-window causality without chatter
+    /// re-pull). Same filter semantics as `tail_events`; the cursor still
+    /// advances on ALL events.
+    ///
+    /// - Parameter args: `bundleID` (required); `mark` (default "default");
+    ///   `category`/`search` (optional filters); `limit` (default 100, newest).
+    /// - Returns: JSON with `count`, the next `cursor`, and `events`.
+    /// - Throws: `ToolRouter.bail` naming `event_mark` when the mark is unknown.
+    static func eventsSinceMark(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let name = ((args["mark"] as? String)?.isEmpty == false) ? (args["mark"] as? String)! : "default"
+        guard let since = marks.get(bundleID: bid, name: name) else {
+            throw ToolRouter.bail(ToolRouter.recovery(what: "unknown event mark '\(name)' for \(bid)",
+                next: "event_mark {bundleID, name} to pin a cursor, then retry"))
+        }
+        let limit = ToolRouter.coerceInt(args, "limit") ?? 100
+        let category = args["category"] as? String
+        let search = (args["search"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let all = ReportBuilder.events(bid, category: category, search: nil, limit: 0)
+        let fresh = all.filter { $0.timestamp.timeIntervalSince1970 * 1000 > since }
+        let shown: [OPEvent]
+        if let search, !search.isEmpty {
+            shown = fresh.filter {
+                $0.api.localizedCaseInsensitiveContains(search)
+                || $0.summary.localizedCaseInsensitiveContains(search)
+                || $0.fields.contains { $0.value.localizedCaseInsensitiveContains(search) }
+            }
+        } else {
+            shown = fresh
+        }
+        let slice = shown.count > limit ? Array(shown.suffix(limit)) : shown
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
+        let arr = (try? JSONSerialization.jsonObject(with: enc.encode(slice))) ?? []
+        let cursor = (all.last?.timestamp.timeIntervalSince1970 ?? 0) * 1000
+        return try ToolRouter.json(["bundleID": bid, "mark": name, "count": slice.count,
+                             "cursor": cursor, "events": arr])
+    }
+
+    /// Diffs two capture cursors: groups events in (sinceA, sinceB] by api
+    /// with counts + first/last timestamps. The tap→traffic-attribution
+    /// read: cursor → act → diff. Read-only over already-captured logs.
+    ///
+    /// - Parameter args: `bundleID` (required); `sinceA`, `sinceB` (cursor
+    ///   epoch ms); `category`/`search` (optional filters).
+    /// - Returns: JSON with `groups` (api → count/first/last), `total`.
+    static func diffEvents(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let sinceA = ToolRouter.coerceDouble(args, "sinceA") else {
+            throw ToolRouter.bail("diff_events needs sinceA (cursor epoch ms from tail_events or event_mark)")
+        }
+        guard let sinceB = ToolRouter.coerceDouble(args, "sinceB") else {
+            throw ToolRouter.bail("diff_events needs sinceB (a later cursor epoch ms)")
+        }
+        let category = args["category"] as? String
+        let search = (args["search"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let all = ReportBuilder.events(bid, category: category, search: nil, limit: 0)
+        let window = all.filter {
+            let ms = $0.timestamp.timeIntervalSince1970 * 1000
+            return ms > sinceA && ms <= sinceB
+        }.filter {
+            guard let search, !search.isEmpty else { return true }
+            return $0.api.localizedCaseInsensitiveContains(search)
+                || $0.summary.localizedCaseInsensitiveContains(search)
+                || $0.fields.contains { $0.value.localizedCaseInsensitiveContains(search) }
+        }
+        var groups: [String: [String: Any]] = [:]
+        let iso = ISO8601DateFormatter()
+        for e in window {
+            let ms = e.timestamp.timeIntervalSince1970 * 1000
+            if var g = groups[e.api] {
+                g["count"] = (g["count"] as? Int ?? 0) + 1
+                g["last"] = iso.string(from: e.timestamp)
+                g["lastMs"] = ms
+                groups[e.api] = g
+            } else {
+                groups[e.api] = ["count": 1, "first": iso.string(from: e.timestamp),
+                                 "firstMs": ms, "last": iso.string(from: e.timestamp), "lastMs": ms]
+            }
+        }
+        return try ToolRouter.json(["bundleID": bid, "total": window.count, "groups": groups])
+    }
+
+    /// Hook/event coverage summary: which instrumented apis fired since a
+    /// cursor, with counts + first/last + dispositions seen. Converts the
+    /// event firehose into a flow map ("which of my hooks fired during that
+    /// tap?") without client-side paging. Host-only NDJSON aggregation.
+    ///
+    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms,
+    ///   default 0); `limit` (default 200 apis, most-fired first).
+    /// - Returns: JSON with `apis` (api → count/first/last/dispositions),
+    ///   `apiCount`, `eventCount`.
+    static func hookCoverage(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
+        let limit = min(max(ToolRouter.coerceInt(args, "limit") ?? 200, 1), 1000)
+        let all = ReportBuilder.events(bid, category: nil, search: nil, limit: 0)
+        let window = all.filter { $0.timestamp.timeIntervalSince1970 * 1000 > since }
+        var agg: [String: (count: Int, first: Date, last: Date, disps: Set<String>)] = [:]
+        for e in window {
+            if var a = agg[e.api] {
+                a.count += 1; a.last = e.timestamp; a.disps.insert(e.disposition.rawValue)
+                agg[e.api] = a
+            } else {
+                agg[e.api] = (1, e.timestamp, e.timestamp, [e.disposition.rawValue])
+            }
+        }
+        let iso = ISO8601DateFormatter()
+        let apis = agg.sorted { $0.value.count > $1.value.count }.prefix(limit).map { api, a -> [String: Any] in
+            ["api": api, "count": a.count, "first": iso.string(from: a.first),
+             "last": iso.string(from: a.last), "dispositions": a.disps.sorted()]
+        }
+        return try ToolRouter.json(["bundleID": bid, "apiCount": agg.count,
+                             "eventCount": window.count, "apis": Array(apis)])
+    }
     /// Best-effort push: register this stdio child for cursor+count notifications
     /// (`notifications/events/added` on stdout). Bodies still come via tail_events.
     /// Refuses outside a stdio child (HTTP stays poll-only).
@@ -151,7 +306,8 @@ enum EventTools {
         guard index < cands.count,
               let pick = cands.dropLast(index + 1).last,
               let pickURL = pick.fields["url"] else {
-            throw ToolRouter.bail("index \(index) out of range (\(cands.count) matching requests)")
+            throw ToolRouter.bail(ToolRouter.recovery(what: "index \(index) out of range (\(cands.count) matching requests)",
+                next: "lower index below \(cands.count) or drop the url/host filter, then retry"))
         }
         let e = pick
         let url = pickURL

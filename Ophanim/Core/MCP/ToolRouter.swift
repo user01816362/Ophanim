@@ -122,8 +122,40 @@ enum ToolRouter {
         throw bail(message)
     }
 
-    /// Plain Levenshtein distance. Argument names are short and this runs once per call.
-    private static func editDistance(_ first: String, _ second: String) -> Int {
+    /// Uniform recovery grammar for failures: what failed, the exact next
+    /// call, a fallback when the next call cannot apply, and the one-line
+    /// cause. Text-first (the server's error envelope is text), parseable by
+    /// agents without reading source.
+    ///
+    /// - Parameter what: What failed, with key values.
+    /// - Parameter next: The exact next tool + minimal args (mandatory for
+    ///   precondition failures).
+    /// - Parameter alt: Fallback when `next` cannot apply (nil when none).
+    /// - Parameter why: One-line cause (mode/parameter mismatch detail).
+    /// - Returns: The `next:`/`alt:`/`why:` suffixed message.
+    static func recovery(what: String, next: String, alt: String? = nil, why: String? = nil) -> String {
+        var message = "\(what) | next: \(next)"
+        if let alt, !alt.isEmpty { message += " | alt: \(alt)" }
+        if let why, !why.isEmpty { message += " | why: \(why)" }
+        return message
+    }
+
+    /// Closest catalog tool name to a misspelled one (tool-name did-you-mean
+    /// for `unknown tool`; the argument-level engine lives in rejectUnknownKeys).
+    ///
+    /// - Parameter name: The unrecognized tool name.
+    /// - Returns: The closest catalog name within tolerance, else nil.
+    static func suggestTool(_ name: String) -> String? {
+        let universe = Set(MCPServer.toolDefinitions.compactMap { $0["name"] as? String })
+            .union(handlers.keys)
+        guard let best = universe.min(by: { editDistance(name, $0) < editDistance(name, $1) }),
+              editDistance(name, best) <= max(2, name.count / 3) else { return nil }
+        return best
+    }
+
+    /// Plain Levenshtein distance (body below; header re-anchored after the
+    /// recovery/suggestTool insert).
+    static func editDistance(_ first: String, _ second: String) -> Int {
         let x = Array(first), y = Array(second)
         if x.isEmpty { return y.count }
         if y.isEmpty { return x.count }
@@ -159,12 +191,20 @@ enum ToolRouter {
         "export_curl": EventTools.exportCurl,
         "subscribe_events": EventTools.subscribeEvents,
         "unsubscribe_events": EventTools.unsubscribeEvents,
+        "event_mark": EventTools.eventMark,
+        "events_since_mark": EventTools.eventsSinceMark,
+        "diff_events": EventTools.diffEvents,
+        "hook_coverage": EventTools.hookCoverage,
         "analyze_app": ReconTools.analyzeApp,
         "app_imports": ReconTools.appImports,
         "find_symbols": ReconTools.findSymbols,
         "suggest_hooks": SuggestTools.suggestHooks,
         "list_libraries": ReconTools.listLibraries,
         "scan_signature": ReconTools.scanSignature,
+        "app_plist": ReconTools.appPlist,
+        "all_symbols": ReconTools.allSymbols,
+        "list_protocols": ReconTools.listProtocols,
+        "string_xrefs": ReconTools.stringXrefs,
         "set_objc_hooks": HookTools.setObjcHooks,
         "remove_hook": HookTools.removeHook,
         "get_hooks": HookTools.getHooks,
@@ -235,9 +275,15 @@ enum ToolRouter {
                                      "set_rules", "apply_preset"]
         let none: Set<String> = ["launch_app", "install_app", "resync_tweaks",
                                   "refresh_sources", "subscribe_events", "unsubscribe_events",
-                                  "set_config", "tap_element", "swipe", "set_text", "tap_and_read"]
+                                  "set_config", "tap_element", "swipe", "set_text", "tap_and_read",
+                                  "web_act", "bookmark_add", "bookmark_note",
+                                  "event_mark", "events_since_mark", "tap_and_observe"]
         var tools: [[String: Any]] = []
-        for name in handlers.keys.sorted() {
+        // Union of the catalog and the handler table: inspect-family tools
+        // route via runInspectTool (not handlers) and were silently absent.
+        let universe = Set(MCPServer.toolDefinitions.compactMap { $0["name"] as? String })
+            .union(handlers.keys)
+        for name in universe.sorted() {
             let readOnly = MCPServer.readOnlyTools.contains(name)
             var dryRun = "na"
             if !readOnly {
