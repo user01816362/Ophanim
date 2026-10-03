@@ -93,8 +93,7 @@ enum ContainerTools {
             throw ToolRouter.bail("no such file: \(url.path)")
         }
         if url.pathExtension.lowercased() == "plist",
-           let data = try? Data(contentsOf: url),
-           let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
+           let obj = PlistReader.plistDict(at: url) {
             return try ToolRouter.json(["bundleID": bid, "path": url.path,
                                  "encoding": "plist", "content": ContainerService.jsonSafe(obj)])
         }
@@ -128,8 +127,7 @@ enum ContainerTools {
             throw ToolRouter.bail("key is required")
         }
         let prefs = AppContainer(bundleId: bid).userPrefsUrl
-        guard let data = try? Data(contentsOf: prefs),
-              var dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+        guard var dict = PlistReader.plistDict(at: prefs) else {
             throw ToolRouter.bail("no readable preferences plist for \(bid)")
         }
         let old = dict[key]
@@ -144,8 +142,7 @@ enum ContainerTools {
         }
         dict[key] = value
         do {
-            let out = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
-            try out.write(to: prefs, options: .atomic)
+            try PlistReader.writePlistDict(dict, to: prefs)
         } catch {
             throw ToolRouter.bail("preferences write failed: \(error.localizedDescription)")
         }
