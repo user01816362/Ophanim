@@ -141,6 +141,11 @@ with "Agent Mode is not enabled" when the app never opted in.
   leaving the app's webview are unreachable (detect + hand back, don't evade).
 - **Custom-drawn controls need focus first.** Bare `set_text` lands invisibly
   on delegate-gated fields; tap the field, then write, then submit.
+- **Custom-drawn screens are walker-blind.** Screens rendered into a single
+  `CGDrawingView` (proven: Twitch post-login cookie consent) expose zero
+  nodes to the tree walker and host no `WKWebView` — `web_snapshot` states
+  `no-webview-under-key-window` and `tap_element` needs 0...1 coordinates
+  (verify by screenshot). Tap-and-see only, by construction.
 
 ## Snapshot timeline
 
