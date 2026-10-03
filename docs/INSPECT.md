@@ -124,6 +124,17 @@ in-app effects possible): `tap_element`, `swipe`, `set_text`.
 coordinates accept Int or Double (`InspectTools.swift:89-180`). All refuse
 with "Agent Mode is not enabled" when the app never opted in.
 
+## Known limits (proven live)
+
+- **Web-based screens are operable by tap only.** A `WKWebView` login form
+  (proven on Twitch: the whole screen is one webview node, zero native
+  controls) cannot be read node-by-node and refuses `set_text`/`typeText`
+  by design — page JS owns that state and a blind insert would desync it.
+  Tap coordinates + screenshots still work; form *filling* needs a deliberate
+  JS-eval bridge product decision (powerful, needs security review — not built).
+- **Custom-drawn controls need focus first.** Bare `set_text` lands invisibly
+  on delegate-gated fields; tap the field, then write, then submit.
+
 ## Snapshot timeline
 
 `inspect_snapshot` pins one tree (+ optional JPEG sidecar via
