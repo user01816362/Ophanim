@@ -11,6 +11,33 @@ import Foundation
 
 enum InspectTools {
 
+    // MARK: - Web snapshot cache (refId session)
+
+    /// Last web_snapshot per bundleID: URL + ref→fingerprint map. Lets web_act
+    /// resolve a snapshot `ref` without the caller re-supplying the
+    /// fingerprint/URL, and bails stale refs before any guest round-trip.
+    /// One generation (latest) — anything older is "re-snapshot". Lock-guarded
+    /// for Swift 6 (static shared state).
+    private final class WebSnapshotCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var bundleID: String?
+        private var url: String?
+        private var refToFp: [Int: String] = [:]
+
+        func store(bundleID bid: String, url: String?, refToFp map: [Int: String]) {
+            lock.withLock { bundleID = bid; self.url = url; refToFp = map }
+        }
+
+        func resolve(bundleID bid: String, ref: Int) -> (url: String?, fp: String)? {
+            lock.withLock {
+                guard bundleID == bid, let fp = refToFp[ref] else { return nil }
+                return (url, fp)
+            }
+        }
+    }
+
+    private static let webCache = WebSnapshotCache()
+
     // MARK: - Shared helpers
 
     /// Snapshot bracketing shared by tap/swipe/set_text: optional pre/post tree pins
@@ -255,16 +282,41 @@ enum InspectTools {
                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw ToolRouter.bail("web_snapshot returned no DOM for \(bid) - is web content on screen?")
             }
+            let nodes = obj["nodes"] as? [[String: Any]] ?? []
+            // Session cache: ref→fingerprint + page URL for ref-led web_act.
+            // Values never enter the cache (fingerprints carry no values).
+            var refToFp: [Int: String] = [:]
+            for n in nodes {
+                if let ref = n["ref"] as? Int, let fp = n["fp"] as? String {
+                    refToFp[ref] = fp
+                }
+            }
+            webCache.store(bundleID: bid, url: obj["url"] as? String, refToFp: refToFp)
             let payload: [String: Any] = ["bundleID": bid,
                                    "url": obj["url"] ?? NSNull(),
                                    "title": obj["title"] ?? NSNull(),
                                    "count": obj["count"] ?? 0,
-                                   "nodes": obj["nodes"] ?? []]
+                                   "nodes": nodes]
             return MCPServer.toolResult(id, payload)
 
         case "web_act":
-            guard let path = args["cssPath"] as? String, !path.isEmpty else {
-                throw ToolRouter.bail("web_act needs cssPath from web_snapshot")
+            // Ref-first resolution (Playwright-convergent): the caller passes
+            // the snapshot `ref`; fingerprint + page URL default from the
+            // session cache, explicit args win. cssPath remains as last-resort
+            // locator (marked via:path in the result). At least one required.
+            let ref = ToolRouter.coerceInt(args, "ref")
+            var fingerprint = args["fingerprint"] as? String
+            var snapshotUrl = args["snapshotUrl"] as? String
+            if let r = ref, fingerprint == nil || snapshotUrl == nil {
+                guard let cached = webCache.resolve(bundleID: bid, ref: r) else {
+                    throw ToolRouter.bail("web_act ref \(r) is unknown or stale for \(bid) - take a fresh web_snapshot and retry")
+                }
+                if fingerprint == nil { fingerprint = cached.fp }
+                if snapshotUrl == nil { snapshotUrl = cached.url }
+            }
+            let path = args["cssPath"] as? String
+            guard ref != nil || !(path?.isEmpty ?? true) else {
+                throw ToolRouter.bail("web_act needs ref or cssPath from web_snapshot")
             }
             guard let action = args["action"] as? String,
                   ["fill", "click", "select", "submit"].contains(action) else {
@@ -274,9 +326,14 @@ enum InspectTools {
                (args["value"] as? String)?.isEmpty ?? true {
                 throw ToolRouter.bail("web_act \(action) needs value")
             }
+            // The filled value travels to transact only — never into logs,
+            // errors, or the result (the guest never echoes it back).
             let rsp = try InspectControl.transact(bundleID: bid, op: .webAct,
                                                   cssPath: path, webAction: action,
-                                                  webValue: args["value"] as? String)
+                                                  webValue: args["value"] as? String,
+                                                  webRef: ref, webFingerprint: fingerprint,
+                                                  snapshotURL: snapshotUrl,
+                                                  webConsent: args["consent"] as? Bool)
             return MCPServer.toolResult(id, ["bundleID": bid, "acted": rsp.acted ?? false,
                                       "detail": rsp.webResult ?? "unknown"])
 

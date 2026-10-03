@@ -315,8 +315,9 @@ final class InspectCommandPump: NSObject {
             return snap_rsp
 
         case .webAct:
-            guard let path = cmd.cssPath, !path.isEmpty else {
-                return .failure(id: cmd.id, "webAct needs cssPath from web_snapshot")
+            let hasRef = (cmd.webRef ?? -1) >= 0
+            guard hasRef || !(cmd.cssPath?.isEmpty ?? true) else {
+                return .failure(id: cmd.id, "webAct needs ref or cssPath from web_snapshot")
             }
             guard let action = cmd.webAction, !action.isEmpty,
                   ["fill", "click", "select", "submit"].contains(action) else {
@@ -327,24 +328,30 @@ final class InspectCommandPump: NSObject {
                     return .failure(id: cmd.id, "webAct \(action) needs webValue")
                 }
             }
-            let result: String?
-            if let v = cmd.webValue {
-                result = v.withCString { vp in
-                    path.withCString { pp in
-                        action.withCString { ap in
-                            OPWebAct(pp, ap, vp).map { r in
-                                defer { OPWebFree(r) }
-                                return String(cString: r)
-                            }
-                        }
-                    }
-                }
-            } else {
-                result = path.withCString { pp in
+            // "" = absent locator component (C NULL-tolerance); the guest
+            // requires at least one of fingerprint/path (guarded above).
+            let fp = cmd.webFingerprint ?? ""
+            let path = cmd.cssPath ?? ""
+            let snapURL = cmd.snapshotURL ?? ""
+            let ref32 = Int32(cmd.webRef ?? -1)
+            let consent32: Int32 = (cmd.webConsent == true) ? 1 : 0
+            let result: String? = fp.withCString { fpp in
+                path.withCString { pp in
                     action.withCString { ap in
-                        OPWebAct(pp, ap, nil).map { r in
-                            defer { OPWebFree(r) }
-                            return String(cString: r)
+                        snapURL.withCString { up in
+                            if let v = cmd.webValue {
+                                return v.withCString { vp in
+                                    OPWebAct(ref32, fpp, pp, ap, vp, up, consent32).map { r in
+                                        defer { OPWebFree(r) }
+                                        return String(cString: r)
+                                    }
+                                }
+                            } else {
+                                return OPWebAct(ref32, fpp, pp, ap, nil, up, consent32).map { r in
+                                    defer { OPWebFree(r) }
+                                    return String(cString: r)
+                                }
+                            }
                         }
                     }
                 }
@@ -352,12 +359,21 @@ final class InspectCommandPump: NSObject {
             guard let detail = result else {
                 return .failure(id: cmd.id, "webAct failed: no WKWebView, missing node, or evaluation timeout")
             }
+            // Staleness refusals name the recovery: the snapshot that produced
+            // the ref is gone (navigated/evicted/ambiguous) — re-snapshot.
+            var detailOut = detail
+            if detail.hasPrefix("ref-miss") || detail.hasPrefix("ambiguous:") ||
+               detail.hasPrefix("navigated:") {
+                detailOut += " - take a fresh web_snapshot and retry"
+            } else if detail == "secret-needs-consent" {
+                detailOut += " - retry web_act with consent:true"
+            }
             var act_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                    imageBase64: nil, mimeType: nil, width: nil, height: nil,
                                    acted: detail.hasPrefix("filled@") || detail.hasPrefix("clicked@") ||
                                           detail.hasPrefix("selected@") || detail == "submitted",
                                    targetClass: "WKWebView")
-            act_rsp.webResult = detail
+            act_rsp.webResult = detailOut
             return act_rsp
 
         case .swipe:
@@ -403,7 +419,7 @@ final class InspectCommandPump: NSObject {
                 // fail BEFORE any tap (isInWeb): touching web content to discover it
                 // is undisclosed side effect, and the answer is always refusal.
                 if InspectorActivator.isInWeb(hit.view) {
-                    return .failure(id: cmd.id, "element '\(elementId)' is web content: page JS owns input state (see web_snapshot)")
+                    return .failure(id: cmd.id, "element '\(elementId)' is web content: page JS owns input state (use web_snapshot, then web_act with the node's ref)")
                 }
                 let frame = hit.view.convert(hit.view.bounds, to: hit.window)
                 let point = CGPoint(x: frame.midX, y: frame.midY)

@@ -2,13 +2,18 @@
 //  InspectorWeb.m
 //  Galgal
 //
-//  See InspectorWeb.h. evaluateJavaScript runs in the page's main world
-//  (legacy completionHandler API — old-SDK safe); the snapshot serializer is
-//  frozen (no operator JS ever executes — only the fixed strings below).
-//  WebKit itself is never linked: the class is resolved at runtime via
-//  NSClassFromString, and the one method we need is declared on the
-//  OPWebPageEvaluator protocol below (informal conformance — no WebKit
-//  headers, so unlinked apps simply report "no webview").
+//  Web-content bridge for agent operation (no new deps, no WebKit linkage):
+//  WKWebView is resolved at runtime via NSClassFromString, so this file
+//  compiles and loads even in apps that never link WebKit (those simply
+//  report "no webview"). All entry points block the caller with a bounded
+//  runloop spin (main-thread pump safe — mirrors the swipe phase spins).
+//
+//  Reference model (Playwright-convergent, cross-app — not per-page): snapshot
+//  emits semantic fingerprints; act re-resolves the fingerprint against the
+//  LIVE DOM with a uniqueness gate, URL-bound and fail-closed. Recorded CSS
+//  paths are the last-resort locator only (marked via:path). No DOM node is
+//  ever held across calls; no operator JS ever executes (frozen strings only;
+//  OPJSLiteral is the sole value entry point).
 
 #import "InspectorWeb.h"
 #import <UIKit/UIKit.h>
@@ -28,30 +33,67 @@ static const double OPWebTimeout = 12.0;
 @end
 
 // Frozen DOM serializer. Password values always masked (not redaction-gated:
-// page text may hold secrets the operator never asked to see).
+// page text may hold secrets the operator never asked to see). Legacy JS
+// syntax only (no ?. / ?? / arrows / template literals — old-WebKit parse
+// safety). The fp/nodeLabel/secretOf/cssPath helpers below are duplicated
+// verbatim in the act script: the two evals share no globals, so each must
+// be self-contained, and the duplication keeps the fingerprint rule identical
+// on both sides by construction (keep them in sync on edit).
 static NSString * const kSnapshotJS =
 @"(function(){"
-@"var out=[],n=0;"
+@"function nodeLabel(el){"
+@"var a=el.getAttribute&&el.getAttribute('aria-label');"
+@"if(a) return a.slice(0,120);"
+@"if(el.labels&&el.labels.length){var t=el.labels[0].innerText||'';if(t) return t.slice(0,120);}"
+@"var by=el.getAttribute&&el.getAttribute('aria-labelledby');"
+@"if(by){var ids=by.split(/\\s+/),parts=[];"
+@"for(var i=0;i<ids.length&&i<4;i++){var n=document.getElementById(ids[i]);"
+@"if(n&&n.innerText) parts.push(n.innerText);}"
+@"if(parts.length) return parts.join(' ').slice(0,120);}"
+@"var p=el.parentElement,d=0;"
+@"while(p&&d<4){if(p.tagName&&p.tagName.toLowerCase()==='label'){"
+@"var lt=p.innerText||'';if(lt) return lt.slice(0,120);}"
+@"p=p.parentElement;d++;}"
+@"return null;}"
+@"function secretOf(el,tag){"
+@"var tp=((el.type||'').toLowerCase());"
+@"var ac='';if(el.getAttribute){ac=(el.getAttribute('autocomplete')||'').toLowerCase();}"
+@"if(tag==='input'&&(tp==='password'||ac==='current-password'||ac==='new-password'||"
+@"ac==='cc-number'||ac==='cc-exp'||ac==='cc-csc')) return 'secret';"
+@"if(tag==='input'&&tp==='hidden') return 'hidden';"
+@"if(tag==='input'&&tp==='file') return 'file';"
+@"return '';}"
+@"function fpFor(el){"
+@"var t=el.tagName.toLowerCase();"
+@"var lb=nodeLabel(el)||'';"
+@"return t+'|'+(el.type||'')+'|'+(el.id||'')+'|'+(el.name||'')+'|'+"
+@"(el.placeholder||'')+'|'+lb+'|'+((el.innerText||'').slice(0,120))+'|'+(el.href||'');}"
 @"function cssPath(el){var parts=[],d=0;"
 @"while(el&&el.nodeType===1&&el!==document.body&&d<12){"
 @"var tag=el.tagName.toLowerCase(),idx=1,sib=el;"
 @"while((sib=sib.previousElementSibling)!=null){if(sib.tagName===el.tagName)idx++;}"
-// cssPath() counts same-TAG siblings, so it must emit :nth-of-type (same-tag
-// index), not :nth-child (all-sibling index): the two disagree whenever tags
-// interleave, and the recorded path then matches nothing on replay.
 @"parts.unshift(tag+(idx>1?':nth-of-type('+idx+')':''));"
 @"el=el.parentElement;d++;}"
 @"parts.unshift('body');return parts.join(' > ');}"
+@"var out=[],n=0;"
 @"var els=document.querySelectorAll('input,textarea,select,button,a,[role=\"button\"],h1,h2,h3');"
 @"for(var k=0;k<els.length&&n<300;k++){"
 @"var el=els[k],r=el.getBoundingClientRect(),t=el.tagName.toLowerCase();"
 @"var o={ref:n++,tag:t,type:el.type||null,"
 @"text:(el.innerText||'').slice(0,120),"
 @"placeholder:el.placeholder||null,href:el.href||null,"
+@"id:((el.id||'').slice(0,80))||null,name:((el.name||'').slice(0,80))||null,"
+@"autocomplete:(el.getAttribute&&el.getAttribute('autocomplete'))||null,"
+@"label:nodeLabel(el),"
 @"frame:[Math.round(r.x),Math.round(r.y),Math.round(r.width),Math.round(r.height)],"
 @"path:cssPath(el)};"
-@"if(t==='input'&&(el.type==='password'||el.autocomplete==='current-password')){o.value='•••';o.secret=true;}"
+@"o.fp=fpFor(el);"
+@"var sk=secretOf(el,t);"
+@"if(sk==='secret'){o.value='•••';o.secret=true;}"
+@"else if(sk==='hidden'){o.secret=true;}"
+@"else if(sk==='file'){}"
 @"else if('value' in el&&typeof el.value==='string'){o.value=String(el.value).slice(0,200);}"
+@"if(t.indexOf('-')>=0&&el.shadowRoot&&el.shadowRoot.children&&el.shadowRoot.children.length>0){o.shadowHost=true;}"
 @"out.push(o);}"
 @"return JSON.stringify({url:location.href,title:document.title,count:out.length,nodes:out});"
 @"})()";
@@ -154,58 +196,117 @@ static NSString *OPJSLiteral(NSString *value) {
     return [arr substringWithRange:NSMakeRange(1, arr.length - 2)];
 }
 
-const char *OPWebAct(const char *cssPath, const char *action, const char *value) {
-    if (!cssPath || !action) { return NULL; }
+const char *OPWebAct(int ref, const char *fingerprint, const char *cssPath,
+                      const char *action, const char *value,
+                      const char *snapshotUrl, int consent) {
+    if (!action) { return NULL; }
+    int hasFp = fingerprint && fingerprint[0] != '\0';
+    int hasPath = cssPath && cssPath[0] != '\0';
+    if (!hasFp && !hasPath) { return NULL; }
     UIView<OPWebPageEvaluator> *webView = OPFirstWebView();
     if (!webView) { return NULL; }
-    NSString *path = [NSString stringWithUTF8String:cssPath];
+    NSString *fp = hasFp ? OPJSLiteral([NSString stringWithUTF8String:fingerprint]) : @"\"\"";
+    NSString *path = hasPath ? OPJSLiteral([NSString stringWithUTF8String:cssPath]) : @"\"\"";
     NSString *act = [NSString stringWithUTF8String:action];
     NSString *val = value ? OPJSLiteral([NSString stringWithUTF8String:value]) : @"\"\"";
-    // Resolution is incremental (:scope stepwise, not one full-string query):
-    // full-string replay proved unreliable live (stable, complete paths still
-    // matched nothing), while stepwise narrows identically for correct paths.
+    NSString *snapURL = (snapshotUrl && snapshotUrl[0] != '\0')
+        ? OPJSLiteral([NSString stringWithUTF8String:snapshotUrl]) : @"\"\"";
+    // ref is the host's cache key (stale-ref pre-bail lives host-side); the
+    // guest resolves by fingerprint equality with a mandatory full-scan
+    // uniqueness gate, so ref needs no guest-side indexing (the scan subsumes
+    // any fast path and keeps strictness honest). Unused by design — documented
+    // so a future reader doesn't "fix" it back in.
+    (void)ref;
+    // Fingerprint, path, URL, and value all travel JSON-encoded via OPJSLiteral
+    // (quoting safe by construction — embedding raw operator text previously
+    // broke script syntax on quotes). The path emits tag/nth-of-type chains.
     // Positional steps resolve MANUALLY (same-tag child index — the exact rule
     // the serializer counts by) instead of trusting the engine's :nth-of-type
-    // under :scope, which returned null live for a present 2nd div. Missing
-    // details name the failing step plus the parent's real child census, so a
-    // serializer/resolver divergence is distinguishable from a gone node.
-    // Fill targets are asserted (input/textarea/select with a value prop) so a
-    // divergent resolution can never write into the wrong node.
+    // under :scope, which returned null live for a present 2nd div. The step
+    // regex admits h1-h6 and custom elements (bare [a-z]+ silently dropped
+    // their index — a certain latent bug in the prior version).
+    // Fill targets are asserted (text-like input/textarea with a value prop)
+    // so a divergent resolution can never write into the wrong node.
     NSString *script = [NSString stringWithFormat:
         @"(function(){"
+        @"if(%@&&%@!==''&&location.href!==%@) return 'navigated:'+location.href;"
+        @"function nodeLabel(el){"
+        @"var a=el.getAttribute&&el.getAttribute('aria-label');"
+        @"if(a) return a.slice(0,120);"
+        @"if(el.labels&&el.labels.length){var t=el.labels[0].innerText||'';if(t) return t.slice(0,120);}"
+        @"var by=el.getAttribute&&el.getAttribute('aria-labelledby');"
+        @"if(by){var ids=by.split(/\\s+/),parts=[];"
+        @"for(var i=0;i<ids.length&&i<4;i++){var n=document.getElementById(ids[i]);"
+        @"if(n&&n.innerText) parts.push(n.innerText);}"
+        @"if(parts.length) return parts.join(' ').slice(0,120);}"
+        @"var p=el.parentElement,d=0;"
+        @"while(p&&d<4){if(p.tagName&&p.tagName.toLowerCase()==='label'){"
+        @"var lt=p.innerText||'';if(lt) return lt.slice(0,120);}"
+        @"p=p.parentElement;d++;}"
+        @"return null;}"
+        @"function fpFor(el){"
+        @"var t=el.tagName.toLowerCase();"
+        @"var lb=nodeLabel(el)||'';"
+        @"return t+'|'+(el.type||'')+'|'+(el.id||'')+'|'+(el.name||'')+'|'+"
+        @"(el.placeholder||'')+'|'+lb+'|'+((el.innerText||'').slice(0,120))+'|'+(el.href||'');}"
         @"function stepResolve(root,step){"
-        @"var m=/^([a-z]+)(?::nth-of-type\\((\\d+)\\))?$/.exec(step);"
+        @"var m=/^([a-z][a-z0-9-]*)(?::nth-of-type\\((\\d+)\\))?$/.exec(step);"
         @"if(!m) return root.querySelector(':scope > '+step);"
         @"var want=parseInt(m[2]||'1',10),seen=0,kids=root.children;"
         @"for(var k=0;k<kids.length;k++){"
         @"if(kids[k].tagName.toLowerCase()===m[1]){seen++;if(seen===want) return kids[k];}}"
         @"return null;}"
-        @"var steps='%@'.split(' > ');"
-        @"var el=document,depth=0;"
-        @"for(var i=0;i<steps.length;i++){"
-        @"var next=(i===0)?document.querySelector(steps[0]):stepResolve(el,steps[i]);"
+        @"var FP=%@,el=null,via='';"
+        @"if(FP&&FP!==''){"
+        @"var els=document.querySelectorAll('input,textarea,select,button,a,[role=\"button\"],h1,h2,h3');"
+        @"var hits=[];"
+        @"for(var k=0;k<els.length;k++){if(fpFor(els[k])===FP) hits.push(els[k]);}"
+        @"if(hits.length===0) return 'ref-miss';"
+        @"if(hits.length>1) return 'ambiguous:'+hits.length;"
+        @"el=hits[0];}"
+        @"else{"
+        @"var steps=%@.split(' > ');"
+        @"el=document;"
+        @"for(var s=0;s<steps.length;s++){"
+        @"var next=(s===0)?document.querySelector(steps[0]):stepResolve(el,steps[s]);"
         @"if(!next){var info='';try{"
-        @"var kids=el.children,divs=0;"
-        @"for(var j=0;j<kids.length;j++){if(kids[j].tagName.toLowerCase()==='div')divs++;}"
-        @"info='|parent='+el.tagName.toLowerCase()+'#kids='+kids.length+'#divs='+divs;"
+        @"var ck=el.children,dc=0;"
+        @"for(var j=0;j<ck.length;j++){if(ck[j].tagName.toLowerCase()==='div')dc++;}"
+        @"info='|parent='+el.tagName.toLowerCase()+'#kids='+ck.length+'#divs='+dc;"
         @"}catch(e){}"
-        @"return 'missing@'+depth+'/'+steps.length+info;}"
-        @"el=next;depth++;}"
-        @"var tag=el.tagName.toLowerCase(),act='%@';"
-        @"if(act==='click'){el.click();return 'clicked@'+tag;}"
-        @"if(act==='fill'){"
-        @"if(!((tag==='input'||tag==='textarea'||tag==='select')&&('value' in el))) return 'not-fillable:'+tag;"
-        @"el.focus();el.value=%@;"
+        @"return 'missing@'+s+'/'+steps.length+info;}"
+        @"el=next;}"
+        @"via='+via:path';}"
+        @"var tag=el.tagName.toLowerCase(),op='%@',allow=%d;"
+        @"if(op==='fill'){"
+        @"var tp=((el.type||'').toLowerCase());"
+        @"var ac='';if(el.getAttribute){ac=(el.getAttribute('autocomplete')||'').toLowerCase();}"
+        @"var sec=(tag==='input'&&(tp==='password'||ac==='current-password'||ac==='new-password'||"
+        @"ac==='cc-number'||ac==='cc-exp'||ac==='cc-csc')); "
+        @"if(sec&&!allow) return 'secret-needs-consent';"
+        @"if(tag==='input'&&tp==='hidden') return 'not-fillable:hidden';"
+        @"if(tag==='input'&&tp==='file') return 'no-file-upload';"
+        @"if(tag==='input'&&(tp==='checkbox'||tp==='radio')) return 'use-click:'+tp;"
+        @"var textlike=(tag==='textarea')||(tag==='input'&&("
+        @"tp==='text'||tp==='password'||tp==='email'||tp==='search'||tp==='tel'||tp==='url'||tp==='number')); "
+        @"if(!textlike||!('value' in el)) return 'not-fillable:'+tag;"
+        @"el.focus();"
+        @"var proto=(tag==='textarea')?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;"
+        @"var desc=Object.getOwnPropertyDescriptor(proto,'value');"
+        @"if(desc&&desc.set) desc.set.call(el,%@); else el.value=%@;"
         @"el.dispatchEvent(new Event('input',{bubbles:true}));"
-        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'filled@'+tag;}"
-        @"if(act==='select'){"
+        @"el.dispatchEvent(new Event('change',{bubbles:true}));"
+        @"return 'filled@'+tag+via;}"
+        @"if(op==='click'){el.click();return 'clicked@'+tag+via;}"
+        @"if(op==='select'){"
         @"if(!('value' in el)) return 'not-selectable:'+tag;"
         @"el.value=%@;"
-        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'selected@'+tag;}"
-        @"if(act==='submit'){var f=el.closest('form');"
-        @"if(f){f.submit();return 'submitted';}el.click();return 'clicked@'+tag;}"
+        @"el.dispatchEvent(new Event('change',{bubbles:true}));"
+        @"return 'selected@'+tag+via;}"
+        @"if(op==='submit'){var f=el.closest('form');"
+        @"if(f){f.submit();return 'submitted';}el.click();return 'clicked@'+tag+via;}"
         @"return 'unknown-action';})()",
-        path, act, val, val];
+        snapURL, snapURL, snapURL, fp, path, act, consent, val, val, val];
     return OPDup(OPRunJS(webView, script));
 }
 

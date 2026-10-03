@@ -92,6 +92,15 @@ struct InspectCommand: Codable {
     var webAction: String?
     /// webAct fill/select value (JSON-encoded into the script; never echoed back).
     var webValue: String?
+    /// webAct: session ref from web_snapshot (host cache key; guest resolves by
+    /// fingerprint, ref is advisory). Additive optional, nil-tolerant.
+    var webRef: Int?
+    /// webAct: semantic fingerprint (tag|type|id|name|placeholder|label|text|href).
+    var webFingerprint: String?
+    /// webAct: snapshot page URL; guest refuses on navigation mismatch.
+    var snapshotURL: String?
+    /// webAct: per-call consent marker for secret fills.
+    var webConsent: Bool?
     /// screenshot: overlay actionable-node frames + class names (default false).
     /// Additive optional - old hosts never send it, old guests ignore it.
     var annotate: Bool?

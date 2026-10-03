@@ -126,12 +126,19 @@ with "Agent Mode is not enabled" when the app never opted in.
 
 ## Known limits (proven live)
 
-- **Web-based screens are operable by tap only.** A `WKWebView` login form
-  (proven on Twitch: the whole screen is one webview node, zero native
-  controls) cannot be read node-by-node and refuses `set_text`/`typeText`
-  by design — page JS owns that state and a blind insert would desync it.
-  Tap coordinates + screenshots still work; form *filling* needs a deliberate
-  JS-eval bridge product decision (powerful, needs security review — not built).
+- **Web-based screens: tap natively, read/act via web_snapshot/web_act.**
+  A `WKWebView` login form (proven on Twitch: the whole screen is one webview
+  node, zero native controls) refuses `set_text`/`typeText` by design — page
+  JS owns that state. `web_snapshot` returns the frozen DOM
+  (ref/fingerprint/tag/label/masked values/url) and `web_act` re-resolves the
+  node's fingerprint against the live DOM (exact match + uniqueness gate,
+  URL-bound — refuses `navigated`/`ambiguous`/`ref-miss` instead of touching
+  the wrong node); recorded CSS paths are last resort only. Fill uses the
+  native setter + input/change events (React-safe); secret fills need
+  per-call `consent:true`; submit stays a separate call. Only plain
+  app-owned `WKWebView`s are drivable: `SFSafariViewController` and
+  `ASWebAuthenticationSession` expose no JS surface by Apple design, so flows
+  leaving the app's webview are unreachable (detect + hand back, don't evade).
 - **Custom-drawn controls need focus first.** Bare `set_text` lands invisibly
   on delegate-gated fields; tap the field, then write, then submit.
 

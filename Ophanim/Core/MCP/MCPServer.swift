@@ -1439,7 +1439,7 @@ final class MCPServer {
         ],
         [
             "name": "web_snapshot",
-            "description": "Frozen DOM snapshot of the first WKWebView (url/title/count + nodes with ref/tag/text/masked values/frames/cssPaths). No operator JS executes; password values always masked.",
+            "description": "Frozen DOM snapshot of the first WKWebView (url/title/count + nodes with ref/fingerprint/tag/id/name/label/text/masked values/frames/cssPaths). No operator JS executes; secrets always masked (passwords, cc-*, hidden tokens); custom-element shadow subtrees marked shadowHost (not entered); main frame only.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -1450,16 +1450,20 @@ final class MCPServer {
         ],
         [
             "name": "web_act",
-            "description": "Act on a web_snapshot node by cssPath: fill (value + input/change events), click, select, submit. Filled values are never echoed back.",
+            "description": "Act on a web_snapshot node, ref-first: the guest re-resolves the node's fingerprint against the live DOM (exact match + uniqueness gate, URL-bound — refuses navigated/ambiguous/stale). fill uses the native setter + input/change events (React-safe) with type gating; secret fills need consent:true; submit is a separate call. cssPath is last-resort only (marked via:path). Filled values are never echoed back.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "cssPath": ["type": "string", "description": "Selector path from web_snapshot."],
+                    "ref": ["type": "integer", "description": "Node ref from web_snapshot. Preferred; defaults fingerprint/snapshotUrl from the session cache."],
+                    "fingerprint": ["type": "string", "description": "Node fp from web_snapshot. Explicit override; required with ref when the cache was evicted."],
+                    "snapshotUrl": ["type": "string", "description": "Snapshot page URL. Explicit override; guest refuses on navigation mismatch."],
+                    "cssPath": ["type": "string", "description": "Last-resort selector path. Ref or cssPath is required."],
                     "action": ["type": "string", "description": "fill | click | select | submit."],
-                    "value": ["type": "string", "description": "Required for fill/select. Never returned."]
+                    "value": ["type": "string", "description": "Required for fill/select. Never returned."],
+                    "consent": ["type": "boolean", "description": "Required per-call to fill secret fields (password/cc)."]
                 ],
-                "required": ["bundleID", "cssPath", "action"]
+                "required": ["bundleID", "action"]
             ]
         ],
         [

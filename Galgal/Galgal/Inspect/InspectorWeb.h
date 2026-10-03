@@ -15,12 +15,18 @@
 /// Returns malloc'd UTF-8 (caller frees), or NULL when no webview / timeout.
 const char *OPWebSnapshot(void);
 
-/// Act on a snapshot node by CSS path: "fill" (value + input/change events, so
-/// React-controlled inputs accept it), "click", "select", "submit".
-/// `value` is JSON-encoded into the script (no injection). Returns malloc'd
-/// result string ("filled@input"/"clicked@button"/"missing@4/13"/...), or NULL on failure.
-/// The filled value is never echoed back.
-const char *OPWebAct(const char *cssPath, const char *action, const char *value);
+/// Act on a snapshot node: fingerprint re-resolution first (exact match +
+/// uniqueness gate over a live re-walk), recorded CSS path last resort
+/// (marked via:path). `fingerprint`/`cssPath`/`snapshotUrl` accept "" for
+/// absent (NULL-tolerant); at least one locator is required. `action` is
+/// fill (native-setter + input/change events, text-like inputs + textarea;
+/// secrets need consent!=0) | click | select | submit. `value` is
+/// JSON-encoded into the script (no injection). Returns malloc'd result
+/// string (filled@tag/clicked@tag/ref-miss/ambiguous:N/navigated:…/…),
+/// or NULL on failure. The filled value is never echoed back.
+const char *OPWebAct(int ref, const char *fingerprint, const char *cssPath,
+                      const char *action, const char *value,
+                      const char *snapshotUrl, int consent);
 
 /// Precise reason the last webview lookup failed (malloc'd; free with OPWebFree):
 /// "webkit-not-loaded" | "no-key-window" | "no-webview-under-key-window".
