@@ -12,6 +12,148 @@ import Foundation
 /// stays GUI-only.
 enum ContainerTools {
 
+    // MARK: - Keychain projection (read-only)
+
+    /// One-call dump of an app's ChainGuard (emulated keychain) items. The store
+    /// is plaintext SQLite while KeyCover stays hard-disabled, so this projects
+    /// service/account/secret triples operators otherwise dig out by hand.
+    /// Sensitive by owner's standing directive (own apps only): values are NOT
+    /// masked — never paste this output into shared contexts.
+    ///
+    /// - Parameter args: `bundleID` (required); `limit` (default 100, cap 500).
+    /// - Returns: JSON with per-table `items` (service/account/secret).
+    /// - Throws: `ToolRouter.bail` when no ChainGuard db exists for the app.
+    static func keychainItems(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let limit = min(max(ToolRouter.coerceInt(args, "limit") ?? 100, 1), 500)
+        let db = KeyCover.chainGuardPath
+            .appendingPathComponent(bid)
+            .appendingPathExtension(KeyCoverKey.decryptedKeyExtension)
+        guard FileManager.default.fileExists(atPath: db.path) else {
+            throw ToolRouter.bail("no ChainGuard database for \(bid) (chainGuard may be off or the app never touched keychain)")
+        }
+        let tableRows = try sqliteJSON(db: db,
+            sql: "SELECT name FROM sqlite_master WHERE type='table';")
+        let tables = Set(tableRows.compactMap { $0["name"] as? String })
+        var out: [[String: Any]] = []
+        var total = 0
+        for t in ["genp", "inet", "idnt", "cert", "keys"] where tables.contains(t) {
+            let colRows = try sqliteJSON(db: db, sql: "PRAGMA table_info(\"\(t)\");")
+            let cols = Set(colRows.compactMap { $0["name"] as? String })
+            func has(_ c: String) -> Bool { cols.contains(c) }
+            var select: [String] = []
+            for c in ["agrp", "acct", "svce", "labl", "desc"] where has(c) { select.append(c) }
+            if has("v_Data") {
+                select.append("CASE WHEN typeof(v_Data)='blob' THEN '<binary ' || length(v_Data) || ' bytes>' " +
+                              "WHEN length(v_Data)>2000 THEN substr(v_Data,1,2000) || '…' ELSE v_Data END AS secret")
+            }
+            guard !select.isEmpty else { continue }
+            let quoted = "\"" + t + "\""
+            let rows = try sqliteJSON(db: db, sql: "SELECT \(select.joined(separator: ", ")) FROM \(quoted);")
+            for var r in rows {
+                if total >= limit { break }
+                r["table"] = t
+                out.append(r); total += 1
+            }
+            if total >= limit { break }
+        }
+        return try ToolRouter.json(["bundleID": bid, "items": out, "count": out.count])
+    }
+
+    // MARK: - Container file read + prefs edit
+
+    /// Read one file inside the app's readable roots (container/logs): plists
+    /// decode to JSON, text is capped, binary reports as base64-capped.
+    ///
+    /// - Parameter args: `bundleID` + `path` (required; absolute or container-relative); `limit` bytes (default 8192, cap 65536).
+    /// - Returns: JSON with `path`, `bytes`, `encoding` (plist|utf8|base64), `content`.
+    /// - Throws: `ToolRouter.bail` outside allowed roots or unreadable.
+    static func containerRead(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let raw = args["path"] as? String, !raw.isEmpty else {
+            throw ToolRouter.bail("path is required")
+        }
+        let limit = min(max(ToolRouter.coerceInt(args, "limit") ?? 8192, 1), 65536)
+        let expanded = ToolRouter.expandedURL(raw)
+        let url: URL
+        if expanded.path.hasPrefix("/") {
+            url = expanded.standardizedFileURL
+        } else {
+            guard let base = ContainerService.readableRoots(bid).first else {
+                throw ToolRouter.bail("no readable container for \(bid)")
+            }
+            url = base.appendingPathComponent(raw).standardizedFileURL
+        }
+        guard ContainerService.isReadable(url, bundleID: bid) else {
+            throw ToolRouter.bail("path is outside the app's container/logs: \(raw)")
+        }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir),
+              !isDir.boolValue else {
+            throw ToolRouter.bail("no such file: \(url.path)")
+        }
+        if url.pathExtension.lowercased() == "plist",
+           let data = try? Data(contentsOf: url),
+           let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
+            return try ToolRouter.json(["bundleID": bid, "path": url.path,
+                                 "encoding": "plist", "content": ContainerService.jsonSafe(obj)])
+        }
+        guard let data = try? Data(contentsOf: url) else {
+            throw ToolRouter.bail("unreadable file: \(url.path)")
+        }
+        let bytes = data.count
+        let slice = data.prefix(limit)
+        if let text = String(data: slice, encoding: .utf8), !text.isEmpty {
+            var payload: [String: Any] = ["bundleID": bid, "path": url.path, "bytes": bytes,
+                                   "encoding": "utf8", "content": text]
+            if bytes > limit { payload["truncated"] = true }
+            return try ToolRouter.json(payload)
+        }
+        return try ToolRouter.json(["bundleID": bid, "path": url.path, "bytes": bytes,
+                             "encoding": "base64",
+                             "content": slice.base64EncodedString(),
+                             "truncated": bytes > limit])
+    }
+
+    /// Set one scalar preference in the app's preferences plist (feature flags,
+    /// onboarding resets, seeded state). Strings/numbers/booleans only; nested
+    /// values fail stated. Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `key` (required); `value` (string/number/bool); `dryRun`.
+    /// - Returns: JSON preview or confirmation with old/new values.
+    /// - Throws: `ToolRouter.bail` on missing plist, non-dict root, or non-scalar value.
+    static func setPref(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let key = args["key"] as? String, !key.isEmpty else {
+            throw ToolRouter.bail("key is required")
+        }
+        let prefs = AppContainer(bundleId: bid).userPrefsUrl
+        guard let data = try? Data(contentsOf: prefs),
+              var dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            throw ToolRouter.bail("no readable preferences plist for \(bid)")
+        }
+        let old = dict[key]
+        let value = args["value"]
+        guard value is String || value is Int || value is Double || value is Bool else {
+            throw ToolRouter.bail("value must be a string, number, or boolean (nested values unsupported)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "key": key,
+                                 "old": old.map(ContainerService.jsonSafe) ?? NSNull(),
+                                 "new": ContainerService.jsonSafe(value as Any)])
+        }
+        dict[key] = value
+        do {
+            let out = try PropertyListSerialization.data(fromPropertyList: dict, format: .xml, options: 0)
+            try out.write(to: prefs, options: .atomic)
+        } catch {
+            throw ToolRouter.bail("preferences write failed: \(error.localizedDescription)")
+        }
+        return try ToolRouter.json(["bundleID": bid, "key": key,
+                             "old": old.map(ContainerService.jsonSafe) ?? NSNull(),
+                             "new": ContainerService.jsonSafe(value as Any)])
+    }
+
     // MARK: - SQLite browser (read-only, host-side)
 
     /// Roots a database path is allowed to come from: the app's composed +
@@ -127,7 +269,7 @@ enum ContainerTools {
         let capped = rows.map { row -> [String: Any] in
             var out: [String: Any] = [:]
             for (k, v) in row {
-                if let s = v as? String, s.count > 500 { out[k] = String(s.prefix(500)) + "…" }
+                if let s = v as? String, s.count > 2000 { out[k] = String(s.prefix(2000)) + "…" }
                 else { out[k] = v }
             }
             return out

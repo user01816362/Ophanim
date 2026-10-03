@@ -180,4 +180,57 @@ enum RuleTools {
             throw ToolRouter.ToolError(message: "unknown preset '\(name)' - use list_presets")
         }
     }
+
+    /// Remove one rule by id (surgical alternative to full-array set_rules).
+    /// Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `id` (required).
+    /// - Returns: JSON preview or removal confirmation.
+    /// - Throws: `ToolRouter.bail` when the id is absent.
+    static func removeRule(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let rid = args["id"] as? String, !rid.isEmpty else {
+            throw ToolRouter.bail("id is required")
+        }
+        let existing = SettingsStore.appSettings(bid)?.ophanim.rules ?? []
+        guard existing.contains(where: { $0.id == rid }) else {
+            throw ToolRouter.bail("no rule '\(rid)' on \(bid)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "id": rid,
+                                 "wouldRemove": true, "remaining": existing.count - 1])
+        }
+        try SettingsStore.updateSettings(bid) { $0.ophanim.rules.removeAll { $0.id == rid } }
+        return try ToolRouter.json(["bundleID": bid, "id": rid, "removed": true])
+    }
+
+    /// Enable/disable one rule by id (surgical alternative to full-array set_rules).
+    /// Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `id` (required); `enabled` (required bool).
+    /// - Returns: JSON preview or confirmation.
+    /// - Throws: `ToolRouter.bail` when the id is absent or enabled is missing.
+    static func setRuleEnabled(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let rid = args["id"] as? String, !rid.isEmpty else {
+            throw ToolRouter.bail("id is required")
+        }
+        guard let on = args["enabled"] as? Bool else {
+            throw ToolRouter.bail("enabled (boolean) is required")
+        }
+        let existing = SettingsStore.appSettings(bid)?.ophanim.rules ?? []
+        guard existing.contains(where: { $0.id == rid }) else {
+            throw ToolRouter.bail("no rule '\(rid)' on \(bid)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "id": rid,
+                                 "enabled": on])
+        }
+        try SettingsStore.updateSettings(bid) {
+            if let i = $0.ophanim.rules.firstIndex(where: { $0.id == rid }) {
+                $0.ophanim.rules[i].enabled = on
+            }
+        }
+        return try ToolRouter.json(["bundleID": bid, "id": rid, "enabled": on])
+    }
 }

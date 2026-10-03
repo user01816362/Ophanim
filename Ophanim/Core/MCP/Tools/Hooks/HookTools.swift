@@ -119,4 +119,56 @@ enum HookTools {
             "inlineHooks": asArray(cfg.inlineHooks),
         ])
     }
+
+    // MARK: - Surgical removal
+
+    /// Remove one hook by array index (surgical alternative to full-array
+    /// set_*_hooks; P5 reverts the dropped entry on next config poll).
+    /// Destructive: dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` + `kind` (objc|swift|inline, required) + `index` (required).
+    /// - Returns: JSON preview (with the entry) or removal confirmation.
+    /// - Throws: `ToolRouter.bail` on unknown kind or out-of-range index.
+    static func removeHook(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let kind = args["kind"] as? String,
+              ["objc", "swift", "inline"].contains(kind) else {
+            throw ToolRouter.bail("kind is required: objc, swift, or inline")
+        }
+        guard let index = ToolRouter.coerceInt(args, "index") else {
+            throw ToolRouter.bail("index is required")
+        }
+        if ToolRouter.isDryRun(args) {
+            let cfg = SettingsStore.config(bid)
+            let count: Int
+            switch kind {
+            case "objc": count = cfg?.objcHooks.count ?? 0
+            case "swift": count = cfg?.swiftHooks.count ?? 0
+            default: count = cfg?.inlineHooks.count ?? 0
+            }
+            guard (0..<count).contains(index) else {
+                throw ToolRouter.bail("index \(index) out of range (0..<\(count)) for \(kind) hooks on \(bid)")
+            }
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "kind": kind,
+                                 "index": index, "wouldRemove": true])
+        }
+        var removed = false
+        try SettingsStore.updateSettings(bid) { s in
+            switch kind {
+            case "objc":
+                guard (0..<s.ophanim.objcHooks.count).contains(index) else { return }
+                s.ophanim.objcHooks.remove(at: index); removed = true
+            case "swift":
+                guard (0..<s.ophanim.swiftHooks.count).contains(index) else { return }
+                s.ophanim.swiftHooks.remove(at: index); removed = true
+            default:
+                guard (0..<s.ophanim.inlineHooks.count).contains(index) else { return }
+                s.ophanim.inlineHooks.remove(at: index); removed = true
+            }
+        }
+        guard removed else {
+            throw ToolRouter.bail("index \(index) out of range for \(kind) hooks on \(bid)")
+        }
+        return try ToolRouter.json(["bundleID": bid, "kind": kind, "index": index, "removed": true])
+    }
 }

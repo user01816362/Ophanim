@@ -146,6 +146,7 @@ enum ToolRouter {
     nonisolated(unsafe) static let handlers: [String: ([String: Any]) throws -> String] = [
         "list_apps": AppTools.listApps,
         "launch_app": AppTools.launchApp,
+        "launch_status": AppTools.launchStatus,
         "install_app": AppTools.installApp,
         "uninstall_app": AppTools.uninstallApp,
         "set_galgal_runtime": AppTools.setGalgalRuntime,
@@ -164,12 +165,15 @@ enum ToolRouter {
         "list_libraries": ReconTools.listLibraries,
         "scan_signature": ReconTools.scanSignature,
         "set_objc_hooks": HookTools.setObjcHooks,
+        "remove_hook": HookTools.removeHook,
         "get_hooks": HookTools.getHooks,
         "set_swift_hooks": HookTools.setSwiftHooks,
         "set_inline_hooks": HookTools.setInlineHooks,
         "list_presets": RuleTools.listPresets,
         "apply_preset": RuleTools.applyPreset,
         "set_rules": RuleTools.setRules,
+        "remove_rule": RuleTools.removeRule,
+        "set_rule_enabled": RuleTools.setRuleEnabled,
         "validate_rule_script": RuleTools.validateRuleScript,
         "get_config": ConfigTools.getConfig,
         "set_config": ConfigTools.setConfig,
@@ -199,6 +203,9 @@ enum ToolRouter {
         "get_log_path": ContainerTools.getLogPath,
         "sqlite_tables": ContainerTools.sqliteTables,
         "sqlite_rows": ContainerTools.sqliteRows,
+        "keychain_items": ContainerTools.keychainItems,
+        "container_read": ContainerTools.containerRead,
+        "set_pref": ContainerTools.setPref,
         "clear_logs": ContainerTools.clearLogs,
         "container_info": ContainerTools.containerInfo,
         "list_profiles": ContainerTools.listProfiles,
@@ -212,5 +219,35 @@ enum ToolRouter {
         "set_injection_strategy": ConfigTools.setInjectionStrategy,
         "get_keymap": ConfigTools.getKeymap,
         "set_keymap": ConfigTools.setKeymap,
+        "tool_matrix": { _ in try ToolRouter.json(ToolRouter.matrix()) },
     ]
+
+    /// Machine-readable tool contract matrix: readOnly/destructive annotations
+    /// plus dryRun behavior per tool. dryRun families (verified against handler
+    /// bodies — update these sets when adding a mutating tool):
+    /// - "default": omitted dryRun previews (isDryRun contract).
+    /// - "explicit": only dryRun:true previews; omitted WRITES (legacy hook/rule writers).
+    /// - "none": acts immediately, no preview branch.
+    /// - "na": read-only, nothing to preview.
+    static func matrix() -> [String: Any] {
+        let explicit: Set<String> = ["set_objc_hooks", "set_swift_hooks", "set_inline_hooks",
+                                     "set_rules", "apply_preset"]
+        let none: Set<String> = ["launch_app", "install_app", "resync_tweaks",
+                                  "refresh_sources", "subscribe_events", "unsubscribe_events",
+                                  "set_config", "tap_element", "swipe", "set_text", "tap_and_read"]
+        var tools: [[String: Any]] = []
+        for name in handlers.keys.sorted() {
+            let readOnly = MCPServer.readOnlyTools.contains(name)
+            var dryRun = "na"
+            if !readOnly {
+                if explicit.contains(name) { dryRun = "explicit" }
+                else if none.contains(name) { dryRun = "none" }
+                else { dryRun = "default" }
+            }
+            tools.append(["name": name, "readOnly": readOnly,
+                          "destructive": MCPServer.destructiveTools.contains(name),
+                          "dryRun": dryRun])
+        }
+        return ["count": tools.count, "tools": tools]
+    }
 }

@@ -53,12 +53,24 @@ enum EventTools {
         let waitMs = min(max(ToolRouter.coerceInt(args, "waitMs") ?? 0, 0), 30000)
         let deadline = Date().addingTimeInterval(Double(waitMs) / 1000.0)
         let started = Date()
+        // Optional server-side filters (same semantics as query_events). The cursor
+        // still advances on ALL events so filtered-out rows are never re-delivered.
+        let category = args["category"] as? String
+        let search = (args["search"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        func visible(_ e: OPEvent) -> Bool {
+            if let category, e.category.rawValue != category { return false }
+            guard let search, !search.isEmpty else { return true }
+            return e.api.localizedCaseInsensitiveContains(search)
+                || e.summary.localizedCaseInsensitiveContains(search)
+                || e.fields.contains { $0.value.localizedCaseInsensitiveContains(search) }
+        }
         while true {
             // Single scan (limit 0 = all), then slice in memory; the cursor is the
             // newest event across all logs so the next call only sees newer rows.
             let all = ReportBuilder.events(bid, category: nil, search: nil, limit: 0)
             let fresh = all.filter { $0.timestamp.timeIntervalSince1970 * 1000 > since }
-            let slice = fresh.count > limit ? Array(fresh.suffix(limit)) : fresh
+            let shown = fresh.filter(visible)
+            let slice = shown.count > limit ? Array(shown.suffix(limit)) : shown
             if !slice.isEmpty || Date() >= deadline {
                 let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601
                 let arr = (try? JSONSerialization.jsonObject(with: enc.encode(slice))) ?? []
@@ -134,6 +146,15 @@ enum EventTools {
                 + (urlFilter.map { " url '\($0)'" } ?? "")
                 + (hostFilter.map { " host '\($0)'" } ?? ""))
         }
+        // index: 0 = newest (default), 1 = one before, ... Fail stated past the end.
+        let index = max(ToolRouter.coerceInt(args, "index") ?? 0, 0)
+        guard index < cands.count,
+              let pick = cands.dropLast(index + 1).last,
+              let pickURL = pick.fields["url"] else {
+            throw ToolRouter.bail("index \(index) out of range (\(cands.count) matching requests)")
+        }
+        let e = pick
+        let url = pickURL
         func sh(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         var parts = ["curl", "-X", e.fields["method"] ?? "GET", sh(url)]
         for (k, v) in e.fields.filter({ $0.key.hasPrefix("req.") }).sorted(by: { $0.key < $1.key }) {
@@ -144,13 +165,14 @@ enum EventTools {
         var note: String? = nil
         if let body = e.requestBody, !body.isEmpty {
             if let text = String(data: body, encoding: .utf8) {
-                parts += ["--data-raw", sh(String(text.prefix(4096)))]
-                if text.count > 4096 { note = "body truncated to 4096 chars" }
+                parts += ["--data-raw", sh(String(text.prefix(16384)))]
+                if text.count > 16384 { note = "body truncated to 16384 chars" }
             } else {
                 note = "binary body (\(body.count) bytes) omitted - add --data-binary yourself"
             }
         }
         var payload: [String: Any] = ["bundleID": bid, "url": url, "curl": parts.joined(separator: " ")]
+        if index > 0 { payload["index"] = index }
         if let note { payload["note"] = note }
         return try ToolRouter.json(payload)
     }

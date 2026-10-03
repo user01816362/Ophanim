@@ -9,6 +9,50 @@ import Foundation
 
 /// Container/log filesystem reads: sizes, reports, log-dir exposure.
 enum ContainerService {
+    /// Roots a host-side read may come from for an app: its composed + resolved
+    /// data containers and its log dirs. Every file-content tool (sqlite browser,
+    /// file reader, keychain projection) confines to these — the reader CLIs must
+    /// never be pointed at arbitrary host paths.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: Existing directories among the allowed roots.
+    static func readableRoots(_ bundleID: String) -> [URL] {
+        var roots = [AppContainer(bundleId: bundleID).containerUrl]
+        if let real = Uninstaller.containerURL(for: bundleID) { roots.append(real) }
+        roots.append(contentsOf: ReportBuilder.logDirs(bundleID))
+        return roots.filter { FileManager.default.fileExists(atPath: $0.path) }
+            .map { $0.standardizedFileURL }
+    }
+
+    /// True when `url` resolves inside the app's readable roots.
+    ///
+    /// - Parameters:
+    ///   - url: Candidate file URL.
+    ///   - bundleID: The app's bundle identifier.
+    /// - Returns: Whether the standardized path sits under an allowed root.
+    static func isReadable(_ url: URL, bundleID: String) -> Bool {
+        let p = url.standardizedFileURL.path
+        return readableRoots(bundleID).contains { p.hasPrefix($0.path) }
+    }
+
+    /// JSON-safe projection of arbitrary plist-decoded values (Data → base64,
+    /// dates → ISO8601, nested containers recursed, anything else stringified).
+    ///
+    /// - Parameter value: A plist-decoded value.
+    /// - Returns: JSONSerialization-safe equivalent.
+    static func jsonSafe(_ value: Any) -> Any {
+        switch value {
+        case let s as String: return s
+        case let n as NSNumber: return n
+        case let d as Data: return ["$base64": d.base64EncodedString()]
+        case let dt as Date:
+            return ISO8601DateFormatter().string(from: dt)
+        case let a as [Any]: return a.map(jsonSafe)
+        case let m as [String: Any]: return m.mapValues(jsonSafe)
+        default: return String(describing: value)
+        }
+    }
+
     /// Recursive byte size of a directory (regular files only).
     ///
     /// - Parameter url: The directory to measure.
@@ -57,6 +101,29 @@ enum ContainerService {
         report["preferencesExists"] = FileManager.default.fileExists(atPath: prefs.path)
         report["profiles"] = ContainerProfiles.profiles(bundleID: bundleID)
         report["activeProfile"] = ContainerProfiles.activeName(bundleID: bundleID)
+        // Signing truth, computed live (not the install-time claim): composed
+        // entitlements plus a codesign parse + top-seal check. A broken seal here
+        // is the "installs but dies on launch" signature (proven on Aloha's
+        // Settings.bundle case) — check this before deeper debugging.
+        if let url = AppQueryService.appURL(bundleID) {
+            let app = HostedApp(appUrl: url)
+            if let ents = try? Entitlements.composeEntitlements(app) {
+                report["entitlements"] = ContainerService.jsonSafe(ents)
+            }
+            if let dv = try? Shell.run(print: false, "/usr/bin/codesign", "-dv", url.path) {
+                var sig: [String: Any] = [:]
+                for line in dv.split(separator: "\n") {
+                    let kv = line.split(separator: "=", maxSplits: 1).map(String.init)
+                    guard kv.count == 2 else { continue }
+                    if ["Identifier", "Signature", "TeamIdentifier"].contains(kv[0]) {
+                        sig[kv[0]] = kv[1]
+                    }
+                }
+                if !sig.isEmpty { report["codeSignature"] = sig }
+            }
+            report["sealValid"] = (try? Shell.run(print: false, "/usr/bin/codesign",
+                                                  "--verify", url.path)) != nil
+        }
         return report
     }
 }

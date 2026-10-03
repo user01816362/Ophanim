@@ -37,15 +37,16 @@ final class MCPServer {
 
     /// Tools that change no state. Everything else defaults to mutating.
     static let readOnlyTools: Set<String> = [
-        "list_apps", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
+        "list_apps", "tool_matrix", "launch_status", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
         "find_symbols", "list_libraries", "scan_signature",
         "get_config", "get_hooks", "validate_rule_script",
         "list_jailbreak_detectors", "list_presets",
         "list_sources", "search_source_apps", "refresh_sources",
-        "get_log_path", "sqlite_tables", "sqlite_rows", "container_info", "list_profiles",
+        "get_log_path", "sqlite_tables", "sqlite_rows", "keychain_items", "container_read",
+        "container_info", "list_profiles",
         "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
         "list_classes", "uitree_read", "screenshot",
-        "inspect_pick", "inspect_pasteboard", "inspect_focus",
+        "inspect_pick", "inspect_pasteboard", "inspect_focus", "find_element",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -56,17 +57,18 @@ final class MCPServer {
         "set_dyld_libraries", "set_app_category", "prune_files",
         "set_config", "set_injection_strategy", "reset_settings",
         "set_keymap", "rename_keymap", "delete_keymap",
-        "set_rules", "apply_preset",
-        "set_objc_hooks", "set_swift_hooks", "set_inline_hooks", "suggest_hooks",
+        "set_rules", "apply_preset", "remove_rule", "set_rule_enabled",
+        "set_objc_hooks", "set_swift_hooks", "set_inline_hooks", "suggest_hooks", "remove_hook",
         "add_source", "remove_source", "rename_source", "edit_source_url",
         "reset_sources", "install_source_app", "source_transfer",
         "add_tweak", "move_tweak", "remove_tweak", "set_tweak_enabled",
         "tweak_folder", "resync_tweaks",
         "clear_logs", "create_profile", "remove_profile", "switch_profile",
         "clear_container", "backup_container", "restore_container",
+        "set_pref",
         "inspect_clear_snapshots",
         "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
-        "tap_element", "swipe", "set_text",
+        "tap_element", "swipe", "set_text", "tap_and_read",
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
@@ -314,6 +316,11 @@ final class MCPServer {
             "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
         ],
         [
+            "name": "tool_matrix",
+            "description": "Machine-readable contract matrix: readOnly/destructive + dryRun behavior (default/explicit/none/na) per tool. Consult before mutating calls.",
+            "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
+        ],
+        [
             "name": "query_events",
             "description": "Return captured instrumentation events for an app (filesystem, network, "
                 + "keychain, crypto, process, jailbreak, etc.), newest last. Optionally filter by "
@@ -339,7 +346,9 @@ final class MCPServer {
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "since": ["type": "number", "description": "Cursor (epoch milliseconds) from a prior call; omit/0 for the latest batch."],
                     "limit": ["type": "integer", "description": "Max events to return (default 100, newest)."],
-                    "waitMs": ["type": "integer", "description": "Long-poll: block up to N ms (max 30000) for new events instead of returning empty. Default 0."]
+                    "waitMs": ["type": "integer", "description": "Long-poll: block up to N ms (max 30000) for new events instead of returning empty. Default 0."],
+                    "category": ["type": "string", "description": "Optional category filter (cursor still advances on all events)."],
+                    "search": ["type": "string", "description": "Optional case-insensitive substring over api/summary/fields."]
                 ],
                 "required": ["bundleID"]
             ]
@@ -414,6 +423,33 @@ final class MCPServer {
                     "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "rules"]
+            ]
+        ],
+        [
+            "name": "remove_rule",
+            "description": "Remove one interception rule by id (surgical alternative to full-array set_rules).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "id": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to remove."]
+                ],
+                "required": ["bundleID", "id"]
+            ]
+        ],
+        [
+            "name": "set_rule_enabled",
+            "description": "Enable/disable one interception rule by id (surgical alternative to full-array set_rules).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "id": ["type": "string"],
+                    "enabled": ["type": "boolean"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to apply."]
+                ],
+                "required": ["bundleID", "id", "enabled"]
             ]
         ],
         [
@@ -509,6 +545,20 @@ final class MCPServer {
                     "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
                 ],
                 "required": ["bundleID", "hooks"]
+            ]
+        ],
+        [
+            "name": "remove_hook",
+            "description": "Remove one hook by array index (surgical alternative to full-array set_*_hooks; P5 reverts it live on next config poll).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "kind": ["type": "string", "description": "objc, swift, or inline."],
+                    "index": ["type": "integer", "description": "Position in the array (see get_hooks)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to remove."]
+                ],
+                "required": ["bundleID", "kind", "index"]
             ]
         ],
         [
@@ -639,7 +689,17 @@ final class MCPServer {
         ],
         [
             "name": "launch_app",
-            "description": "Launch an installed app so it runs with its current instrumentation config.",
+            "description": "Launch an installed app so it runs with its current instrumentation config. Pass openURL to open a deep link after launch.",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "openURL": ["type": "string", "description": "Deep link to open post-launch (URL schemes + universal links)."]],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "launch_status",
+            "description": "Pump-aware liveness: workspace running flag + inspect gate + config switch. Answers whether the app is up AND instrumented.",
             "inputSchema": [
                 "type": "object",
                 "properties": ["bundleID": ["type": "string", "description": "The app's bundle identifier."]],
@@ -978,6 +1038,45 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "keychain_items",
+            "description": "Dump an app's ChainGuard (emulated keychain) items: service/account/secret triples. Sensitive by owner directive (own apps): values are NOT masked — never paste into shared contexts.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "limit": ["type": "integer", "description": "Max items (default 100, cap 500)."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "container_read",
+            "description": "Read one file inside the app's container/logs (plists decode to JSON; text capped; binary base64-capped). Read-only, path-confined.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "path": ["type": "string", "description": "Absolute path or container-relative path."],
+                    "limit": ["type": "integer", "description": "Max bytes (default 8192, cap 65536)."]
+                ],
+                "required": ["bundleID", "path"]
+            ]
+        ],
+        [
+            "name": "set_pref",
+            "description": "Set one scalar preference (string/number/boolean) in the app's preferences plist. Nested values refused.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "key": ["type": "string"],
+                    "value": ["type": ["string", "number", "boolean"], "description": "Scalar value."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to write."]
+                ],
+                "required": ["bundleID", "key", "value"]
+            ]
+        ],
+        [
             "name": "clear_logs",
             "description": "Delete capture logs, byte-counted.",
             "inputSchema": [
@@ -1255,6 +1354,37 @@ final class MCPServer {
                     "y": ["type": "number"],
                     "mode": ["type": "string"],
                     "snapshot": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "find_element",
+            "description": "Find nodes by text/label/class substring (case-insensitive) in a fresh tree. Returns matching ids for tap_element/set_text.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "text": ["type": "string"],
+                    "label": ["type": "string"],
+                    "class": ["type": "string"],
+                    "mode": ["type": "string"],
+                    "limit": ["type": "integer", "description": "Max matches (default 20, cap 100)."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "tap_and_read",
+            "description": "Tap (by id or x/y) then return a fresh tree nodes[] showing what changed. Fused act+verify, no snapshot pins (v1).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "elementId": ["type": "string"],
+                    "x": ["type": "number"],
+                    "y": ["type": "number"],
+                    "mode": ["type": "string"]
                 ],
                 "required": ["bundleID"]
             ]

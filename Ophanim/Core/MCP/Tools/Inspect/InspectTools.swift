@@ -33,6 +33,35 @@ enum InspectTools {
         return MCPServer.toolResult(id, payload.merging(extra) { _, new in new })
     }
 
+    /// Flat actionable-node list for text-only bridges: the full tree ships as
+    /// a text block (nesting blows past client object-depth limits), but agents
+    /// also need structured ids to tap/set_text. Walk flat — no nesting — keep
+    /// buttons, text inputs (field + view: empty views have no text yet, which
+    /// is exactly when set_text needs them), and labeled nodes; capped so the
+    /// summary stays small. The input roles must stay identical to the classes
+    /// InspectorActivator.setText accepts (UITextField/UITextView — Apple's full
+    /// first-party text-entry set: UISearchTextField subclasses UITextField,
+    /// SwiftUI fields host the same two) — a role added there belongs here.
+    ///
+    /// - Parameter tree: The decoded tree root.
+    /// - Returns: Up to 100 node dicts (id/class/role/frame/enabled + text/label).
+    static func flatNodes(_ tree: InspectNode) -> [[String: Any]] {
+        var flat: [[String: Any]] = []
+        func collect(_ n: InspectNode) {
+            let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
+            if n.role == "button" || n.role == "textfield" || n.role == "textview" || labeled {
+                var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
+                                        "frame": n.frame, "enabled": n.enabled]
+                if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
+                if let l = n.axLabel, !l.isEmpty { d["label"] = l }
+                if flat.count < 100 { flat.append(d) }
+            }
+            for c in n.children { collect(c) }
+        }
+        collect(tree)
+        return flat
+    }
+
     /// Tree-read arguments shared by uitree_read and inspect_snapshot (mode, substring
     /// filter, subtree root, agent budget caps). Parsed once here so the two readers
     /// cannot drift.
@@ -95,28 +124,7 @@ enum InspectTools {
                                           "windows": treeParams.rootId == nil ? (tree.children).count : 1]
             if let rootId = treeParams.rootId { summary["rootId"] = rootId }
             if let by = rsp.truncatedBy, !by.isEmpty { summary["truncatedBy"] = by }
-            // Flat actionable-node list for text-only bridges: the full tree ships as
-            // a text block (nesting blows past client object-depth limits), but agents
-            // also need structured ids to tap/set_text. Walk flat — no nesting — keep
-            // buttons, text inputs (field + view: empty views have no text yet, which
-            // is exactly when set_text needs them), and labeled nodes; capped so the
-            // summary stays small. The input roles must stay identical to the classes
-            // InspectorActivator.setText accepts (UITextField/UITextView — Apple's full
-            // first-party text-entry set: UISearchTextField subclasses UITextField,
-            // SwiftUI fields host the same two) — a role added there belongs here.
-            var flat: [[String: Any]] = []
-            func collect(_ n: InspectNode) {
-                let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
-                if n.role == "button" || n.role == "textfield" || n.role == "textview" || labeled {
-                    var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
-                                            "frame": n.frame, "enabled": n.enabled]
-                    if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
-                    if let l = n.axLabel, !l.isEmpty { d["label"] = l }
-                    if flat.count < 100 { flat.append(d) }
-                }
-                for c in n.children { collect(c) }
-            }
-            collect(tree)
+            let flat = Self.flatNodes(tree)
             summary["nodes"] = flat
             summary["nodeCount"] = flat.count
             return MCPServer.result(id, [
@@ -165,6 +173,60 @@ enum InspectTools {
                         "acted": rsp.acted ?? false,
                         "targetClass": rsp.targetClass ?? "unknown"]
             })
+
+        case "find_element":
+            // Collapse read-then-filter into one call: fresh tree, substring match
+            // over text/label/class (case-insensitive, any criterion matches).
+            let mode = try inspectMode(args)
+            let limit = min(max(ToolRouter.coerceInt(args, "limit") ?? 20, 1), 100)
+            let hasText = ((args["text"] as? String)?.isEmpty == false)
+            let hasLabel = ((args["label"] as? String)?.isEmpty == false)
+            let hasClass = ((args["class"] as? String)?.isEmpty == false)
+            guard hasText || hasLabel || hasClass else {
+                throw ToolRouter.bail("find_element needs at least one of text, label, class")
+            }
+            let findRsp = try InspectControl.transact(bundleID: bid, op: .uiTree,
+                                                      mode: mode)
+            guard let findTree = findRsp.tree else {
+                throw ToolRouter.bail("find_element read no tree for \(bid)")
+            }
+            func hit(_ d: [String: Any]) -> Bool {
+                if hasText, let q = args["text"] as? String,
+                   !((d["text"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+                if hasLabel, let q = args["label"] as? String,
+                   !((d["label"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+                if hasClass, let q = args["class"] as? String,
+                   !((d["class"] as? String)?.localizedCaseInsensitiveContains(q) ?? false) { return false }
+                return true
+            }
+            let matches = Self.flatNodes(findTree).filter(hit).prefix(limit)
+            return MCPServer.toolResult(id, ["bundleID": bid, "matches": Array(matches),
+                                      "count": matches.count])
+
+        case "tap_and_read":
+            // Fused act+verify: tap (by id or x/y), then a fresh tree in the same
+            // mode whose nodes[] shows what changed. No snapshot pins (v1).
+            let tapId = (args["elementId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let tapX = ToolRouter.coerceDouble(args, "x")
+            let tapY = ToolRouter.coerceDouble(args, "y")
+            guard tapId != nil || (tapX != nil && tapY != nil) else {
+                throw ToolRouter.bail("tap_and_read needs elementId or both x and y in 0...1")
+            }
+            let tapMode = try inspectMode(args)
+            let tapRsp = try InspectControl.transact(bundleID: bid, op: .tap,
+                                                     elementId: tapId, x: tapX, y: tapY,
+                                                     mode: tapMode)
+            let afterRsp = try InspectControl.transact(bundleID: bid, op: .uiTree,
+                                                       mode: tapMode)
+            var payload: [String: Any] = ["bundleID": bid,
+                                   "acted": tapRsp.acted ?? false,
+                                   "targetClass": tapRsp.targetClass ?? "unknown"]
+            if let after = afterRsp.tree {
+                let nodes = Self.flatNodes(after)
+                payload["nodes"] = nodes
+                payload["nodeCount"] = nodes.count
+            }
+            return MCPServer.toolResult(id, payload)
 
         case "inspect_pick":
             func norm(_ key: String) throws -> Double {
@@ -860,6 +922,7 @@ enum InspectTools {
     /// dispatcher forks on this (never its own copy) so the two cannot drift.
     static let inspectToolNames: Set<String> = [
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
+        "find_element", "tap_and_read",
         "inspect_pick", "inspect_pasteboard", "inspect_focus",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff",

@@ -82,10 +82,41 @@ enum AppTools {
         if sema.wait(timeout: .now() + MCPTimeouts.launch) == .timedOut {
             throw ToolRouter.bail("launch did not finish within \(Int(MCPTimeouts.launch))s: \(bid)")
         }
+        // Deep-link test without touching the launch path: after the normal launch,
+        // open a URL through LaunchServices (URL schemes + universal links). Command
+        // -line args / env override stay unsupported on purpose — runAppExec clears
+        // debug-affecting environment by design, and threading overrides through it
+        // would punch holes in that guarantee.
+        if let raw = args["openURL"] as? String, !raw.isEmpty {
+            guard let deep = URL(string: raw), deep.scheme != nil else {
+                throw ToolRouter.bail("openURL is not a valid URL with a scheme: \(raw)")
+            }
+            NSWorkspace.shared.open(deep)
+            return "Launched \(bid) and opened \(raw)."
+        }
         return "Launched \(bid)."
         #else
         throw ToolRouter.bail("launch is not supported in this build")
         #endif
+    }
+
+    /// Pump-aware liveness: workspace running flag PLUS the inspect gate PLUS the
+    /// config switch. `list_apps.running` alone is blind post-launch (starting vs
+    /// dead look identical); this answers "is it up AND instrumented".
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: JSON with `running`, `agentLive`, `instrumentationEnabled`.
+    static func launchStatus(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        #if canImport(AppKit)
+        let running = NSWorkspace.shared.runningApplications.contains(where: { $0.bundleIdentifier == bid })
+        #else
+        let running = false
+        #endif
+        let agentLive = (try? InspectGate.requireLive(bundleID: bid)) != nil
+        let enabled = SettingsStore.config(bid)?.enabled ?? false
+        return try ToolRouter.json(["bundleID": bid, "running": running,
+                             "agentLive": agentLive, "instrumentationEnabled": enabled])
     }
 
     /// Installs an .ipa with Galgal injection forced on.
