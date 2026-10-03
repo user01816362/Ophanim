@@ -335,12 +335,17 @@ final class InspectCommandPump: NSObject {
             }
             guard InspectorActivator.setText(text, in: hit.view) else {
                 // Fallback for engine-rendered inputs (Flutter bridge, custom controls):
-                // tap to focus, then insertText into the first responder. Web content
-                // refuses inside typeText (JS owns that state).
+                // tap to focus, then insertText into the first responder. Web targets
+                // fail BEFORE any tap (isInWeb): touching web content to discover it
+                // is undisclosed side effect, and the answer is always refusal.
+                if InspectorActivator.isInWeb(hit.view) {
+                    return .failure(id: cmd.id, "element '\(elementId)' is web content: page JS owns input state (see web_snapshot)")
+                }
                 let frame = hit.view.convert(hit.view.bounds, to: hit.window)
                 let point = CGPoint(x: frame.midX, y: frame.midY)
-                guard InspectorActivator.typeText(text, at: point, in: hit.window).acted else {
-                    return .failure(id: cmd.id, "element '\(elementId)' (\(hit.cls)) is not a text field")
+                let typed = InspectorActivator.typeText(text, at: point, in: hit.window)
+                guard typed.acted else {
+                    return .failure(id: cmd.id, "element '\(elementId)' (\(hit.cls)): \(typed.refusal ?? "not a text field")")
                 }
                 return InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                        imageBase64: nil, mimeType: nil, width: nil, height: nil,

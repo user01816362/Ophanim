@@ -126,7 +126,7 @@ enum InspectorScreenshot {
             if out.count >= 100 { return }
             let role = Inspector.role(of: view)
             let (text, _, _) = Inspector.classify(view)
-            if role == "button" || role == "textfield" || role == "textview" ||
+            if role == "button" || role == "textfield" || role == "textview" || role == "web" ||
                !(text?.isEmpty ?? true) || view.accessibilityLabel != nil ||
                view.accessibilityIdentifier != nil {
                 let f = view.convert(view.bounds, to: window)

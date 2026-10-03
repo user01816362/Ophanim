@@ -49,7 +49,7 @@ enum InspectTools {
         var flat: [[String: Any]] = []
         func collect(_ n: InspectNode) {
             let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
-            if n.role == "button" || n.role == "textfield" || n.role == "textview" || labeled {
+            if n.role == "button" || n.role == "textfield" || n.role == "textview" || n.role == "web" || labeled {
                 var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
                                         "frame": n.frame, "enabled": n.enabled]
                 if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }

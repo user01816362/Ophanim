@@ -117,24 +117,41 @@ enum InspectorActivator {
     /// - Parameter text: Text to insert at the focused input's cursor.
     /// - Parameter point: Window point to tap for focus (element center).
     /// - Parameter window: Key window hosting the point.
-    /// - Returns: Whether text was inserted, and the focused control's class.
+    /// - Returns: Whether text was inserted, the focused control's class, and a
+    ///   stated refusal reason when not acted (surfaced by the pump verbatim).
     static func typeText(_ text: String, at point: CGPoint, in window: UIWindow)
-    -> (acted: Bool, targetClass: String?) {
+    -> (acted: Bool, targetClass: String?, refusal: String?) {
         let (focused, _) = tap(at: point, in: window)
-        guard focused else { return (false, nil) }
+        guard focused else { return (false, nil, "focus tap refused") }
         // Let focus land (same runloop-turn constraint as swipe phases).
         RunLoop.main.run(until: Date().addingTimeInterval(0.15))
-        guard let first = currentFirstResponder() else { return (false, nil) }
+        guard let first = currentFirstResponder() else { return (false, nil, "nothing took focus") }
         let cls = String(describing: type(of: first))
         // Web inputs drive page state through JS; inserting behind its back corrupts it.
         var ancestor: UIResponder? = first
         while let a = ancestor {
-            if String(describing: type(of: a)).contains("WKWebView") { return (false, cls) }
+            if String(describing: type(of: a)).contains("WKWebView") {
+                return (false, cls, "web content: page JS owns input state (see web_snapshot)")
+            }
             ancestor = a.next
         }
-        guard let input = first as? UITextInput else { return (false, cls) }
+        guard let input = first as? UITextInput else { return (false, cls, "focused control is not a text input") }
         input.insertText(text)
-        return (true, cls)
+        return (true, cls, nil)
+    }
+
+    /// True when the view sits inside web content (WKWebView ancestor or self).
+    /// Checked BEFORE any tap side effect: web targets fail stated, never touched.
+    ///
+    /// - Parameter view: View to test.
+    /// - Returns: Whether web JS owns this subtree's input state.
+    static func isInWeb(_ view: UIView) -> Bool {
+        var cur: UIView? = view
+        while let v = cur {
+            if String(describing: type(of: v)).contains("WKWebView") { return true }
+            cur = v.superview
+        }
+        return false
     }
 
     /// Current first responder via the standard sendAction probe (no private API:
