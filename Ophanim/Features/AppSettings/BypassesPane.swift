@@ -84,7 +84,7 @@ struct BypassesView: View {
                             let executable = app.executable
                             Task.detached {
                                 do {
-                                    try await Shell.signApp(executable)
+                                    try Shell.signApp(executable)
                                 } catch {
                                     Log.shared.error(error)
                                 }

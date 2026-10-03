@@ -344,7 +344,6 @@
 			children = (
 				AA719640287A085200623C15 /* Rules */,
 				AA970FD228793A310099A5D0 /* OphanimRelease.entitlements */,
-				53D9DAF226C1849D0071959E /* OphanimError.swift */,
 				8783CFFE26B8C52E00171041 /* Assets.xcassets */,
 				349915322F8866A3005565D1 /* AppIcon.icon */,
 				349915342F8866A8005565D1 /* AppIcon.dev.icon */,

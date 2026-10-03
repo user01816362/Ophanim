@@ -12,7 +12,7 @@ import SwiftUI
 /// in-memory buffer; `error`/`msg` also raise MainActor alerts).
 @Observable class Log: @unchecked Sendable {
 
-    nonisolated(unsafe) static let shared = Log()
+    static let shared = Log()
 
     func error(_ err: Error) {
         let message = err.localizedDescription

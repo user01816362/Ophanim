@@ -20,7 +20,7 @@ enum InstallStepsNative: String {
 
 class InstallVM: ProgressVM<InstallStepsNative> {
 
-    nonisolated(unsafe) static let shared = InstallVM()
+    static let shared = InstallVM()
 
     init() {
         super.init(start: .begin, ends: [.finish, .failed])

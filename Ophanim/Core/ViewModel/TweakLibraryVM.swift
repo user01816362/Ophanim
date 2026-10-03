@@ -72,6 +72,7 @@ import SwiftUI
         }
     }
 
+    @MainActor
     func chooseCustomFolder() {
         NSOpenPanel.selectTweakFolder { [weak self] result in
             guard case .success(let folderURL) = result, let self else { return }
@@ -105,6 +106,7 @@ import SwiftUI
         }
     }
 
+    @MainActor
     func selectAndAddTweak() {
         NSOpenPanel.selectTweakItem { [weak self] result in
             guard case .success(let url) = result, let self else { return }

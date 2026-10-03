@@ -13,13 +13,13 @@
 
 /// Run body; YES when it completed, NO when it threw (name/reason copied out, NULL-ok).
 /// Synchronous: safe to read out-params on return.
-BOOL OPHookGuardRun(void (^body)(void),
+BOOL OPHookGuardRun(void (^ _Nonnull body)(void),
                     NSString * _Nullable * _Nullable outName,
                     NSString * _Nullable * _Nullable outReason);
 
 /// Value-returning variant for pump-style dispatch: the body result, or nil when it threw
 /// (name/reason out as above). The caller substitutes its own failure value.
-id _Nullable OPHookGuardProtect(id _Nullable (^body)(void),
+id _Nullable OPHookGuardProtect(id _Nullable (^ _Nonnull body)(void),
                                 NSString * _Nullable * _Nullable outName,
                                 NSString * _Nullable * _Nullable outReason);
 

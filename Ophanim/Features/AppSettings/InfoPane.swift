@@ -36,7 +36,7 @@ struct InfoView: View {
                 Text("\(info.bundleVersion)")
             }
             HStack {
-                Text("settings.applicationCategoryType") + Text(":")
+                Text("\(Text("settings.applicationCategoryType")):")
                 Spacer()
                 Text("\(info.applicationCategoryType.rawValue)")
             }

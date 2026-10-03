@@ -4,7 +4,7 @@
 
 #import "OPHookGuard.h"
 
-BOOL OPHookGuardRun(void (^body)(void),
+BOOL OPHookGuardRun(void (^ _Nonnull body)(void),
                     NSString * _Nullable * _Nullable outName,
                     NSString * _Nullable * _Nullable outReason) {
     if (!body) { return YES; }
@@ -18,7 +18,7 @@ BOOL OPHookGuardRun(void (^body)(void),
     }
 }
 
-id _Nullable OPHookGuardProtect(id _Nullable (^body)(void),
+id _Nullable OPHookGuardProtect(id _Nullable (^ _Nonnull body)(void),
                                 NSString * _Nullable * _Nullable outName,
                                 NSString * _Nullable * _Nullable outReason) {
     if (!body) { return nil; }

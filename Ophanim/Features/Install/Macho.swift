@@ -24,13 +24,13 @@ class Macho {
         if header.magic == FAT_MAGIC || header.magic == FAT_CIGAM {
             // Make sure the endianness is correct
             if shouldSwap {
-                swap_fat_header(&header, NXHostByteOrder())
+                swapFatHeader(&header, NXHostByteOrder())
             }
 
             for _ in 0..<header.nfat_arch {
                 var arch = binary.extract(fat_arch.self, offset: offset)
                 if shouldSwap {
-                    swap_fat_arch(&arch, 1, NXHostByteOrder())
+                    swapFatArch(&arch, NXHostByteOrder())
                 }
 
                 if arch.cputype == CPU_TYPE_ARM64 {
@@ -104,13 +104,13 @@ class Macho {
             // Perform steps 1-2
             let loadCommand = commandData.extract(load_command.self,
                                                   offset: commandData.startIndex,
-                                                  swap: shouldSwap ? swap_load_command:nil)
+                                                  swap: shouldSwap ? swapLoadCommand:nil)
             if ![LC_LOAD_WEAK_DYLIB, UInt32(LC_LOAD_DYLIB)].contains(loadCommand.cmd) {
                 return false
             }
             let dylibCommand = commandData.extract(dylib_command.self,
                                                    offset: commandData.startIndex,
-                                                   swap: shouldSwap ? swap_dylib_command:nil)
+                                                   swap: shouldSwap ? swapDylibCommand:nil)
             if String(data: commandData,
                       offset: commandData.startIndex,
                       commandSize: Int(dylibCommand.cmdsize),
@@ -145,7 +145,7 @@ class Macho {
                 return nil
             }
             if shouldSwap {
-                swap_dylib_command(&command, NX_BigEndian)
+                swapDylibCommand(&command, NX_BigEndian)
             }
             var commandData = Data(bytes: &command, count: dylibCommandFixedSize)
             commandData.append(stringData)
@@ -171,7 +171,7 @@ class Macho {
         try replaceLastCommand(&binary, satisfy: {data, shouldSwap in
             let loadCommand = data.extract(load_command.self,
                                            offset: data.startIndex,
-                                           swap: shouldSwap ? swap_load_command:nil)
+                                           swap: shouldSwap ? swapLoadCommand:nil)
             return [UInt32(LC_VERSION_MIN_IPHONEOS),
                     UInt32(LC_VERSION_MIN_MACOSX),
                     UInt32(LC_BUILD_VERSION)]
@@ -179,7 +179,7 @@ class Macho {
 
         }, with: {shouldSwap in
             if shouldSwap {
-                swap_build_version_command(&macCatalystCommand, NX_BigEndian)
+                swapBuildVersionCommand(&macCatalystCommand, NX_BigEndian)
             }
             return Data(bytes: &macCatalystCommand, count: MemoryLayout<build_version_command>.size)
         }, atEnd: true)
@@ -207,7 +207,7 @@ class Macho {
         let movedCommandsEnd = try iterateLoadCommands(binary: binary) { offset, needSwap in
             let loadCommand = binary.extract(load_command.self,
                                              offset: offset,
-                                             swap: needSwap ? swap_load_command:nil)
+                                             swap: needSwap ? swapLoadCommand:nil)
             if isTargetCommand(binary[offset ..< offset+Int(loadCommand.cmdsize)], needSwap) {
                 oldCommandStart = offset
                 oldCommandSize = loadCommand.cmdsize
@@ -264,7 +264,7 @@ class Macho {
         var offset = headerSize
         let shouldSwap = header.magic == MH_CIGAM_64
         if  shouldSwap {
-            swap_mach_header_64(&header, NXHostByteOrder())
+            swapMachHeader64(&header, NXHostByteOrder())
             print("Slim Mach-O has reversed byte order")
         }
 
@@ -276,7 +276,7 @@ class Macho {
         for index in 0..<header.ncmds {
             let loadCommand = binary.extract(load_command.self,
                                              offset: offset,
-                                             swap: shouldSwap ? swap_load_command:nil)
+                                             swap: shouldSwap ? swapLoadCommand:nil)
             let commandEnd = offset + Int(loadCommand.cmdsize)
             if commandEnd > allCommandsEnd || commandEnd <= offset {
                 print("Cannot iterate load commands: Mach-O file is corrupted(\(index))")
@@ -301,7 +301,7 @@ class Macho {
         _ = try iterateLoadCommands(binary: binary) { offset, shouldSwap in
             let loadCommand = binary.extract(load_command.self,
                                              offset: offset,
-                                             swap: shouldSwap ? swap_load_command:nil)
+                                             swap: shouldSwap ? swapLoadCommand:nil)
             if loadCommand.cmd == command {
                 result = test(binary, offset, shouldSwap)
                 return true
@@ -320,7 +320,7 @@ class Macho {
         try firstLoadCommand(atURL: url, command: UInt32(LC_ENCRYPTION_INFO_64)) { binary, offset, shouldSwap in
             let infoCommand = binary.extract(encryption_info_command_64.self,
                                              offset: offset,
-                                             swap: shouldSwap ? swap_encryption_command_64:nil)
+                                             swap: shouldSwap ? swapEncryptionCommand64:nil)
             return infoCommand.cryptid != 0
         }
     }
@@ -335,7 +335,7 @@ class Macho {
         try firstLoadCommand(atURL: url, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
             let versionCommand = binary.extract(build_version_command.self,
                                                 offset: offset,
-                                                swap: shouldSwap ? swap_build_version_command:nil)
+                                                swap: shouldSwap ? swapBuildVersionCommand:nil)
             return versionCommand.platform == PLATFORM_MACCATALYST
         }
     }
@@ -421,4 +421,72 @@ class Macho {
         report["reason"] = blockers.isEmpty ? "ok" : blockers.joined(separator: ", ")
         return report
     }
+}
+
+// MARK: - Host-order byte swap
+//
+// Replaces the libc swap_* family (swap_fat_header, swap_fat_arch,
+// swap_mach_header_64, swap_load_command, swap_dylib_command,
+// swap_build_version_command, swap_encryption_command_64 — deprecated in
+// macOS 13, "No longer supported"). Same signatures as Data.extract's swap
+// parameter, same contract as the libc originals: each function
+// unconditionally byte-swaps every integer field, so call sites pass them
+// only for opposite-endian file data (big-endian CIGAM/FAT_CIGAM input on
+// little-endian hosts, or host-built structs being written back big-endian).
+// Implemented with FixedWidthInteger.byteSwapped (signed fields included).
+
+fileprivate func swapFatHeader(_ p: UnsafeMutablePointer<fat_header>, _ order: NXByteOrder) {
+    p.pointee.magic = p.pointee.magic.byteSwapped
+    p.pointee.nfat_arch = p.pointee.nfat_arch.byteSwapped
+}
+
+fileprivate func swapFatArch(_ p: UnsafeMutablePointer<fat_arch>, _ order: NXByteOrder) {
+    p.pointee.cputype = p.pointee.cputype.byteSwapped
+    p.pointee.cpusubtype = p.pointee.cpusubtype.byteSwapped
+    p.pointee.offset = p.pointee.offset.byteSwapped
+    p.pointee.size = p.pointee.size.byteSwapped
+    p.pointee.align = p.pointee.align.byteSwapped
+}
+
+fileprivate func swapMachHeader64(_ p: UnsafeMutablePointer<mach_header_64>, _ order: NXByteOrder) {
+    p.pointee.magic = p.pointee.magic.byteSwapped
+    p.pointee.cputype = p.pointee.cputype.byteSwapped
+    p.pointee.cpusubtype = p.pointee.cpusubtype.byteSwapped
+    p.pointee.filetype = p.pointee.filetype.byteSwapped
+    p.pointee.ncmds = p.pointee.ncmds.byteSwapped
+    p.pointee.sizeofcmds = p.pointee.sizeofcmds.byteSwapped
+    p.pointee.flags = p.pointee.flags.byteSwapped
+    p.pointee.reserved = p.pointee.reserved.byteSwapped
+}
+
+fileprivate func swapLoadCommand(_ p: UnsafeMutablePointer<load_command>, _ order: NXByteOrder) {
+    p.pointee.cmd = p.pointee.cmd.byteSwapped
+    p.pointee.cmdsize = p.pointee.cmdsize.byteSwapped
+}
+
+fileprivate func swapDylibCommand(_ p: UnsafeMutablePointer<dylib_command>, _ order: NXByteOrder) {
+    p.pointee.cmd = p.pointee.cmd.byteSwapped
+    p.pointee.cmdsize = p.pointee.cmdsize.byteSwapped
+    p.pointee.dylib.name.offset = p.pointee.dylib.name.offset.byteSwapped
+    p.pointee.dylib.timestamp = p.pointee.dylib.timestamp.byteSwapped
+    p.pointee.dylib.current_version = p.pointee.dylib.current_version.byteSwapped
+    p.pointee.dylib.compatibility_version = p.pointee.dylib.compatibility_version.byteSwapped
+}
+
+fileprivate func swapBuildVersionCommand(_ p: UnsafeMutablePointer<build_version_command>, _ order: NXByteOrder) {
+    p.pointee.cmd = p.pointee.cmd.byteSwapped
+    p.pointee.cmdsize = p.pointee.cmdsize.byteSwapped
+    p.pointee.platform = p.pointee.platform.byteSwapped
+    p.pointee.minos = p.pointee.minos.byteSwapped
+    p.pointee.sdk = p.pointee.sdk.byteSwapped
+    p.pointee.ntools = p.pointee.ntools.byteSwapped
+}
+
+fileprivate func swapEncryptionCommand64(_ p: UnsafeMutablePointer<encryption_info_command_64>, _ order: NXByteOrder) {
+    p.pointee.cmd = p.pointee.cmd.byteSwapped
+    p.pointee.cmdsize = p.pointee.cmdsize.byteSwapped
+    p.pointee.cryptoff = p.pointee.cryptoff.byteSwapped
+    p.pointee.cryptsize = p.pointee.cryptsize.byteSwapped
+    p.pointee.cryptid = p.pointee.cryptid.byteSwapped
+    p.pointee.pad = p.pointee.pad.byteSwapped
 }
