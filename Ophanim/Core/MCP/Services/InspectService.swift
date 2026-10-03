@@ -122,6 +122,7 @@ enum InspectControl {
                          steps: Int? = nil, text: String? = nil,
                          depthLimit: Int? = nil, nodeLimit: Int? = nil,
                          className: String? = nil, annotate: Bool? = nil,
+                         cssPath: String? = nil, webAction: String? = nil, webValue: String? = nil,
                          timeout: TimeInterval = MCPTimeouts.inspect) throws -> InspectResponse {
         // Held for the whole transaction (bounded by timeout): serializes the single slot.
         // Blocks the calling thread like launch_app's 120s semaphore does - on the stdio
@@ -135,6 +136,7 @@ enum InspectControl {
                                  x1: x1, y1: y1, x2: x2, y2: y2, steps: steps,
                                  depthLimit: depthLimit, nodeLimit: nodeLimit,
                                  limit: limit, className: className, text: text,
+                                 cssPath: cssPath, webAction: webAction, webValue: webValue,
                                  annotate: annotate)
         let dir = directory(for: bid)
         sweepOrphans(in: dir)

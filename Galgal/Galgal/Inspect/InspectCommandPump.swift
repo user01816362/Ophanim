@@ -296,6 +296,63 @@ final class InspectCommandPump: NSObject {
             focus_rsp.appState = info.appState
             return focus_rsp
 
+        case .webSnapshot:
+            guard let cstr = OPWebSnapshot() else {
+                return .failure(id: cmd.id, "no WKWebView found - take a screenshot to confirm web content is on screen")
+            }
+            defer { OPWebFree(cstr) }
+            var snap_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                   imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                   acted: nil, targetClass: "WKWebView")
+            snap_rsp.domSnapshot = String(cString: cstr)
+            return snap_rsp
+
+        case .webAct:
+            guard let path = cmd.cssPath, !path.isEmpty else {
+                return .failure(id: cmd.id, "webAct needs cssPath from web_snapshot")
+            }
+            guard let action = cmd.webAction, !action.isEmpty,
+                  ["fill", "click", "select", "submit"].contains(action) else {
+                return .failure(id: cmd.id, "webAct needs webAction: fill | click | select | submit")
+            }
+            if action == "fill" || action == "select" {
+                guard let v = cmd.webValue, !v.isEmpty else {
+                    return .failure(id: cmd.id, "webAct \(action) needs webValue")
+                }
+            }
+            let result: String?
+            if let v = cmd.webValue {
+                result = v.withCString { vp in
+                    path.withCString { pp in
+                        action.withCString { ap in
+                            OPWebAct(pp, ap, vp).map { r in
+                                defer { OPWebFree(r) }
+                                return String(cString: r)
+                            }
+                        }
+                    }
+                }
+            } else {
+                result = path.withCString { pp in
+                    action.withCString { ap in
+                        OPWebAct(pp, ap, nil).map { r in
+                            defer { OPWebFree(r) }
+                            return String(cString: r)
+                        }
+                    }
+                }
+            }
+            guard let detail = result else {
+                return .failure(id: cmd.id, "webAct failed: no WKWebView, missing node, or evaluation timeout")
+            }
+            var act_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                   imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                   acted: detail == "filled" || detail == "clicked" ||
+                                          detail == "selected" || detail == "submitted",
+                                   targetClass: "WKWebView")
+            act_rsp.webResult = detail
+            return act_rsp
+
         case .swipe:
             // Same key-window contract as tap: the touch path targets it, so anything else
             // fails stated instead of swiping the wrong window.

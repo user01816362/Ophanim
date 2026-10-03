@@ -248,6 +248,38 @@ enum InspectTools {
             if let vc = rsp.viewController { payload["viewController"] = vc }
             return MCPServer.toolResult(id, payload)
 
+        case "web_snapshot":
+            let rsp = try InspectControl.transact(bundleID: bid, op: .webSnapshot)
+            guard let dom = rsp.domSnapshot, !dom.isEmpty,
+                  let data = dom.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw ToolRouter.bail("web_snapshot returned no DOM for \(bid) - is web content on screen?")
+            }
+            var payload: [String: Any] = ["bundleID": bid,
+                                   "url": obj["url"] ?? NSNull(),
+                                   "title": obj["title"] ?? NSNull(),
+                                   "count": obj["count"] ?? 0,
+                                   "nodes": obj["nodes"] ?? []]
+            return MCPServer.toolResult(id, payload)
+
+        case "web_act":
+            guard let path = args["cssPath"] as? String, !path.isEmpty else {
+                throw ToolRouter.bail("web_act needs cssPath from web_snapshot")
+            }
+            guard let action = args["action"] as? String,
+                  ["fill", "click", "select", "submit"].contains(action) else {
+                throw ToolRouter.bail("web_act needs action: fill | click | select | submit")
+            }
+            if (action == "fill" || action == "select"),
+               (args["value"] as? String)?.isEmpty ?? true {
+                throw ToolRouter.bail("web_act \(action) needs value")
+            }
+            let rsp = try InspectControl.transact(bundleID: bid, op: .webAct,
+                                                  cssPath: path, webAction: action,
+                                                  webValue: args["value"] as? String)
+            return MCPServer.toolResult(id, ["bundleID": bid, "acted": rsp.acted ?? false,
+                                      "detail": rsp.webResult ?? "unknown"])
+
         case "inspect_pasteboard":
             let rsp = try InspectControl.transact(bundleID: bid, op: .pasteboard)
             var payload: [String: Any] = ["bundleID": bid]
@@ -924,6 +956,7 @@ enum InspectTools {
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
         "find_element", "tap_and_read",
         "inspect_pick", "inspect_pasteboard", "inspect_focus",
+        "web_snapshot", "web_act",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff",
         "inspect_clear_snapshots",

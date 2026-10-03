@@ -33,6 +33,13 @@ enum InspectOp: String, Codable {
     /// Focus + app state: first-responder class (nil when nothing focused) and
     /// application state. Read-only; no tree walk.
     case focus
+    /// Frozen DOM snapshot of the first WKWebView (JSON text): url/title/count +
+    /// nodes (ref/tag/type/text/value-masked-for-passwords/placeholder/href/frame/path).
+    /// No operator JS executes — one fixed serializer string.
+    case webSnapshot
+    /// Act on a web_snapshot node by CSS path: fill (value + input/change events),
+    /// click, select, submit. Value JSON-encoded into the fixed script template.
+    case webAct
 }
 
 /// Tree density. `full` walks everything (positional ids over the raw hierarchy, deepest).
@@ -79,6 +86,12 @@ struct InspectCommand: Codable {
     var className: String?
     /// setText: replacement text for a field.
     var text: String?
+    /// webAct: CSS path recorded by web_snapshot (tag/nth-child chain).
+    var cssPath: String?
+    /// webAct: fill | click | select | submit.
+    var webAction: String?
+    /// webAct fill/select value (JSON-encoded into the script; never echoed back).
+    var webValue: String?
     /// screenshot: overlay actionable-node frames + class names (default false).
     /// Additive optional - old hosts never send it, old guests ignore it.
     var annotate: Bool?
@@ -133,6 +146,10 @@ struct InspectResponse: Codable {
     /// (active/inactive/background). Read-only, no tree walk.
     var focusClass: String? = nil
     var appState: String? = nil
+    /// webAct: engine result string (filled/clicked/selected/submitted/missing/...).
+    var webResult: String? = nil
+    /// webSnapshot: frozen DOM JSON text ({url,title,count,nodes}).
+    var domSnapshot: String? = nil
 
     /// Builds a failure response carrying the command id, so the host moves on instead of
     /// burning its full timeout on silence.

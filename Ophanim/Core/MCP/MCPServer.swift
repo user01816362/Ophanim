@@ -46,7 +46,7 @@ final class MCPServer {
         "container_info", "list_profiles",
         "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
         "list_classes", "uitree_read", "screenshot",
-        "inspect_pick", "inspect_pasteboard", "inspect_focus", "find_element",
+        "inspect_pick", "inspect_pasteboard", "inspect_focus", "find_element", "web_snapshot",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -68,7 +68,7 @@ final class MCPServer {
         "set_pref",
         "inspect_clear_snapshots",
         "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
-        "tap_element", "swipe", "set_text", "tap_and_read",
+        "tap_element", "swipe", "set_text", "tap_and_read", "web_act",
     ]
 
     /// Dispatch one JSON-RPC message. Returns the response object, or nil for notifications.
@@ -1435,6 +1435,31 @@ final class MCPServer {
                     "bundleID": ["type": "string"]
                 ],
                 "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "web_snapshot",
+            "description": "Frozen DOM snapshot of the first WKWebView (url/title/count + nodes with ref/tag/text/masked values/frames/cssPaths). No operator JS executes; password values always masked.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "web_act",
+            "description": "Act on a web_snapshot node by cssPath: fill (value + input/change events), click, select, submit. Filled values are never echoed back.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "cssPath": ["type": "string", "description": "Selector path from web_snapshot."],
+                    "action": ["type": "string", "description": "fill | click | select | submit."],
+                    "value": ["type": "string", "description": "Required for fill/select. Never returned."]
+                ],
+                "required": ["bundleID", "cssPath", "action"]
             ]
         ],
         [
