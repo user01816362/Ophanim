@@ -5,14 +5,27 @@
 //  See InspectorWeb.h. evaluateJavaScript runs in the page's main world
 //  (legacy completionHandler API — old-SDK safe); the snapshot serializer is
 //  frozen (no operator JS ever executes — only the fixed strings below).
-//  WebKit itself is resolved at runtime (NSClassFromString): apps that never
-//  load it simply report "no webview". UIKit calls are direct (guest links it).
+//  WebKit itself is never linked: the class is resolved at runtime via
+//  NSClassFromString, and the one method we need is declared on the
+//  OPWebPageEvaluator protocol below (informal conformance — no WebKit
+//  headers, so unlinked apps simply report "no webview").
 
 #import "InspectorWeb.h"
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <string.h>
+#import <stdlib.h>
 
 static const double OPWebTimeout = 12.0;
+
+/// The single WebKit entry point we use, declared locally so this file
+/// compiles without linking or importing WebKit. Signature matches
+/// WKWebView's legacy main-world eval (completion delivers on the main
+/// queue — the runloop spin below is what lets it land).
+@protocol OPWebPageEvaluator <NSObject>
+- (void)evaluateJavaScript:(NSString *)javaScriptString
+         completionHandler:(void (^)(id _Nullable result, NSError * _Nullable error))completionHandler;
+@end
 
 // Frozen DOM serializer. Password values always masked (not redaction-gated:
 // page text may hold secrets the operator never asked to see).
@@ -40,36 +53,54 @@ static NSString * const kSnapshotJS =
 @"return JSON.stringify({url:location.href,title:document.title,count:out.length,nodes:out});"
 @"})()";
 
-// First WKWebView under the key window (depth-first). Class resolved at
-// runtime: nil means this app never loaded WebKit — stated, not an error.
-static id OPFirstWebView(void) {
+/// Key window, same contract as Inspector.keyWindow (Swift): visible-scene
+/// windows, key first, then first visible. One funnel so DOM eval and the
+/// tree/tap paths never disagree about which window they mean.
+static UIWindow *OPKeyWindow(void) {
+    NSMutableArray<UIWindow *> *windows = [NSMutableArray array];
+    for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) { continue; }
+        for (UIWindow *w in ((UIWindowScene *)scene).windows) {
+            if (!w.isHidden && w.alpha > 0.01) { [windows addObject:w]; }
+        }
+    }
+    for (UIWindow *w in windows) { if (w.isKeyWindow) { return w; } }
+    return windows.firstObject;
+}
+
+/// First WKWebView under the key window (depth-first). Nil class (app never
+/// loaded WebKit) or no webview on screen both mean nil: stated upstream.
+static UIView<OPWebPageEvaluator> *OPFirstWebView(void) {
     Class WKWebViewClass = NSClassFromString(@"WKWebView");
     if (!WKWebViewClass) { return nil; }
-    UIWindow *window = [UIApplication sharedApplication].keyWindow;
+    UIWindow *window = OPKeyWindow();
     if (!window) { return nil; }
-    NSMutableArray *stack = [NSMutableArray arrayWithObject:window];
+    NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithObject:window];
     while (stack.count) {
-        UIView *v = [stack lastObject];
+        UIView *v = stack.lastObject;
         [stack removeLastObject];
-        if ([v isKindOfClass:WKWebViewClass]) { return v; }
-        NSArray *subs = nil;
+        if ([v isKindOfClass:WKWebViewClass] &&
+            [v conformsToProtocol:@protocol(OPWebPageEvaluator)]) {
+            return (UIView<OPWebPageEvaluator> *)v;
+        }
+        NSArray<UIView *> *subs = nil;
         @try { subs = [v.subviews copy]; } @catch (__unused NSException *e) { continue; }
-        for (UIView *s in [subs reverseObjectEnumerator]) [stack addObject:s];
+        for (UIView *s in subs.reverseObjectEnumerator) { [stack addObject:s]; }
     }
     return nil;
 }
 
 // Run a script string on a webview with a bounded runloop spin (main-thread
 // pump safe: completions deliver on turns instead of deadlocking a semaphore).
-static NSString *OPRunJS(id webView, NSString *script) {
+static NSString *OPRunJS(UIView<OPWebPageEvaluator> *webView, NSString *script) {
     if (!webView || !script) { return nil; }
     __block NSString *result = nil;
     __block BOOL done = NO;
     @try {
         [webView evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
             if (!error && value) {
-                if ([value isKindOfClass:[NSString class]]) result = value;
-                else result = [NSString stringWithFormat:@"%@", value];
+                if ([value isKindOfClass:[NSString class]]) { result = value; }
+                else { result = [NSString stringWithFormat:@"%@", value]; }
             }
             done = YES;
         }];
@@ -92,7 +123,7 @@ static char *OPDup(NSString *s) {
 }
 
 const char *OPWebSnapshot(void) {
-    id webView = OPFirstWebView();
+    UIView<OPWebPageEvaluator> *webView = OPFirstWebView();
     if (!webView) { return NULL; }
     return OPDup(OPRunJS(webView, kSnapshotJS));
 }
@@ -101,7 +132,7 @@ const char *OPWebSnapshot(void) {
 // construction — embedding raw operator text would be an injection hole).
 static NSString *OPJSLiteral(NSString *value) {
     NSData *data = [NSJSONSerialization dataWithJSONObject:@[value ?: @""]
-                                                   options:0 error:nil];
+                                                   options:0 error:NULL];
     if (!data) { return @"\"\""; }
     NSString *arr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     if (arr.length < 2) { return @"\"\""; }
@@ -110,7 +141,7 @@ static NSString *OPJSLiteral(NSString *value) {
 
 const char *OPWebAct(const char *cssPath, const char *action, const char *value) {
     if (!cssPath || !action) { return NULL; }
-    id webView = OPFirstWebView();
+    UIView<OPWebPageEvaluator> *webView = OPFirstWebView();
     if (!webView) { return NULL; }
     NSString *path = [NSString stringWithUTF8String:cssPath];
     NSString *act = [NSString stringWithUTF8String:action];

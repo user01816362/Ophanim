@@ -14,17 +14,31 @@ STAGE="$APP_ROOT/Carthage/Build/Galgal.xcframework/ios-arm64"
 DD="$HOME/Library/Developer/Xcode/DerivedData"
 
 echo "▸ Building Galgal.framework (iOS device, arm64)…"
+# xcodebuild output goes to a log, not /dev/null: a swallowed log turned a
+# one-line clang diagnostic into a blind red build (InspectorWeb CompileC).
+# Quiet on success (tail only), full log on failure.
+FW_LOG="$APP_ROOT/Carthage/Build/galgal-fw.log"
+mkdir -p "$APP_ROOT/Carthage/Build"
 # -U lets the boringssl SSL_read/SSL_write interpose symbols be resolved at load (libboringssl
 # is not a linkable library); they bind inside the hosted app.
 xcodebuild -project Galgal.xcodeproj -scheme GalgalFW -configuration Release \
   -destination 'generic/platform=iOS' SUPPORTS_MACCATALYST=NO \
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
-  OTHER_LDFLAGS='$(inherited) -Wl,-U,_SSL_read -Wl,-U,_SSL_write' build >/dev/null
+  OTHER_LDFLAGS='$(inherited) -Wl,-U,_SSL_read -Wl,-U,_SSL_write' build >"$FW_LOG" 2>&1 || {
+  echo "error: GalgalFW build failed — last 60 log lines:" >&2
+  tail -60 "$FW_LOG" >&2
+  exit 1
+}
 
 echo "▸ Building GalgalInterface.bundle (macOS)…"
+PLUGIN_LOG="$APP_ROOT/Carthage/Build/galgal-plugin.log"
 xcodebuild -project Galgal.xcodeproj -scheme GalgalInterface -configuration Release \
   -destination 'generic/platform=macOS' \
-  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build >/dev/null
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build >"$PLUGIN_LOG" 2>&1 || {
+  echo "error: GalgalInterface build failed — last 60 log lines:" >&2
+  tail -60 "$PLUGIN_LOG" >&2
+  exit 1
+}
 
 FW_SRC="$(find "$DD"/Galgal-*/Build/Products/Release-iphoneos -maxdepth 1 -name Galgal.framework 2>/dev/null | head -1)"
 PLUGIN_SRC="$(find "$DD"/Galgal-*/Build/Products/Release -maxdepth 1 -name GalgalInterface.bundle 2>/dev/null | head -1)"
