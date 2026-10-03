@@ -162,19 +162,33 @@ const char *OPWebAct(const char *cssPath, const char *action, const char *value)
     NSString *act = [NSString stringWithUTF8String:action];
     NSString *val = value ? OPJSLiteral([NSString stringWithUTF8String:value]) : @"\"\"";
     // Single-quoted path: cssPath() emits tag/nth-of-type chains only (no quotes possible).
+    // Resolution is incremental (:scope stepwise, not one full-string query):
+    // full-string replay proved unreliable live (stable, complete paths still
+    // matched nothing), while stepwise narrows identically for correct paths.
+    // Fill targets are asserted (input/textarea/select with a value prop) so a
+    // divergent resolution can never write into the wrong node; failures carry
+    // the failing depth (missing@4/13) instead of a bare guess.
     NSString *script = [NSString stringWithFormat:
         @"(function(){"
-        @"var el=document.querySelector('%@');"
-        @"if(!el) return 'missing';"
-        @"var act='%@';"
-        @"if(act==='click'){el.click();return 'clicked';}"
-        @"if(act==='fill'){el.focus();el.value=%@;"
+        @"var steps='%@'.split(' > ');"
+        @"var el=document,depth=0;"
+        @"for(var i=0;i<steps.length;i++){"
+        @"var next=(i===0)?document.querySelector(steps[0]):el.querySelector(':scope > '+steps[i]);"
+        @"if(!next) return 'missing@'+depth+'/'+steps.length;"
+        @"el=next;depth++;}"
+        @"var tag=el.tagName.toLowerCase(),act='%@';"
+        @"if(act==='click'){el.click();return 'clicked@'+tag;}"
+        @"if(act==='fill'){"
+        @"if(!((tag==='input'||tag==='textarea'||tag==='select')&&('value' in el))) return 'not-fillable:'+tag;"
+        @"el.focus();el.value=%@;"
         @"el.dispatchEvent(new Event('input',{bubbles:true}));"
-        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'filled';}"
-        @"if(act==='select'){el.value=%@;"
-        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'selected';}"
+        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'filled@'+tag;}"
+        @"if(act==='select'){"
+        @"if(!('value' in el)) return 'not-selectable:'+tag;"
+        @"el.value=%@;"
+        @"el.dispatchEvent(new Event('change',{bubbles:true}));return 'selected@'+tag;}"
         @"if(act==='submit'){var f=el.closest('form');"
-        @"if(f){f.submit();return 'submitted';}el.click();return 'clicked';}"
+        @"if(f){f.submit();return 'submitted';}el.click();return 'clicked@'+tag;}"
         @"return 'unknown-action';})()",
         path, act, val, val];
     return OPDup(OPRunJS(webView, script));

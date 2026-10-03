@@ -354,8 +354,8 @@ final class InspectCommandPump: NSObject {
             }
             var act_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
                                    imageBase64: nil, mimeType: nil, width: nil, height: nil,
-                                   acted: detail == "filled" || detail == "clicked" ||
-                                          detail == "selected" || detail == "submitted",
+                                   acted: detail.hasPrefix("filled@") || detail.hasPrefix("clicked@") ||
+                                          detail.hasPrefix("selected@") || detail == "submitted",
                                    targetClass: "WKWebView")
             act_rsp.webResult = detail
             return act_rsp

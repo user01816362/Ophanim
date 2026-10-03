@@ -146,7 +146,7 @@ struct InspectResponse: Codable {
     /// (active/inactive/background). Read-only, no tree walk.
     var focusClass: String? = nil
     var appState: String? = nil
-    /// webAct: engine result string (filled/clicked/selected/submitted/missing/...).
+    /// webAct: engine result string (filled@tag/clicked@tag/selected@tag/submitted/missing@depth/...).
     var webResult: String? = nil
     /// webSnapshot: frozen DOM JSON text ({url,title,count,nodes}).
     var domSnapshot: String? = nil

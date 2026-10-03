@@ -18,7 +18,7 @@ const char *OPWebSnapshot(void);
 /// Act on a snapshot node by CSS path: "fill" (value + input/change events, so
 /// React-controlled inputs accept it), "click", "select", "submit".
 /// `value` is JSON-encoded into the script (no injection). Returns malloc'd
-/// result string ("filled"/"clicked"/"missing"/...), or NULL on failure.
+/// result string ("filled@input"/"clicked@button"/"missing@4/13"/...), or NULL on failure.
 /// The filled value is never echoed back.
 const char *OPWebAct(const char *cssPath, const char *action, const char *value);
 
