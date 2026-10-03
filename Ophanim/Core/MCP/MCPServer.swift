@@ -53,7 +53,7 @@ final class MCPServer {
 
     /// Tools that delete or replace state (preview first where offered).
     static let destructiveTools: Set<String> = [
-        "install_app", "uninstall_app", "set_galgal_runtime",
+        "install_app", "uninstall_app", "terminate_app", "set_galgal_runtime",
         "set_dyld_libraries", "set_app_category", "prune_files",
         "set_config", "set_injection_strategy", "reset_settings",
         "set_keymap", "rename_keymap", "delete_keymap",
@@ -703,6 +703,18 @@ final class MCPServer {
             "inputSchema": [
                 "type": "object",
                 "properties": ["bundleID": ["type": "string", "description": "The app's bundle identifier."]],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "terminate_app",
+            "description": "Terminate a running app (graceful quit, force-kill fallback). Needed because launch_app on a running app only activates — restart-required config changes need this first.",
+            "inputSchema": [
+                "type": "object",
+                "properties": ["bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "force": ["type": "boolean", "description": "Skip graceful quit."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to terminate."]
+                ],
                 "required": ["bundleID"]
             ]
         ],

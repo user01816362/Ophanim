@@ -147,6 +147,7 @@ enum ToolRouter {
         "list_apps": AppTools.listApps,
         "launch_app": AppTools.launchApp,
         "launch_status": AppTools.launchStatus,
+        "terminate_app": AppTools.terminateApp,
         "install_app": AppTools.installApp,
         "uninstall_app": AppTools.uninstallApp,
         "set_galgal_runtime": AppTools.setGalgalRuntime,

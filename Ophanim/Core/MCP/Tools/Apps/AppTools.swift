@@ -119,6 +119,48 @@ enum AppTools {
                              "agentLive": agentLive, "instrumentationEnabled": enabled])
     }
 
+    /// Terminate a running app: graceful quit first, force-kill after a grace
+    /// period. Needed because launch_app on a running app only activates —
+    /// config changes requiring a restart (agentMode, hooks, tweaks) need this
+    /// first. Destructive (unsaved state may be lost): dryRun previews by default.
+    ///
+    /// - Parameter args: `bundleID` (required); `dryRun`; `force` (skip graceful quit).
+    /// - Returns: JSON preview or termination report.
+    /// - Throws: `ToolRouter.bail` when the app is not installed or not running.
+    static func terminateApp(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard AppQueryService.appURL(bid) != nil else { throw ToolRouter.bail("app not installed: \(bid)") }
+        #if canImport(AppKit)
+        guard let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else {
+            throw ToolRouter.bail("app not running: \(bid)")
+        }
+        let pid = running.processIdentifier
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "pid": pid])
+        }
+        let forceOnly = (args["force"] as? Bool) ?? false
+        var method = "already-exited"
+        if !forceOnly {
+            running.terminate()
+            let deadline = Date().addingTimeInterval(5)
+            while !running.isTerminated, Date() < deadline { Thread.sleep(forTimeInterval: 0.25) }
+            if running.isTerminated { method = "terminate" }
+        }
+        if method != "terminate" {
+            running.forceTerminate()
+            let deadline = Date().addingTimeInterval(5)
+            while !running.isTerminated, Date() < deadline { Thread.sleep(forTimeInterval: 0.25) }
+            method = running.isTerminated ? "forceTerminate" : "still-running"
+        }
+        if method == "still-running" {
+            throw ToolRouter.bail("could not terminate \(bid) (pid \(pid))")
+        }
+        return try ToolRouter.json(["bundleID": bid, "pid": pid, "terminated": true, "method": method])
+        #else
+        throw ToolRouter.bail("terminate is not supported in this build")
+        #endif
+    }
+
     /// Installs an .ipa with Galgal injection forced on.
     ///
     /// Runs the same importer the GUI uses (no modal prompt) and blocks until

@@ -79,10 +79,16 @@ enum ContainerTools {
         if expanded.path.hasPrefix("/") {
             url = expanded.standardizedFileURL
         } else {
-            guard let base = ContainerService.readableRoots(bid).first else {
-                throw ToolRouter.bail("no readable container for \(bid)")
+            // Relative paths try each readable root, with and without the Data/
+            // segment (data containers nest content under Data/, the composed
+            // container path does not) — first hit wins, stated miss otherwise.
+            let bases = ContainerService.readableRoots(bid)
+            let candidates = bases + bases.map { $0.appendingPathComponent("Data") }
+            guard let hit = candidates.lazy.map({ $0.appendingPathComponent(raw).standardizedFileURL })
+                .first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+                throw ToolRouter.bail("no such file under the app's container/logs: \(raw)")
             }
-            url = base.appendingPathComponent(raw).standardizedFileURL
+            url = hit
         }
         guard ContainerService.isReadable(url, bundleID: bid) else {
             throw ToolRouter.bail("path is outside the app's container/logs: \(raw)")
@@ -211,6 +217,8 @@ enum ContainerTools {
             throw ToolRouter.bail("sqlite query failed (exit \(p.terminationStatus))")
         }
         let data = out.fileHandleForReading.readDataToEndOfFile()
+        // Empty result sets print zero bytes (not `[]`) in -json mode.
+        if data.isEmpty || data.allSatisfy({ $0 == 0x0A || $0 == 0x20 }) { return [] }
         guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw ToolRouter.bail("sqlite returned unparseable output")
         }
