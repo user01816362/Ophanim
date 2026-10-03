@@ -161,20 +161,35 @@ const char *OPWebAct(const char *cssPath, const char *action, const char *value)
     NSString *path = [NSString stringWithUTF8String:cssPath];
     NSString *act = [NSString stringWithUTF8String:action];
     NSString *val = value ? OPJSLiteral([NSString stringWithUTF8String:value]) : @"\"\"";
-    // Single-quoted path: cssPath() emits tag/nth-of-type chains only (no quotes possible).
     // Resolution is incremental (:scope stepwise, not one full-string query):
     // full-string replay proved unreliable live (stable, complete paths still
     // matched nothing), while stepwise narrows identically for correct paths.
+    // Positional steps resolve MANUALLY (same-tag child index — the exact rule
+    // the serializer counts by) instead of trusting the engine's :nth-of-type
+    // under :scope, which returned null live for a present 2nd div. Missing
+    // details name the failing step plus the parent's real child census, so a
+    // serializer/resolver divergence is distinguishable from a gone node.
     // Fill targets are asserted (input/textarea/select with a value prop) so a
-    // divergent resolution can never write into the wrong node; failures carry
-    // the failing depth (missing@4/13) instead of a bare guess.
+    // divergent resolution can never write into the wrong node.
     NSString *script = [NSString stringWithFormat:
         @"(function(){"
+        @"function stepResolve(root,step){"
+        @"var m=/^([a-z]+)(?::nth-of-type\\((\\d+)\\))?$/.exec(step);"
+        @"if(!m) return root.querySelector(':scope > '+step);"
+        @"var want=parseInt(m[2]||'1',10),seen=0,kids=root.children;"
+        @"for(var k=0;k<kids.length;k++){"
+        @"if(kids[k].tagName.toLowerCase()===m[1]){seen++;if(seen===want) return kids[k];}}"
+        @"return null;}"
         @"var steps='%@'.split(' > ');"
         @"var el=document,depth=0;"
         @"for(var i=0;i<steps.length;i++){"
-        @"var next=(i===0)?document.querySelector(steps[0]):el.querySelector(':scope > '+steps[i]);"
-        @"if(!next) return 'missing@'+depth+'/'+steps.length;"
+        @"var next=(i===0)?document.querySelector(steps[0]):stepResolve(el,steps[i]);"
+        @"if(!next){var info='';try{"
+        @"var kids=el.children,divs=0;"
+        @"for(var j=0;j<kids.length;j++){if(kids[j].tagName.toLowerCase()==='div')divs++;}"
+        @"info='|parent='+el.tagName.toLowerCase()+'#kids='+kids.length+'#divs='+divs;"
+        @"}catch(e){}"
+        @"return 'missing@'+depth+'/'+steps.length+info;}"
         @"el=next;depth++;}"
         @"var tag=el.tagName.toLowerCase(),act='%@';"
         @"if(act==='click'){el.click();return 'clicked@'+tag;}"
