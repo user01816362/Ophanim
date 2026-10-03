@@ -6,7 +6,6 @@
 //  Created by Isaac Marovitz on 09/10/2022.
 //
 
-import SystemConfiguration
 import Foundation
 
 /// URL-probe box: carries the data-task result and the (non-Sendable)
@@ -38,16 +37,14 @@ private final class URLProbeBox: @unchecked Sendable {
 
 class NetworkVM {
     static func isConnectedToNetwork() -> Bool {
-        // NOTE: SCNetworkReachability is deprecated since macOS 14.4 and the
-        // intended replacement is NWPathMonitor (Network framework) — but the
-        // Xcode 26.6 toolchain's MacOSX26.5 SDK ships a broken Network.h
-        // (includes missing 'Network/nw_object.h'), so any `import Network` in
-        // this target fatals the build during clang module scanning (proven:
-        // CI failure on 6ef3a4e). Revisit when the toolchain heals.
-        guard let flags = getFlags() else { return false }
-        let isReachable = flags.contains(.reachable)
-        let needsConnection = flags.contains(.connectionRequired)
-        let result = (isReachable && !needsConnection)
+        // POSIX interface check (getifaddrs — stable, not deprecated, no
+        // framework import): a live, non-loopback IPv4/IPv6 interface means we
+        // can attempt downloads. This replaces SCNetworkReachability
+        // (deprecated macOS 14.4); NWPathMonitor is the intended successor but
+        // the Xcode 26.6 SDK's Network.h is broken (missing nw_object.h), so
+        // `import Network` fatals this target's build (proven CI failure).
+        // Revisit when the toolchain heals.
+        let result = hasLiveNonLoopbackInterface()
 
         if !result && !ToastVM.shared.toasts.contains(where: { $0.toastType == .network }) {
             ToastVM.shared.showToast(
@@ -59,37 +56,26 @@ class NetworkVM {
         return result
     }
 
-    static func getFlags() -> SCNetworkReachabilityFlags? {
-        guard let reachability = ipv4Reachability() ?? ipv6Reachability() else { return nil }
-        var flags = SCNetworkReachabilityFlags()
-        if !SCNetworkReachabilityGetFlags(reachability, &flags) {
-            return nil
+    /// True when an interface is up, running, non-loopback, and carries an
+    /// IPv4 or IPv6 address (loopback alone does not count as connectivity).
+    private static func hasLiveNonLoopbackInterface() -> Bool {
+        var addrs: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&addrs) == 0, let first = addrs else { return false }
+        defer { freeifaddrs(addrs) }
+        var cursor: UnsafeMutablePointer<ifaddrs>? = first
+        while let current = cursor {
+            let flags = current.pointee.ifa_flags
+            let upAndRunning = (flags & UInt32(IFF_UP | IFF_RUNNING)) == UInt32(IFF_UP | IFF_RUNNING)
+            let loopback = (flags & UInt32(IFF_LOOPBACK)) != 0
+            if upAndRunning && !loopback, let addr = current.pointee.ifa_addr {
+                let family = addr.pointee.sa_family
+                if family == sa_family_t(AF_INET) || family == sa_family_t(AF_INET6) {
+                    return true
+                }
+            }
+            cursor = current.pointee.ifa_next
         }
-        return flags
-    }
-
-    static func ipv4Reachability() -> SCNetworkReachability? {
-        var zeroAddress = sockaddr_in()
-        zeroAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        zeroAddress.sin_family = sa_family_t(AF_INET)
-
-        return withUnsafePointer(to: &zeroAddress, {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                SCNetworkReachabilityCreateWithAddress(nil, $0)
-            }
-        })
-    }
-
-    static func ipv6Reachability() -> SCNetworkReachability? {
-        var zeroAddress = sockaddr_in6()
-        zeroAddress.sin6_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        zeroAddress.sin6_family = sa_family_t(AF_INET6)
-
-        return withUnsafePointer(to: &zeroAddress, {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                SCNetworkReachabilityCreateWithAddress(nil, $0)
-            }
-        })
+        return false
     }
 
     static func urlAccessible(url: URL,
