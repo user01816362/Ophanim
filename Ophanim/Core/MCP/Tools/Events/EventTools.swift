@@ -141,7 +141,7 @@ enum EventTools {
             }
             return true
         }
-        guard let e = cands.last, let url = e.fields["url"] else {
+        guard !cands.isEmpty else {
             throw ToolRouter.bail("no recorded request matches"
                 + (urlFilter.map { " url '\($0)'" } ?? "")
                 + (hostFilter.map { " host '\($0)'" } ?? ""))
