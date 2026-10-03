@@ -6,32 +6,8 @@
 //  Created by Isaac Marovitz on 09/10/2022.
 //
 
-import Network
+import SystemConfiguration
 import Foundation
-
-/// First-path box: NWPathMonitor delivers the current path immediately on
-/// start, so a one-shot monitor plus a bounded wait preserves the old
-/// synchronous call shape without hanging. Lock-guarded: the update handler
-/// runs on the monitor queue (concurrently-executing from the checker's view).
-private final class FirstPathBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value: Bool?
-    private let semaphore = DispatchSemaphore(value: 0)
-
-    func set(_ satisfied: Bool) {
-        let first = lock.withLock { () -> Bool in
-            guard value == nil else { return false }
-            value = satisfied
-            return true
-        }
-        if first { semaphore.signal() }
-    }
-
-    func wait(timeout: DispatchTime) -> Bool {
-        _ = semaphore.wait(timeout: timeout)
-        return lock.withLock { value } ?? false
-    }
-}
 
 /// URL-probe box: carries the data-task result and the (non-Sendable)
 /// completion across the @Sendable task boundary under one lock.
@@ -62,16 +38,16 @@ private final class URLProbeBox: @unchecked Sendable {
 
 class NetworkVM {
     static func isConnectedToNetwork() -> Bool {
-        // One-shot NWPathMonitor (Network framework — the SCNetworkReachability
-        // family is deprecated since macOS 14.4). The first update carries the
-        // current path; the bounded wait keeps this synchronous and hang-free.
-        let monitor = NWPathMonitor()
-        let queue = DispatchQueue(label: "ophanim.reachability")
-        let box = FirstPathBox()
-        monitor.pathUpdateHandler = { path in box.set(path.status == .satisfied) }
-        monitor.start(queue: queue)
-        let result = box.wait(timeout: .now() + 2)
-        monitor.cancel()
+        // NOTE: SCNetworkReachability is deprecated since macOS 14.4 and the
+        // intended replacement is NWPathMonitor (Network framework) — but the
+        // Xcode 26.6 toolchain's MacOSX26.5 SDK ships a broken Network.h
+        // (includes missing 'Network/nw_object.h'), so any `import Network` in
+        // this target fatals the build during clang module scanning (proven:
+        // CI failure on 6ef3a4e). Revisit when the toolchain heals.
+        guard let flags = getFlags() else { return false }
+        let isReachable = flags.contains(.reachable)
+        let needsConnection = flags.contains(.connectionRequired)
+        let result = (isReachable && !needsConnection)
 
         if !result && !ToastVM.shared.toasts.contains(where: { $0.toastType == .network }) {
             ToastVM.shared.showToast(
@@ -81,6 +57,39 @@ class NetworkVM {
         }
 
         return result
+    }
+
+    static func getFlags() -> SCNetworkReachabilityFlags? {
+        guard let reachability = ipv4Reachability() ?? ipv6Reachability() else { return nil }
+        var flags = SCNetworkReachabilityFlags()
+        if !SCNetworkReachabilityGetFlags(reachability, &flags) {
+            return nil
+        }
+        return flags
+    }
+
+    static func ipv4Reachability() -> SCNetworkReachability? {
+        var zeroAddress = sockaddr_in()
+        zeroAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        zeroAddress.sin_family = sa_family_t(AF_INET)
+
+        return withUnsafePointer(to: &zeroAddress, {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                SCNetworkReachabilityCreateWithAddress(nil, $0)
+            }
+        })
+    }
+
+    static func ipv6Reachability() -> SCNetworkReachability? {
+        var zeroAddress = sockaddr_in6()
+        zeroAddress.sin6_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        zeroAddress.sin6_family = sa_family_t(AF_INET6)
+
+        return withUnsafePointer(to: &zeroAddress, {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                SCNetworkReachabilityCreateWithAddress(nil, $0)
+            }
+        })
     }
 
     static func urlAccessible(url: URL,
