@@ -26,7 +26,11 @@ enum RuleTools {
         return try ToolRouter.json(["presets": [
             ["name": "block-trackers", "description": "Block network requests to known tracker/analytics/ad hosts"],
             ["name": "fake-idfv", "description": "Return a fixed fake identifierForVendor"],
-            ["name": "fake-idfa", "description": "Return a fixed fake advertising identifier"]
+            ["name": "fake-idfa", "description": "Return a fixed fake advertising identifier"],
+            ["name": "block-host", "description": "Block one host (glob). Parameters: {host} (required).",
+             "parameters": ["host"]],
+            ["name": "fake-device-id", "description": "Fake identifierForVendor with your value. Parameters: {value} (UUID string, required).",
+             "parameters": ["value"]]
         ]])
     }
 
@@ -47,7 +51,9 @@ enum RuleTools {
     static func applyPreset(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
         guard let name = args["preset"] as? String else { throw ToolRouter.bail("preset is required") }
-        let dicts = try Self.presetRules(name)
+        // frida-trace -P analogue: templated presets take string parameters.
+        let params = (args["parameters"] as? [String: String]) ?? [:]
+        let dicts = try Self.presetRules(name, parameters: params)
         let data = try JSONSerialization.data(withJSONObject: dicts)
         let preset = try JSONDecoder().decode([OPRule].self, from: data)
         // Explicit-true preview like the hook setters (omitted = apply, the
@@ -130,7 +136,7 @@ enum RuleTools {
     /// - Throws: `ToolError` for an unknown preset name.
     // MARK: - Private preset data
 
-    private static func presetRules(_ name: String) throws -> [[String: Any]] {
+    private static func presetRules(_ name: String, parameters: [String: String] = [:]) throws -> [[String: Any]] {
         switch name {
         case "block-trackers":
             let domains = ReportBuilder.trackerCatalog.keys.map { "\"\($0)\"" }.joined(separator: ",")
@@ -148,6 +154,23 @@ enum RuleTools {
             return [["id": "op-fake-idfa", "enabled": true, "note": "Fake advertising identifier",
                      "match": ["apiGlob": "ASIdentifierManager.advertisingIdentifier"],
                      "action": ["kind": "script", "script": "ctx.returnValue='00000000-0000-0000-0000-00000000AD1D';"]]]
+        case "block-host":
+            guard let host = parameters["host"], !host.isEmpty else {
+                throw ToolRouter.bail("preset 'block-host' needs parameters.host (e.g. {\"host\": \"ads.example.com\"})")
+            }
+            return [["id": "op-block-host", "enabled": true, "note": "Block host '\(host)'",
+                     "match": ["categories": ["network"], "hostGlob": "*\(host)*"],
+                     "action": ["kind": "block"]]]
+        case "fake-device-id":
+            guard let value = parameters["value"], !value.isEmpty else {
+                throw ToolRouter.bail("preset 'fake-device-id' needs parameters.value (a UUID string)")
+            }
+            // Quote-strip: the value lands inside a JS string literal; a quote would
+            // break the script (fail-safe via the JS exception path, but reject early).
+            let safe = value.replacingOccurrences(of: "'", with: "")
+            return [["id": "op-fake-device-id", "enabled": true, "note": "Fake identifierForVendor",
+                     "match": ["apiGlob": "UIDevice.identifierForVendor"],
+                     "action": ["kind": "script", "script": "ctx.returnValue='\(safe)';"]]]
         default:
             throw ToolRouter.ToolError(message: "unknown preset '\(name)' - use list_presets")
         }

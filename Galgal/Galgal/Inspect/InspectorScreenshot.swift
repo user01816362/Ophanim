@@ -22,7 +22,8 @@ enum InspectorScreenshot {
     ///
     /// - Parameter redact: Black out secure-field frames before encoding.
     /// - Returns: JPEG data plus pixel size, or nil when no window is capturable.
-    static func capture(redact: Bool, annotate: Bool = false) -> (data: Data, width: Int, height: Int)? {
+    static func capture(redact: Bool, annotate: Bool = false, cropTo: CGRect? = nil)
+    -> (data: Data, width: Int, height: Int)? {
         guard let window = Inspector.keyWindow() else { return nil }
         let bounds = window.bounds
         guard bounds.width > 1, bounds.height > 1 else { return nil }
@@ -62,17 +63,46 @@ enum InspectorScreenshot {
             }
         }
         guard let out = ctx.makeImage() else { return nil }
+        // Element crop (optional): intersect the requested window-points frame with
+        // the capture, in downscaled pixels. Empty intersection fails nil (caller
+        // reports it stated); the crop keeps full JPEG quality, no re-downscale.
+        var framed: CGImage = out
+        if let crop = cropTo {
+            let px = CGRect(x: crop.origin.x * scale, y: crop.origin.y * scale,
+                            width: crop.width * scale, height: crop.height * scale)
+                .intersection(CGRect(x: 0, y: 0, width: targetW, height: targetH))
+            guard !px.isNull, px.width >= 2, px.height >= 2,
+                  let cut = out.cropping(to: px.integral) else { return nil }
+            framed = cut
+        }
         // Optional overlay (default off): actionable-node frames + class names, drawn
         // AFTER redaction fill so boxes never leak masked text (labels are class names
         // only). Same membership rule as the host nodes[] filter, so overlay boxes and
         // tappable ids agree. Tree frames are window points; the image is window points
         // × scale — one uniform factor, no per-axis drift.
         let final: CGImage
-        if annotate, let overlaid = overlay(out, in: window, targetW: targetW, targetH: targetH,
-                                            scale: scale) {
-            final = overlaid
+        if annotate {
+            // Boxes in output-pixel space: full capture maps window points × scale;
+            // a crop additionally shifts by the crop origin. Precomputed here so the
+            // overlay never re-derives geometry (and agrees with nodes[] frames).
+            let origin = cropTo?.origin ?? .zero
+            let boxes: [(CGRect, String)] = actionableFrames(in: window).compactMap { (frame, cls) in
+                let px = CGRect(x: (frame.origin.x - origin.x) * scale,
+                                y: (frame.origin.y - origin.y) * scale,
+                                width: frame.width * scale,
+                                height: frame.height * scale)
+                let vis = px.intersection(CGRect(x: 0, y: 0,
+                                                 width: framed.width, height: framed.height))
+                guard !vis.isNull, vis.width >= 2, vis.height >= 2 else { return nil }
+                return (vis, cls)
+            }
+            if let overlaid = overlay(framed, boxes: boxes) {
+                final = overlaid
+            } else {
+                final = framed
+            }
         } else {
-            final = out
+            final = framed
         }
         // Encode straight into mutable data: Finalize writes the JPEG there, no copy-out API
         // needed (there is none - the destination owns the buffer).
@@ -83,7 +113,7 @@ enum InspectorScreenshot {
         }
         CGImageDestinationAddImage(dest, final, [kCGImageDestinationLossyCompressionQuality: 0.85] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { return nil }
-        return (encoded as Data, targetW, targetH)
+        return (encoded as Data, final.width, final.height)
     }
 
     /// Frames of actionable nodes for the annotate overlay: buttons, text inputs,
@@ -113,11 +143,11 @@ enum InspectorScreenshot {
     }
 
     /// Draw red frames + class labels over `image` (top-left origin, UIKit space).
-    /// Returns nil on renderer failure (caller falls back to the plain capture).
-    private static func overlay(_ image: CGImage, in window: UIWindow,
-                                targetW: Int, targetH: Int, scale: CGFloat) -> CGImage? {
+    /// Boxes arrive in output pixels (caller maps window points); returns nil on
+    /// renderer failure (caller falls back to the plain capture).
+    private static func overlay(_ image: CGImage, boxes: [(CGRect, String)]) -> CGImage? {
         let ui = UIImage(cgImage: image)
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: targetW, height: targetH))
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: image.width, height: image.height))
         return renderer.image { _ in
             ui.draw(at: .zero)
             let attrs: [NSAttributedString.Key: Any] = [
@@ -125,11 +155,7 @@ enum InspectorScreenshot {
                 .foregroundColor: UIColor.red,
                 .backgroundColor: UIColor(white: 0, alpha: 0.55),
             ]
-            for (frame, cls) in actionableFrames(in: window) {
-                let rect = CGRect(x: frame.origin.x * scale,
-                                  y: frame.origin.y * scale,
-                                  width: frame.width * scale,
-                                  height: frame.height * scale)
+            for (rect, cls) in boxes {
                 UIColor.red.setStroke()
                 UIRectFrame(rect)
                 (cls as NSString).draw(at: CGPoint(x: rect.minX + 2, y: max(0, rect.minY - 13)),

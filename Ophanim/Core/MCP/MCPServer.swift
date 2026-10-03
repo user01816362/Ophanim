@@ -57,7 +57,7 @@ final class MCPServer {
         "set_config", "set_injection_strategy", "reset_settings",
         "set_keymap", "rename_keymap", "delete_keymap",
         "set_rules", "apply_preset",
-        "set_objc_hooks", "set_swift_hooks", "set_inline_hooks",
+        "set_objc_hooks", "set_swift_hooks", "set_inline_hooks", "suggest_hooks",
         "add_source", "remove_source", "rename_source", "edit_source_url",
         "reset_sources", "install_source_app", "source_transfer",
         "add_tweak", "move_tweak", "remove_tweak", "set_tweak_enabled",
@@ -385,12 +385,14 @@ final class MCPServer {
         [
             "name": "apply_preset",
             "description": "Apply a named rule preset to an app (merges into existing rules, by id). "
-                + "block-trackers blocks known tracker/analytics/ad hosts; fake-idfv/fake-idfa return fixed fake identifiers.",
+                + "block-trackers blocks known tracker/analytics/ad hosts; fake-idfv/fake-idfa return fixed fake identifiers; "
+                + "block-host takes parameters.host; fake-device-id takes parameters.value.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "preset": ["type": "string", "description": "Preset name: block-trackers | fake-idfv | fake-idfa."]
+                    "preset": ["type": "string", "description": "Preset name: block-trackers | fake-idfv | fake-idfa | block-host | fake-device-id."],
+                    "parameters": ["type": "object", "description": "Template parameters for block-host ({host}) and fake-device-id ({value})."]
                 ],
                 "required": ["bundleID", "preset"]
             ]
@@ -470,6 +472,22 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "keyword": ["type": "string", "description": "Substring to match (e.g. 'Cronet', 'Response', 'didReceive')."]
+                ],
+                "required": ["bundleID", "keyword"]
+            ]
+        ],
+        [
+            "name": "suggest_hooks",
+            "description": "Draft ObjC boundary hooks from a keyword using the LIVE runtime inventory (frida-trace shape, host-only). Pairings come from inspect_class_detail (void methods, 0-3 args only); non-void/arity mismatches are counted skipped. dryRun previews (default true); pass false to merge new hooks into the app's set.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "keyword": ["type": "string", "description": "Substring matched against live class + method names."],
+                    "category": ["type": "string", "description": "Capture category for drafts (default process)."],
+                    "maxClasses": ["type": "integer", "description": "Live classes inventoried (default 5, cap 10)."],
+                    "maxHooks": ["type": "integer", "description": "Draft cap (default 10, cap 20)."],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to install new drafts."]
                 ],
                 "required": ["bundleID", "keyword"]
             ]
@@ -1188,12 +1206,13 @@ final class MCPServer {
         ],
         [
             "name": "screenshot",
-            "description": "Capture a screenshot (image block + dimensions). Response names detected frameworks + scene. Pass annotate:true to overlay actionable-node frames + class names (same membership as uitree nodes[]).",
+            "description": "Capture a screenshot (image block + dimensions). Response names detected frameworks + scene. Pass annotate:true to overlay actionable-node frames + class names (same membership as uitree nodes[]). Pass elementId to crop to that element's frame.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string"],
-                    "annotate": ["type": "boolean"]
+                    "annotate": ["type": "boolean"],
+                    "elementId": ["type": "string", "description": "Crop to this element (same-mode id from uitree nodes[])."]
                 ],
                 "required": ["bundleID"]
             ]

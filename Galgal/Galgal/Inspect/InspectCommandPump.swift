@@ -203,9 +203,23 @@ final class InspectCommandPump: NSObject {
             return rsp
 
         case .screenshot:
+            // Optional element crop: resolve in the caller's mode (same rule as tap),
+            // crop to the element frame in window points (guest maps to pixels exactly).
+            var crop: CGRect? = nil
+            if let elementId = cmd.elementId, !elementId.isEmpty {
+                guard let hit = Inspector.resolve(elementId: elementId, mode: cmd.mode ?? .full) else {
+                    return .failure(id: cmd.id, "element '\(elementId)' no longer resolves - take a fresh tree in the same mode")
+                }
+                guard hit.window === Inspector.keyWindow() else {
+                    return .failure(id: cmd.id, "element '\(elementId)' is not in the key window - take a fresh tree")
+                }
+                crop = hit.view.convert(hit.view.bounds, to: hit.window)
+            }
             guard let shot = InspectorScreenshot.capture(redact: redacted,
-                                                         annotate: cmd.annotate ?? false) else {
-                return .failure(id: cmd.id, "no window available for capture")
+                                                         annotate: cmd.annotate ?? false,
+                                                         cropTo: crop) else {
+                return .failure(id: cmd.id, crop == nil ? "no window available for capture"
+                                                        : "element frame outside capture")
             }
             let key = Inspector.keyWindowFramework()
             var shot_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,

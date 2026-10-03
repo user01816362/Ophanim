@@ -160,6 +160,7 @@ enum ToolRouter {
         "analyze_app": ReconTools.analyzeApp,
         "app_imports": ReconTools.appImports,
         "find_symbols": ReconTools.findSymbols,
+        "suggest_hooks": SuggestTools.suggestHooks,
         "list_libraries": ReconTools.listLibraries,
         "scan_signature": ReconTools.scanSignature,
         "set_objc_hooks": HookTools.setObjcHooks,

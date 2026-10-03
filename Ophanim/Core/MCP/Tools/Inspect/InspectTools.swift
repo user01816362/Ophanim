@@ -109,7 +109,7 @@ enum InspectTools {
                 let labeled = !(n.text?.isEmpty ?? true) || n.axLabel != nil || n.axIdentifier != nil
                 if n.role == "button" || n.role == "textfield" || n.role == "textview" || labeled {
                     var d: [String: Any] = ["id": n.id, "class": n.cls, "role": n.role,
-                                            "enabled": n.enabled]
+                                            "frame": n.frame, "enabled": n.enabled]
                     if let t = n.text, !t.isEmpty { d["text"] = String(t.prefix(80)) }
                     if let l = n.axLabel, !l.isEmpty { d["label"] = l }
                     if flat.count < 100 { flat.append(d) }
@@ -127,7 +127,9 @@ enum InspectTools {
 
         case "screenshot":
             let annotate = (args["annotate"] as? Bool) ?? false
+            let shotElementId = (args["elementId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let rsp = try InspectControl.transact(bundleID: bid, op: .screenshot,
+                                                  elementId: shotElementId,
                                                   annotate: annotate ? true : nil)
             guard let b64 = rsp.imageBase64, !b64.isEmpty else {
                 throw ToolRouter.bail("screenshot captured nothing for \(bid) - is a window visible?")

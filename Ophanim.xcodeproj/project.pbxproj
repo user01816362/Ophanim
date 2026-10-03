@@ -50,6 +50,7 @@
 		BC77E289CAFC42CD /* AppTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220847F9046C01C1 /* AppTools.swift */; };
 		5B7A3449F68B4385 /* EventTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3765949B44E0A21E /* EventTools.swift */; };
 		DADC6715A2A738F7 /* ReconTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 056DEEFFE3AD0AF6 /* ReconTools.swift */; };
+		7001A1159011CAFE /* SuggestTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7001A1159010CAFE /* SuggestTools.swift */; };
 		63820A553F7822A2 /* HookTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AC7C7D95F6CB3C2 /* HookTools.swift */; };
 		B7C5923B73019E46 /* RuleTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4348A085B12A9469 /* RuleTools.swift */; };
 		A9BCA17E026BF421 /* ConfigTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86C5858FBCEEE0E6 /* ConfigTools.swift */; };
@@ -189,6 +190,7 @@
 		220847F9046C01C1 /* AppTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppTools.swift; path = Ophanim/Core/MCP/Tools/Apps/AppTools.swift; sourceTree = SOURCE_ROOT; };
 		3765949B44E0A21E /* EventTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EventTools.swift; path = Ophanim/Core/MCP/Tools/Events/EventTools.swift; sourceTree = SOURCE_ROOT; };
 		056DEEFFE3AD0AF6 /* ReconTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ReconTools.swift; path = Ophanim/Core/MCP/Tools/Recon/ReconTools.swift; sourceTree = SOURCE_ROOT; };
+		7001A1159010CAFE /* SuggestTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SuggestTools.swift; path = Ophanim/Core/MCP/Tools/Recon/SuggestTools.swift; sourceTree = SOURCE_ROOT; };
 		8AC7C7D95F6CB3C2 /* HookTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HookTools.swift; path = Ophanim/Core/MCP/Tools/Hooks/HookTools.swift; sourceTree = SOURCE_ROOT; };
 		4348A085B12A9469 /* RuleTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RuleTools.swift; path = Ophanim/Core/MCP/Tools/Hooks/RuleTools.swift; sourceTree = SOURCE_ROOT; };
 		86C5858FBCEEE0E6 /* ConfigTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConfigTools.swift; path = Ophanim/Core/MCP/Tools/Config/ConfigTools.swift; sourceTree = SOURCE_ROOT; };
@@ -693,6 +695,7 @@
 			isa = PBXGroup;
 			children = (
 				056DEEFFE3AD0AF6 /* ReconTools.swift */,
+				7001A1159010CAFE /* SuggestTools.swift */,
 			);
 			name = Recon;
 			sourceTree = "<group>";
@@ -978,6 +981,7 @@
 				BC77E289CAFC42CD /* AppTools.swift in Sources */,
 				5B7A3449F68B4385 /* EventTools.swift in Sources */,
 				DADC6715A2A738F7 /* ReconTools.swift in Sources */,
+				7001A1159011CAFE /* SuggestTools.swift in Sources */,
 				63820A553F7822A2 /* HookTools.swift in Sources */,
 				B7C5923B73019E46 /* RuleTools.swift in Sources */,
 				A9BCA17E026BF421 /* ConfigTools.swift in Sources */,
