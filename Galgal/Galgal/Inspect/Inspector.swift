@@ -232,9 +232,7 @@ enum Inspector {
     /// interaction-disabled views resolve. Mirrors resolve()'s traversal exactly
     /// (collapse, visibleChildren, web opacity, leaf drops), so the returned id
     /// re-resolves in the same mode. Unfiltered walk assumed: ids index the full
-    /// forest, like a filter-less uiTree read.
-    /// Geometric pick: frontmost view at normalized x/y (hitTest-independent, so
-    /// interaction-disabled views resolve). Returns elementId + class + VC.
+    /// forest, like a filter-less uiTree read. Returns elementId + class + VC.
     ///
     /// - Parameter x: Normalized horizontal position in 0...1.
     /// - Parameter y: Normalized vertical position in 0...1.

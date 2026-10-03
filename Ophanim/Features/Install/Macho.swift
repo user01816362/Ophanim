@@ -351,13 +351,9 @@ class Macho {
     static func inspect(_ url: URL) throws -> [String: Any] {
         var report: [String: Any] = ["path": url.path]
 
-        guard let data = try? Data(contentsOf: url) else {
-            report["loadable"] = false
-            report["reason"] = "not a readable file"
-            return report
-        }
-
-        // A framework is loadable if its binary is; report the binary's own verdict either way.
+        // A framework is loadable if its binary is: resolve the binary FIRST,
+        // because reading a directory URL as data always fails (which used to
+        // make every framework report "not a readable file" before reaching here).
         let isFramework = url.pathExtension == "framework"
         let binaryURL: URL
         if isFramework {
@@ -373,6 +369,12 @@ class Macho {
         }
         report["isFramework"] = isFramework
         if isFramework { report["binary"] = binaryURL.path }
+
+        guard let data = try? Data(contentsOf: binaryURL) else {
+            report["loadable"] = false
+            report["reason"] = "not a readable file"
+            return report
+        }
 
         guard data.count >= 4 else {
             report["loadable"] = false

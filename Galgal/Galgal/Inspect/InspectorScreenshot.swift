@@ -127,7 +127,8 @@ enum InspectorScreenshot {
             let role = Inspector.role(of: view)
             let (text, _, _) = Inspector.classify(view)
             if role == "button" || role == "textfield" || role == "textview" ||
-               !(text?.isEmpty ?? true) || view.accessibilityLabel != nil {
+               !(text?.isEmpty ?? true) || view.accessibilityLabel != nil ||
+               view.accessibilityIdentifier != nil {
                 let f = view.convert(view.bounds, to: window)
                 guard f.width >= 4, f.height >= 4 else {
                     for kid in Inspector.visibleChildren(of: view) { walk(kid) }

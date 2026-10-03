@@ -158,6 +158,11 @@ enum RuleTools {
             guard let host = parameters["host"], !host.isEmpty else {
                 throw ToolRouter.bail("preset 'block-host' needs parameters.host (e.g. {\"host\": \"ads.example.com\"})")
             }
+            // OPGlob has no escape syntax (* and ? are always wildcards): reject
+            // metacharacters so a literal host can never widen into a broad block.
+            if host.contains(where: { "*?[]".contains($0) }) {
+                throw ToolRouter.bail("parameters.host must be a literal host (no *?[] wildcards)")
+            }
             return [["id": "op-block-host", "enabled": true, "note": "Block host '\(host)'",
                      "match": ["categories": ["network"], "hostGlob": "*\(host)*"],
                      "action": ["kind": "block"]]]

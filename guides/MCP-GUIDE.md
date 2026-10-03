@@ -90,7 +90,7 @@ Conventions: **R** read-only · **D** destructive · **I** idempotent.
 
 | Tool | R/D | Purpose + key args |
 |---|---|---|
-| `list_presets` | R/I | `block-trackers`, `fake-idfv`, `fake-idfa` (`RuleTools.swift:6-12`) |
+| `list_presets` | R/I | `block-trackers`, `fake-idfv`, `fake-idfa`, `block-host {host}`, `fake-device-id {value}` (`RuleTools.swift:6-12`) |
 | `apply_preset` | D, **omitted = apply** | `preset` (required). Merges by id — existing ids skipped, reported as `skipped`; `dryRun:true` previews wouldAdd/skipped (`RuleTools.swift:14-36`) |
 | `set_rules` | D, **omitted = write** | `rules` (required, full replace). Script rules take effect live. `dryRun:true` previews the count (`RuleTools.swift:38-47`) |
 | `validate_rule_script` | R/I | `script` (required). Parses only, never executes (wrapped in an uncalled function). Top-level `return` fails validation — correct, because the contract is ctx mutation (`RuleTools.swift:49-69`) |
@@ -252,8 +252,9 @@ Static (non-script) equivalents: `modifyArgs` rewrites via `cannedArgs`
 **Presets.** `block-trackers` = one script rule (`op-block-trackers`,
 network-only, lowercased host substring match — breaks deep-link resolution +
 in-app ads while active); `fake-idfv`/`fake-idfa` = fixed-UUID script rules
-on `UIDevice.identifierForVendor` / `ASIdentifierManager.advertisingIdentifier`
-(`RuleTools.swift:72-93`).
+on `UIDevice.identifierForVendor` / `ASIdentifierManager.advertisingIdentifier`;
+templated `block-host` (`parameters.host`, metacharacters rejected) and
+`fake-device-id` (`parameters.value`, quote-stripped) (`RuleTools.swift:72-110`).
 
 **Authoring flow.** `validate_rule_script` → `set_rules` (full replace;
 `dryRun:true` previews count) → live on running app for rules; new hooks need

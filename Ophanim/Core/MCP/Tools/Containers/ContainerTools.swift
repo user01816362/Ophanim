@@ -12,6 +12,130 @@ import Foundation
 /// stays GUI-only.
 enum ContainerTools {
 
+    // MARK: - SQLite browser (read-only, host-side)
+
+    /// Roots a database path is allowed to come from: the app's composed +
+    /// resolved containers and its log dirs. Anything else fails stated — the
+    /// sqlite CLI must never be pointed at arbitrary host paths.
+    private static func sqliteRoots(_ bid: String) -> [URL] {
+        var roots = [AppContainer(bundleId: bid).containerUrl]
+        if let real = Uninstaller.containerURL(for: bid) { roots.append(real) }
+        roots.append(contentsOf: ReportBuilder.logDirs(bid))
+        return roots
+    }
+
+    /// Resolve a database locator to a readable sqlite file inside the allowed
+    /// roots. `db` may be a full path or a filename substring (first match,
+    /// searched recursively to depth 6 — app-group nesting like
+    /// Documents/group.X/.../Library/.../Databases/).
+    private static func resolveDatabase(_ bid: String, _ db: String) throws -> URL {
+        let fm = FileManager.default
+        let direct = URL(fileURLWithPath: db).standardizedFileURL
+        let roots = sqliteRoots(bid).map { $0.standardizedFileURL }
+        func inside(_ u: URL) -> Bool {
+            roots.contains { u.path.hasPrefix($0.path) }
+        }
+        if fm.fileExists(atPath: direct.path), inside(direct),
+           ["sqlite", "db"].contains(direct.pathExtension.lowercased()) {
+            return direct
+        }
+        var found: [URL] = []
+        for root in roots {
+            guard let en = fm.enumerator(at: root, includingPropertiesForKeys: nil,
+                                         options: [.skipsHiddenFiles]) else { continue }
+            var depthGuard = 0
+            for case let f as URL in en {
+                depthGuard += 1
+                if depthGuard > 4000 { break }
+                guard ["sqlite", "db"].contains(f.pathExtension.lowercased()),
+                      f.lastPathComponent.localizedCaseInsensitiveContains(db) else { continue }
+                found.append(f)
+                if found.count >= 10 { break }
+            }
+            if found.count >= 10 { break }
+        }
+        guard let first = found.first else {
+            throw ToolRouter.bail("no sqlite database matching '\(db)' under the app's container/logs")
+        }
+        return first
+    }
+
+    /// Run a read-only query via the OS sqlite3 CLI (no package dep). `-readonly`
+    /// plus identifier validation at the call sites (never interpolate raw input).
+    private static func sqliteJSON(db: URL, sql: String) throws -> [[String: Any]] {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/sqlite3")
+        p.arguments = ["-readonly", "-json", db.path, sql]
+        let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+        try p.run(); p.waitUntilExit()
+        guard p.terminationStatus == 0 else {
+            throw ToolRouter.bail("sqlite query failed (exit \(p.terminationStatus))")
+        }
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw ToolRouter.bail("sqlite returned unparseable output")
+        }
+        return arr
+    }
+
+    /// List tables (+ row counts) of an app-container sqlite database.
+    ///
+    /// - Parameter args: `bundleID` (required); `db` (required path or filename substring).
+    /// - Returns: JSON with resolved `path`, `tables` (name + rows), `count`.
+    static func sqliteTables(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let db = args["db"] as? String, !db.isEmpty else {
+            throw ToolRouter.bail("db is required (path or filename substring)")
+        }
+        let url = try resolveDatabase(bid, db)
+        let rows = try sqliteJSON(db: url,
+            sql: "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+        var tables: [[String: Any]] = []
+        for r in rows {
+            guard let name = r["name"] as? String else { continue }
+            let quoted = "\"" + name.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+            let cnt = try sqliteJSON(db: url, sql: "SELECT COUNT(*) AS n FROM \(quoted);")
+            tables.append(["name": name, "rows": (cnt.first?["n"] as? Int) ?? 0])
+        }
+        return try ToolRouter.json(["bundleID": bid, "path": url.path,
+                             "tables": tables, "count": tables.count])
+    }
+
+    /// Read rows of one table (validated against the table list first, so the
+    /// name can never inject SQL).
+    ///
+    /// - Parameter args: `bundleID`, `db`, `table` (all required); `limit` (default 50, cap 200).
+    /// - Returns: JSON with `rows` (capped), `count`, and whether output truncated.
+    static func sqliteRows(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let db = args["db"] as? String, !db.isEmpty,
+              let table = args["table"] as? String, !table.isEmpty else {
+            throw ToolRouter.bail("db and table are required")
+        }
+        let limit = min(max(ToolRouter.coerceInt(args, "limit") ?? 50, 1), 200)
+        let url = try resolveDatabase(bid, db)
+        let known = try sqliteJSON(db: url,
+            sql: "SELECT name FROM sqlite_master WHERE type='table';")
+        guard known.compactMap({ $0["name"] as? String }).contains(table) else {
+            throw ToolRouter.bail("no such table '\(table)' in \(url.lastPathComponent)")
+        }
+        let quoted = "\"" + table.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        var rows = try sqliteJSON(db: url, sql: "SELECT * FROM \(quoted) LIMIT \(limit + 1);")
+        let truncated = rows.count > limit
+        if truncated { rows = Array(rows.prefix(limit)) }
+        // Cap cell text so one blob column can't flood the response.
+        let capped = rows.map { row -> [String: Any] in
+            var out: [String: Any] = [:]
+            for (k, v) in row {
+                if let s = v as? String, s.count > 500 { out[k] = String(s.prefix(500)) + "…" }
+                else { out[k] = v }
+            }
+            return out
+        }
+        return try ToolRouter.json(["bundleID": bid, "path": url.path, "table": table,
+                             "rows": capped, "count": capped.count, "truncated": truncated])
+    }
+
     // MARK: - Logs
 
     /// Reports capture-log locations and ndjson files with sizes.

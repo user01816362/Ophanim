@@ -42,10 +42,10 @@ final class MCPServer {
         "get_config", "get_hooks", "validate_rule_script",
         "list_jailbreak_detectors", "list_presets",
         "list_sources", "search_source_apps", "refresh_sources",
-        "get_log_path", "container_info", "list_profiles",
+        "get_log_path", "sqlite_tables", "sqlite_rows", "container_info", "list_profiles",
         "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
         "list_classes", "uitree_read", "screenshot",
-        "inspect_pick",
+        "inspect_pick", "inspect_pasteboard", "inspect_focus",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -379,7 +379,7 @@ final class MCPServer {
         ],
         [
             "name": "list_presets",
-            "description": "List ready-made rule presets (block-trackers, fake-idfv, fake-idfa) you can apply with apply_preset. block-trackers breaks deep-link resolution + in-app ads while active.",
+            "description": "List ready-made rule presets (block-trackers, fake-idfv, fake-idfa, block-host {host}, fake-device-id {value}) you can apply with apply_preset. block-trackers breaks deep-link resolution + in-app ads while active.",
             "inputSchema": ["type": "object", "properties": [:], "additionalProperties": false]
         ],
         [
@@ -478,7 +478,7 @@ final class MCPServer {
         ],
         [
             "name": "suggest_hooks",
-            "description": "Draft ObjC boundary hooks from a keyword using the LIVE runtime inventory (frida-trace shape, host-only). Pairings come from inspect_class_detail (void methods, 0-3 args only); non-void/arity mismatches are counted skipped. dryRun previews (default true); pass false to merge new hooks into the app's set.",
+            "description": "Draft ObjC boundary hooks from a keyword using the LIVE runtime inventory (frida-trace shape, host-only). Pairings come from inspect_class_detail (void methods, 0-3 args only); non-void/arity mismatches are counted skipped. dryRun previews (default true — unlike hook writers, which default-write); pass false to merge new hooks into the app's set.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
@@ -952,6 +952,32 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "sqlite_tables",
+            "description": "List tables (+ row counts) of an app-container sqlite database. Read-only, path-confined to the app's container/logs.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "db": ["type": "string", "description": "Database path or filename substring."]
+                ],
+                "required": ["bundleID", "db"]
+            ]
+        ],
+        [
+            "name": "sqlite_rows",
+            "description": "Read rows of one table (validated against the table list; capped 200 rows, long cells truncated). Read-only.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "db": ["type": "string", "description": "Database path or filename substring."],
+                    "table": ["type": "string"],
+                    "limit": ["type": "integer", "description": "Max rows (default 50, cap 200)."]
+                ],
+                "required": ["bundleID", "db", "table"]
+            ]
+        ],
+        [
             "name": "clear_logs",
             "description": "Delete capture logs, byte-counted.",
             "inputSchema": [
@@ -1245,6 +1271,28 @@ final class MCPServer {
                     "mode": ["type": "string"]
                 ],
                 "required": ["bundleID", "x", "y"]
+            ]
+        ],
+        [
+            "name": "inspect_pasteboard",
+            "description": "Read the general pasteboard string (nil when empty/non-text). Read-only copy-flow observer.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "inspect_focus",
+            "description": "First-responder class (nil when unfocused) + application state. Read-only, no tree walk.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"]
+                ],
+                "required": ["bundleID"]
             ]
         ],
         [

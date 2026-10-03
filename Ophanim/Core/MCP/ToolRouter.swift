@@ -197,6 +197,8 @@ enum ToolRouter {
         "tweak_folder": TweakTools.tweakFolder,
         "resync_tweaks": TweakTools.resyncTweaks,
         "get_log_path": ContainerTools.getLogPath,
+        "sqlite_tables": ContainerTools.sqliteTables,
+        "sqlite_rows": ContainerTools.sqliteRows,
         "clear_logs": ContainerTools.clearLogs,
         "container_info": ContainerTools.containerInfo,
         "list_profiles": ContainerTools.listProfiles,

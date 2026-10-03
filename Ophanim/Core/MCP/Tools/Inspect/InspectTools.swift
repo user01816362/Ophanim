@@ -186,6 +186,19 @@ enum InspectTools {
             if let vc = rsp.viewController { payload["viewController"] = vc }
             return MCPServer.toolResult(id, payload)
 
+        case "inspect_pasteboard":
+            let rsp = try InspectControl.transact(bundleID: bid, op: .pasteboard)
+            var payload: [String: Any] = ["bundleID": bid]
+            payload["pasteboard"] = rsp.pasteboard ?? NSNull()
+            return MCPServer.toolResult(id, payload)
+
+        case "inspect_focus":
+            let rsp = try InspectControl.transact(bundleID: bid, op: .focus)
+            var payload: [String: Any] = ["bundleID": bid,
+                                   "appState": rsp.appState ?? "unknown"]
+            payload["focusClass"] = rsp.focusClass ?? NSNull()
+            return MCPServer.toolResult(id, payload)
+
         case "swipe":
             func norm(_ key: String) throws -> Double {
                 guard let v = ToolRouter.coerceDouble(args, key),
@@ -847,7 +860,7 @@ enum InspectTools {
     /// dispatcher forks on this (never its own copy) so the two cannot drift.
     static let inspectToolNames: Set<String> = [
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
-        "inspect_pick",
+        "inspect_pick", "inspect_pasteboard", "inspect_focus",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff",
         "inspect_clear_snapshots",

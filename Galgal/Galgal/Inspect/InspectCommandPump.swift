@@ -280,6 +280,22 @@ final class InspectCommandPump: NSObject {
             pick_rsp.viewController = hit.vc
             return pick_rsp
 
+        case .pasteboard:
+            var pb_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                   imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                   acted: nil, targetClass: nil)
+            pb_rsp.pasteboard = InspectorActivator.pasteboardString()
+            return pb_rsp
+
+        case .focus:
+            let info = InspectorActivator.focusInfo()
+            var focus_rsp = InspectResponse(id: cmd.id, ok: true, error: nil, truncated: nil, tree: nil,
+                                   imageBase64: nil, mimeType: nil, width: nil, height: nil,
+                                   acted: nil, targetClass: info.focusClass)
+            focus_rsp.focusClass = info.focusClass
+            focus_rsp.appState = info.appState
+            return focus_rsp
+
         case .swipe:
             // Same key-window contract as tap: the touch path targets it, so anything else
             // fails stated instead of swiping the wrong window.

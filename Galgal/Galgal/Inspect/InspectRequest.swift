@@ -27,6 +27,12 @@ enum InspectOp: String, Codable {
     /// Geometric pick: frontmost view at normalized x/y (hitTest-independent, so
     /// interaction-disabled views resolve). Returns elementId + class + VC.
     case pick
+    /// Read-only pasteboard: general pasteboard string (nil when empty/non-text).
+    /// Observes copy flows without touching them.
+    case pasteboard
+    /// Focus + app state: first-responder class (nil when nothing focused) and
+    /// application state. Read-only; no tree walk.
+    case focus
 }
 
 /// Tree density. `full` walks everything (positional ids over the raw hierarchy, deepest).
@@ -121,6 +127,12 @@ struct InspectResponse: Codable {
     var vcs: [String]? = nil
     /// pick: positional id of the frontmost view at the point (same-mode resolvable).
     var elementId: String? = nil
+    /// pasteboard: general pasteboard string (nil when empty/non-text). Read-only.
+    var pasteboard: String? = nil
+    /// focus: first-responder class (nil when nothing focused) + app state
+    /// (active/inactive/background). Read-only, no tree walk.
+    var focusClass: String? = nil
+    var appState: String? = nil
 
     /// Builds a failure response carrying the command id, so the host moves on instead of
     /// burning its full timeout on silence.

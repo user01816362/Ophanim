@@ -147,6 +147,30 @@ enum InspectorActivator {
                                         to: nil, from: nil, for: nil)
         return opFoundFirstResponder
     }
+
+    /// Focus + app state for the focus op: first-responder class (nil when nothing
+    /// focused) and UIApplication state. Read-only; reuses the probe above.
+    ///
+    /// - Returns: Focused control's class name (if any) and app state string.
+    static func focusInfo() -> (focusClass: String?, appState: String) {
+        let first = currentFirstResponder()
+        let state: String
+        switch UIApplication.shared.applicationState {
+        case .active: state = "active"
+        case .inactive: state = "inactive"
+        case .background: state = "background"
+        @unknown default: state = "unknown"
+        }
+        return (first.map { String(describing: type(of: $0)) }, state)
+    }
+
+    /// Read-only pasteboard string (general pasteboard). Observes copy flows;
+    /// nil when empty or non-text. No write API exists on this path by design.
+    ///
+    /// - Returns: The pasteboard string, if any.
+    static func pasteboardString() -> String? {
+        UIPasteboard.general.string
+    }
 }
 
 /// File-private first-responder slot for the probe above (weak: never retains app objects).
