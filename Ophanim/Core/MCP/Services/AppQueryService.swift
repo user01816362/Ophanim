@@ -316,7 +316,7 @@ enum AppQueryService {
             ranges.append((off, off + UInt64(s.utf8.count), s))
             if ranges.count >= 2000 { break }
         }
-        guard !ranges.isEmpty else { return ["refs": [], "approximate": true] }
+        guard !ranges.isEmpty else { return ["refs": [], "approximate": true, "via": "none", "trackedStrings": 0] }
         let starts = ranges.map { $0.start }.sorted()
         var refs: [[String: Any]] = []
         // One matcher for both candidate sources (chained targets or raw
@@ -367,7 +367,7 @@ enum AppQueryService {
                 }
             }
         }
-        return ["refs": refs, "approximate": true, "via": via]
+        return ["refs": refs, "approximate": true, "via": via, "trackedStrings": ranges.count]
     }
 
     /// Raw protocol/conformance section dumps (v0): `otool -s` over the ObjC
