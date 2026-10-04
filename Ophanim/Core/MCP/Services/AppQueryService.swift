@@ -405,7 +405,7 @@ enum AppQueryService {
         var entitlements: Any = NSNull()
         if !entPlist.out.isEmpty,
            let data = entPlist.out.data(using: .utf8),
-           let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
+           let obj = PlistReader.plistDict(data: data) {
             entitlements = ContainerService.jsonSafe(obj)
         }
         return [

@@ -28,10 +28,18 @@ enum PlistReader {
     /// - Parameter plistURL: The plist file URL.
     /// - Returns: The dictionary, or nil when missing/corrupt/non-dict.
     static func plistDict(at plistURL: URL) -> [String: Any]? {
-        guard let data = try? Data(contentsOf: plistURL),
-              let obj = try? PropertyListSerialization.propertyList(from: data, format: nil),
-              let dict = obj as? [String: Any] else { return nil }
-        return dict
+        guard let data = try? Data(contentsOf: plistURL) else { return nil }
+        return plistDict(data: data)
+    }
+
+    /// Decodes plist bytes (R10-sanctioned owner for `propertyList`: callers
+    /// with in-memory plist XML — e.g. `codesign --entitlements :-` output —
+    /// route through here instead of decoding inline).
+    ///
+    /// - Parameter data: The plist bytes.
+    /// - Returns: The dictionary, or nil when corrupt/non-dict.
+    static func plistDict(data: Data) -> [String: Any]? {
+        (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
     }
 
     /// Writes a dictionary as an XML plist, atomically.
