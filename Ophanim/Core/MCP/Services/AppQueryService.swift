@@ -189,6 +189,97 @@ enum AppQueryService {
         return ["plist": ContainerService.jsonSafe(info), "checks": checks]
     }
 
+    /// Chained-fixup rebase targets (vmaddrs) from LC_DYLD_CHAINED_FIXUPS.
+    /// Modern binaries chain ALL data pointers (fixup payloads, not plain
+    /// addresses), so a raw 8-byte slot scan finds nothing on them — decode
+    /// the chains instead (proven live: 8.5K targets, 96% in-range on a
+    /// format-6 arm64 binary). Supports formats 1/2/6 (ARM64E/PTR_64/
+    /// PTR_64_OFFSET); bind/auth entries skipped (external/undecodable).
+    /// Pure-Data walk, no new deps. Nil when absent/unparseable (caller falls
+    /// back to the raw slot scan for classic binaries).
+    ///
+    /// - Parameter data: The Mach-O file bytes (thin LE; FAT returns nil).
+    /// - Returns: Rebase target vmaddrs, or nil.
+    static func chainedTargets(data: Data) -> [UInt64]? {
+        func u32(_ o: Int) -> UInt32? {
+            guard o + 4 <= data.count else { return nil }
+            return UInt32(data[o]) | (UInt32(data[o + 1]) << 8)
+                | (UInt32(data[o + 2]) << 16) | (UInt32(data[o + 3]) << 24)
+        }
+        func u64(_ o: Int) -> UInt64? {
+            guard o + 8 <= data.count else { return nil }
+            var v: UInt64 = 0
+            for i in 0..<8 { v |= UInt64(data[o + i]) << (i * 8) }
+            return v
+        }
+        func u16(_ o: Int) -> UInt? {
+            guard o + 2 <= data.count else { return nil }
+            return UInt(data[o]) | (UInt(data[o + 1]) << 8)
+        }
+        guard data.count >= 32, u32(0) == 0xFEEDFACF else { return nil }
+        guard let ncmds = u32(16) else { return nil }
+        var segs: [(vmaddr: UInt64, fileoff: UInt64, filesize: UInt64)] = []
+        var fixData: (off: Int, size: Int)?
+        var off = 32
+        for _ in 0..<ncmds {
+            guard let cmd = u32(off), let sz = u32(off + 4), sz >= 8 else { return nil }
+            if cmd == 0x19, let vm = u64(off + 24), let fo = u64(off + 40),
+               let fs = u64(off + 48) {
+                segs.append((vm, fo, fs))
+            } else if cmd == 0x80000034, let doff = u32(off + 8), let dsz = u32(off + 12) {
+                fixData = (Int(doff), Int(dsz))
+            }
+            off += Int(sz)
+        }
+        guard let fix = fixData,
+              fix.off + fix.size <= data.count,
+              let startsRel = u32(fix.off + 4) else { return nil }
+        let starts = fix.off + Int(startsRel)
+        guard let segCount = u32(starts), starts + 4 + Int(segCount) * 4 <= data.count else { return nil }
+        // Link base: the first file-mapped segment (__TEXT — NOT __PAGEZERO,
+        // which also has fileoff 0 but maps nothing; using it zeroes every
+        // address and silently matches nothing).
+        guard let base = segs.first(where: { $0.fileoff == 0 && $0.filesize > 0 }).map({ $0.vmaddr }) else { return nil }
+        var targets: [UInt64] = []
+        var totalSteps = 0
+        for si in 0..<Int(segCount) {
+            guard let ioff = u32(starts + 4 + si * 4), ioff != 0 else { continue }
+            let s = starts + Int(ioff)
+            guard let fmt = u16(s + 6), let pageCount = u16(s + 22),
+                  let pageSize = u16(s + 4), si < segs.count else { continue }
+            guard fmt == 1 || fmt == 2 || fmt == 6 else { continue }
+            let segFileoff = segs[si].fileoff
+            for pi in 0..<Int(pageCount) {
+                guard let st = u16(s + 24 + pi * 2), st != 0xFFFF else { continue }
+                let stride = (fmt == 1) ? 8 : 4
+                var pos = Int(segFileoff) + pi * Int(pageSize) + Int(st)
+                while totalSteps < 1_000_000 {
+                    guard let v = u64(pos) else { break }
+                    totalSteps += 1
+                    if fmt == 1 {
+                        let auth = (v >> 63) & 1, bind = (v >> 62) & 1
+                        let nxt = Int((v >> 51) & 0x7FF)
+                        if auth == 0 && bind == 0 {
+                            targets.append((((v >> 43) & 0xFF) << 43) | (v & 0x7FFFFFFFFFF))
+                        }
+                        if nxt == 0 { break }
+                        pos += nxt * stride
+                    } else {
+                        let bind = (v >> 63) & 1
+                        let nxt = Int((v >> 51) & 0xFFF)
+                        if bind == 0 {
+                            let combined = (((v >> 36) & 0xFF) << 36) | (v & 0xFFFFFFFFF)
+                            targets.append(fmt == 6 ? base &+ combined : combined)
+                        }
+                        if nxt == 0 { break }
+                        pos += nxt * stride
+                    }
+                }
+            }
+        }
+        return targets
+    }
+
     /// Approximate string cross-refs (table + pointer-scan tier, NOT
     /// instruction xrefs): `strings -t d` gives file offsets; an 8-byte
     /// little-endian scan of __DATA finds pointer slots holding those
@@ -228,32 +319,55 @@ enum AppQueryService {
         guard !ranges.isEmpty else { return ["refs": [], "approximate": true] }
         let starts = ranges.map { $0.start }.sorted()
         var refs: [[String: Any]] = []
-        let n = data.count / 8
-        data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            var i = 0
-            while i < n && refs.count < 200 {
-                let v = raw.loadUnaligned(fromByteOffset: i * 8, as: UInt64.self).littleEndian
-                for slide in slides {
-                    guard v >= slide else { continue }
-                    let f = v - slide
-                    var lo = 0, hi = starts.count - 1, cand = -1
-                    while lo <= hi {
-                        let mid = (lo + hi) / 2
-                        if starts[mid] <= f { cand = mid; lo = mid + 1 } else { hi = mid - 1 }
-                    }
-                    if cand >= 0 {
-                        let st = starts[cand]
-                        if let r = ranges.first(where: { $0.start == st }), f < r.end {
-                            refs.append(["string": String(r.text.prefix(120)),
-                                         "stringOffset": st, "refOffset": UInt64(i * 8)])
-                            break
-                        }
+        // One matcher for both candidate sources (chained targets or raw
+        // slots): slide-correct each candidate, binary-search the string
+        // ranges. Returns the hit range, if any.
+        func matchValue(_ v: UInt64, _ slides: [UInt64]) -> (start: UInt64, text: String)? {
+            for slide in slides {
+                guard v >= slide else { continue }
+                let f = v - slide
+                var lo = 0, hi = starts.count - 1, cand = -1
+                while lo <= hi {
+                    let mid = (lo + hi) / 2
+                    if starts[mid] <= f { cand = mid; lo = mid + 1 } else { hi = mid - 1 }
+                }
+                if cand >= 0 {
+                    let st = starts[cand]
+                    if let r = ranges.first(where: { $0.start == st }), f < r.end {
+                        return (st, r.text)
                     }
                 }
-                i += 1
+            }
+            return nil
+        }
+        // Chained binaries: match decoded rebase targets (refOffset carries
+        // the target vmaddr). Classic binaries: fall back to the raw slot
+        // scan (refOffset carries the file offset).
+        var via = "raw"
+        if let chained = chainedTargets(data: data) {
+            via = "chained"
+            for t in chained {
+                if refs.count >= 200 { break }
+                if let hit = matchValue(t, slides) {
+                    refs.append(["string": String(hit.text.prefix(120)),
+                                 "stringOffset": hit.start, "refOffset": t])
+                }
+            }
+        } else {
+            let n = data.count / 8
+            data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+                var i = 0
+                while i < n && refs.count < 200 {
+                    let v = raw.loadUnaligned(fromByteOffset: i * 8, as: UInt64.self).littleEndian
+                    if let hit = matchValue(v, slides) {
+                        refs.append(["string": String(hit.text.prefix(120)),
+                                     "stringOffset": hit.start, "refOffset": UInt64(i * 8)])
+                    }
+                    i += 1
+                }
             }
         }
-        return ["refs": refs, "approximate": true]
+        return ["refs": refs, "approximate": true, "via": via]
     }
 
     /// Raw protocol/conformance section dumps (v0): `otool -s` over the ObjC
