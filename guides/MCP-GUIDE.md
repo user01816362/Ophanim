@@ -103,6 +103,8 @@ the contract (`ToolRouter.matrix`, `ToolRouter.swift:233-253`).
 | `set_objc_hooks` | D, **omitted = write** | `hooks` (required, full replace). `{className, selector, args 0-3 (default 1), classMethod, category, api?, imageGlob?}`. Void methods only; `objc_msgSend`-dispatched calls only — direct Swift calls and pure-Swift methods unreachable (`HookTools.swift:11-21`; `MCPServer.swift:410-427`; shape `OPConfig.swift:72-97`) |
 | `set_swift_hooks` | D, **omitted = write** | `{className (_TtC… form from `find_symbols`), method (substring of mangled symbol), category, api?, imageGlob?}`. Vtable-dispatched methods only; `-O` devirtualization bypasses the vtable — use inline hooks instead. Failures aggregate in `ophanim.swiftHook.installSummary` events (`HookTools.swift:23-33`; `MCPServer.swift:429-449`; shape `OPConfig.swift:102-122`) |
 | `set_inline_hooks` | D, **omitted = write** | `{api, category, module?, symbol?, address?, offset?, signature?, followThunk?, captureReturn?, renderArgs?, renderReturn?}`. arm64 only; gated on `enableInlineHooks=true` (reports `gateOn`; warns when off). Locate priority: address → symbol → module+offset → module+signature (`HookTools.swift:35-48`; `MCPServer.swift:451-476`; shape `OPConfig.swift:170-208`) |
+| `add_hooks` | D, **omitted = write** | Merge entries into one tier (append, not replace) — ends wipe-by-resend. Same preflight + dryRun shape as writers |
+| `suggest_hooks` kinds | R/I preview | `kind=objc` (live inventory, default) \| `kind=swift` (needs `method`; mangled class pairs, labeled likely) \| `kind=inline` (hex pattern → module+offset anchors). All writers accept `leaseSeconds` trial leases (crash-safe auto-revert) |
 
 Rule match/action shapes: `match` = AND of `categories?`, `apiGlob?`,
 `hostGlob?`, `urlGlob?`, `pathGlob?`, `argContains?`
@@ -144,6 +146,7 @@ file op (`TweakTools.swift:46`, `72`, `89`, `113-114`).
 | `clear_container` | D/I, dryRun-default | `scope`: caches/data/keychain/preferences (required). `data` scope also wipes the snapshot timeline + bookmarks (marks would point at a UI that no longer exists); other scopes stay surgical (`ContainerTools.swift:99-180`) |
 | `backup_container` | D, dryRun-default | `destPath` (required). `ditto` zip; reports `wouldOverwrite` on preview (`ContainerTools.swift:182-201`) |
 | `restore_container` | D, dryRun-default | `archivePath` (required). Refuses while running; replaces the live tree via `ditto` (`ContainerTools.swift:203-225`) |
+| `delete_pref` | D, dryRun-default | Remove one top-level preferences key (onboarding-reset recipes). Same confinement as `set_pref`; cfprefsd staleness applies (relaunch to observe) |
 
 ### Web (WKWebView observe + act)
 
@@ -186,7 +189,8 @@ stack would be wrong, so only synchronous swizzle events carry
 caller-attribution flag (`captureNetworkCallers`, default off: dladdr cost)
 for the hot-path equivalent.
 | `unsubscribe_events` | live effect | `bundleID` optional — one feed or all. Reports `threadParked` (`EventTools.swift:57-63`) |
-| `export_curl` | R/I | Newest matching request (`index`: 0 = newest) as replay-grade curl (method + url + `req.*` headers, text body to 16384 chars; binary noted, never dumped). Headers may carry secrets — never paste into shared contexts without checking (`EventTools.swift:128-178`) |
+| `export_curl` | R/I | Newest matching request (`index`: 0 = newest) as replay-grade curl (method + url + `req.*` headers, text body to 16384 chars; binary noted, never dumped — `base64Body:true` emits base64-capped instead). Headers may carry secrets — never paste into shared contexts without checking (`EventTools.swift:128-178`) |
+| `resend_request` | live effect (host network) | Re-issue a recorded request from host networking with header/body/method overrides; returns status/headers/body + diff vs recorded (`statusMatch`). Proves the SERVER hypothesis. Runs OUTSIDE app identity (cookies/client certs do not transfer) |
 | `event_mark` | live effect (host cursor) | Pin the current newest-event cursor under `name` (default "default") for later `events_since_mark` windows |
 | `events_since_mark` | R/I | Events after a named mark (exact-window causality); same filters as `tail_events` |
 | `diff_events` | R/I | Group events in (`sinceA`, `sinceB`] by api with counts + first/last. The tap-to-traffic read: cursor → act → diff |
@@ -197,11 +201,12 @@ for the hot-path equivalent.
 | `all_symbols` | R/I | Paged full dump without keyword guessing (`kind`: symbols/classes/selectors, `page`/`perPage`) — same nm/demangle pipeline |
 | `list_libraries` | R/I | `otool -L` parse with versions, embedded/system split, weak-link marks, one-level transitive closure over embedded frameworks |
 | `list_protocols` | R/I | Raw ObjC protocol + Swift conformance section dumps (delegate-shape hook prediction; typed parsing later) |
-| `string_xrefs` | R/I | Approximate data-pointer scan from matching cstrings (chained-fixup-aware; labeled `approximate`, `via: chained|raw`) — string-to-hook-anchor without disassembly |
+| `string_xrefs` | R/I | Approximate data-pointer scan from matching cstrings (chained-fixup-aware; labeled `approximate`, `via: chained|raw`) — string-to-hook-anchor without disassembly. `trackedStrings` distinguishes absent (0 tracked) from unreferenced (N tracked, 0 refs) |
 | `app_identity` | R/I | CDHash + whole-file sha256 + LC_UUID + authority + cryptid + verify status. Gate every byte-export on this first |
 | `app_hash` | R/I | Whole-file SHA-256 of a bundle file (default: main executable) |
 | `app_export_file` | live effect | Bounded, hashed, symlink-proof single-file export out of the bundle (never writes into it) |
 | `app_export_bundle` | live effect | Whole-.app `ditto` zip + identity sidecar. Refuses FairPlay mains (`ENCRYPTED_FAIRPLAY`) and broken seals unless `allowBrokenSeal` (labeled `SEAL_BROKEN`) |
+| `app_capabilities` | R/I | Keychain-group sharing, App Groups, ATS posture, background modes, version skew + optional app-A-vs-app-B entitlement diff. Pure dict logic over shipped projections |
 | `app_plist` | R/I | Bundle Info.plist + semantic launch-planning checks (URL schemes → openURL targets, ATS, background modes, usage keys) |
 | `scan_signature` | R/I | `pattern` (required, `"1F 20 ?? D5"` form). Capped at 500 hits (`ReconTools.swift:56-74`) |
 | `list_classes` | R/I | `filter?`, `limit` (default 200, cap 2000). Live-first: runtime classes when Agent Mode runs, else static strings (`ReconTools.swift:28-35`; `InspectTools.swift:752-759`) |
@@ -238,7 +243,10 @@ bounded-waits (max 30 s) for a text/label/class/identifier match and
 returns it with `treeHash`/`waitedMs` — never hot-loop `uitree_read`.
 `tap_and_observe` fuses tap + post tree + the caused event window
 (`category?`/`search?`/`waitMs?`) — "this tap caused these 3 requests" in
-one call.
+one call. `interruption_check` reports alert-sheet interruptions
+(`interrupted`, non-key `window`, `alertIds[]`, `appState`) — detection
+only, no auto-dismiss. Find results rank exact-identifier, then
+exact-text matches first (stable order otherwise).
 
 Framework coverage for text entry (`set_text` writes `UITextField`/
 `UITextView` directly — no tapping, no keyboard): UIKit and SwiftUI
