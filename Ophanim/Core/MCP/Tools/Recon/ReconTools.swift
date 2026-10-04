@@ -124,9 +124,8 @@ enum ReconTools {
                 flags.append("background-modes: \(modes.joined(separator: ", "))")
             }
         }
-        if versions["short"] != nil, versions["build"] != nil, versions["short"] != versions["build"],
-           versions["short"]?.contains(versions["build"] ?? "@") != true {
-            flags.append("version-skew: short=\(versions["short"] ?? "?") build=\(versions["build"] ?? "?")")
+        if versions["short"] == nil || versions["build"] == nil {
+            flags.append("version-skew: missing CFBundleShortVersionString/CFBundleVersion (build identity untrackable)")
         }
         var payload: [String: Any] = ["bundleID": bid, "flags": flags, "versions": versions,
                                "teamIdentifier": identity["teamIdentifier"] ?? NSNull(),

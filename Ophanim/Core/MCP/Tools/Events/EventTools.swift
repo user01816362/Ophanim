@@ -298,7 +298,7 @@ enum EventTools {
                 + (hostFilter.map { " host '\($0)'" } ?? ""))
         }
         guard index < cands.count,
-              let pick = cands.dropLast(index + 1).last,
+              let pick = cands.dropLast(index).last,
               pick.fields["url"] != nil else {
             throw ToolRouter.bail(ToolRouter.recovery(what: "index \(index) out of range (\(cands.count) matching requests)",
                 next: "lower index below \(cands.count) or drop the url/host filter, then retry"))
