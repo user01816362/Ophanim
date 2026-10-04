@@ -417,7 +417,9 @@ enum EventTools {
         let http = response as? HTTPURLResponse
         let status = http?.statusCode ?? -1
         var headers: [String: String] = [:]
-        (http?.allHeaderFields as? [String: String])?.forEach { headers[$0.key] = "\($0.value)" }
+        if let raw = http?.allHeaderFields {
+            for (k, v) in raw { headers["\(k)"] = "\(v)" }
+        }
         var bodyOut: Any = NSNull()
         var bodyNote: String? = nil
         if let data, !data.isEmpty {
@@ -429,10 +431,12 @@ enum EventTools {
             }
         }
         let recordedStatus = Int(e.fields["status"] ?? "")
+        let statusMatch: Any = recordedStatus.map { $0 == status } ?? NSNull()
+        let recordedValue: Any = e.fields["status"] ?? NSNull()
         return try ToolRouter.json(["bundleID": bid, "url": urlStr,
                              "status": status, "headers": headers, "body": bodyOut,
-                             "diffVsRecorded": ["statusMatch": recordedStatus.map { $0 == status } ?? NSNull(),
-                                                "recordedStatus": e.fields["status"] ?? NSNull()],
+                             "diffVsRecorded": ["statusMatch": statusMatch,
+                                                "recordedStatus": recordedValue],
                              "note": bodyNote ?? "outside app identity: cookies/client certs do not transfer"])
     }
 
