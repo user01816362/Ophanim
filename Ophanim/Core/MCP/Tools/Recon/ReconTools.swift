@@ -83,6 +83,70 @@ enum ReconTools {
         return try ToolRouter.json(InspectTools.classInventory(bid, filter: filter, limit: limit))
     }
 
+    /// Capability projection + joins for launch planning: keychain-group
+    /// sharing, App Groups, ATS posture, background modes, usage keys,
+    /// version skew, and optional app-A-vs-app-B entitlement diff. Pure
+    /// host-side dict logic over already-computed projections.
+    ///
+    /// - Parameter args: `bundleID` (required); `compareWith` (optional other
+    ///   bundleID for entitlement diff).
+    /// - Returns: JSON with `flags`, `versions`, and `diff` (when comparing).
+    /// - Throws: `ToolRouter.bail` when the app is not installed.
+    static func appCapabilities(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard AppQueryService.appURL(bid) != nil else { throw ToolRouter.bail("no bundle for \(bid)") }
+        let identity = AppQueryService.appIdentity(bid)
+        let ents = identity["entitlements"] as? [String: Any] ?? [:]
+        let keychainGroups = ents["keychain-access-groups"] as? [String] ?? []
+        let appGroups = ents["com.apple.security.application-groups"] as? [String] ?? []
+        let teamPrefix = (identity["teamIdentifier"] as? String).flatMap { $0 == "not set" ? nil : $0 }
+        let sharedGroups = keychainGroups.filter { g in
+            teamPrefix.map { !g.hasPrefix($0) } ?? true
+        }
+        var flags: [String] = []
+        if !sharedGroups.isEmpty { flags.append("shares-keychain-groups: \(sharedGroups.joined(separator: ", "))") }
+        if !appGroups.isEmpty { flags.append("app-groups: \(appGroups.joined(separator: ", "))") }
+        var versions: [String: String] = [:]
+        if let app = AppQueryService.appURL(bid) {
+            let info = PlistReader.appInfoDict(at: app.appendingPathComponent("Info.plist"))
+            if let v = info["CFBundleShortVersionString"] as? String { versions["short"] = v }
+            if let b = info["CFBundleVersion"] as? String { versions["build"] = b }
+            if let minOS = info["MinimumOSVersion"] as? String {
+                versions["minimumOS"] = minOS
+                let host = ProcessInfo.processInfo.operatingSystemVersion
+                versions["hostOS"] = "\(host.majorVersion).\(host.minorVersion).\(host.patchVersion)"
+            }
+            if let ats = info["NSAppTransportSecurity"] as? [String: Any],
+               (ats["NSAllowsArbitraryLoads"] as? Bool) == true {
+                flags.append("ats-arbitrary-loads: true")
+            }
+            if let modes = info["UIBackgroundModes"] as? [String], !modes.isEmpty {
+                flags.append("background-modes: \(modes.joined(separator: ", "))")
+            }
+        }
+        if versions["short"] != nil, versions["build"] != nil, versions["short"] != versions["build"],
+           versions["short"]?.contains(versions["build"] ?? "@") != true {
+            flags.append("version-skew: short=\(versions["short"] ?? "?") build=\(versions["build"] ?? "?")")
+        }
+        var payload: [String: Any] = ["bundleID": bid, "flags": flags, "versions": versions,
+                               "teamIdentifier": identity["teamIdentifier"] ?? NSNull(),
+                               "cryptid": identity["cryptid"] ?? 0]
+        if let other = (args["compareWith"] as? String).flatMap({ $0.isEmpty ? nil : $0 }),
+           AppQueryService.appURL(other) != nil {
+            let otherEnts = (AppQueryService.appIdentity(other)["entitlements"] as? [String: Any]) ?? [:]
+            let aKeys = Set(ents.keys), bKeys = Set(otherEnts.keys)
+            var diff: [String: Any] = [:]
+            diff["onlyInSelf"] = Array(aKeys.subtracting(bKeys)).sorted()
+            diff["onlyInOther"] = Array(bKeys.subtracting(aKeys)).sorted()
+            diff["changed"] = aKeys.intersection(bKeys).filter {
+                String(describing: ents[$0]) != String(describing: otherEnts[$0])
+            }.sorted()
+            payload["compareWith"] = other
+            payload["diff"] = diff
+        }
+        return try ToolRouter.json(payload)
+    }
+
     /// Linked libraries of an app binary (otool -L) — headless twin of the Recon
     /// libraries section. Read-only. Versions parsed (not dropped), embedded
     /// vs system split, weak links marked (otool -l), one-level transitive

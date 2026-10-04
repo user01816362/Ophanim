@@ -268,23 +268,19 @@ enum EventTools {
         return try ToolRouter.json(payload)
     }
 
-    /// Replay-grade curl export rendered from a recorded network event (zero capture
-    /// changes): method + url + req.* headers + decoded body when textual. Picks the
-    /// newest URLSession request matching url/host/since; binary bodies are noted,
-    /// never dumped. Prove-it: paste the command in Terminal, compare statuses.
+    /// Shared recorded-request picker for exportCurl/resendRequest: newest
+    /// URLSession request matching url/host/since, `index` 0 = newest.
     ///
-    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms, default 0);
-    ///   `url`/`host` (optional case-insensitive substring filters).
-    /// - Returns: JSON with `bundleID`, `url`, the `curl` command, and a `note`
-    ///   when the body was truncated or omitted.
-    /// - Throws: `ToolRouter.bail` when no recorded request matches.
-    // MARK: - Export
-
-    static func exportCurl(_ args: [String: Any]) throws -> String {
-        let bid = try ToolRouter.requireBundleID(args)
-        let since = ToolRouter.coerceDouble(args, "since") ?? 0
-        let urlFilter = (args["url"] as? String)?.lowercased()
-        let hostFilter = (args["host"] as? String)?.lowercased()
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter urlFilter: Optional case-insensitive url substring.
+    /// - Parameter hostFilter: Optional case-insensitive host substring.
+    /// - Parameter since: Cursor epoch ms.
+    /// - Parameter index: 0 = newest.
+    /// - Returns: The picked event.
+    /// - Throws: `ToolRouter.bail` on no match or out-of-range index.
+    private static func pickNetworkRequest(bundleID bid: String, urlFilter: String?,
+                                           hostFilter: String?, since: Double,
+                                           index: Int) throws -> OPEvent {
         let all = ReportBuilder.events(bid, category: "network", search: nil, limit: 0)
         let cands = all.filter { e in
             guard let url = e.fields["url"], !url.isEmpty,
@@ -301,16 +297,42 @@ enum EventTools {
                 + (urlFilter.map { " url '\($0)'" } ?? "")
                 + (hostFilter.map { " host '\($0)'" } ?? ""))
         }
-        // index: 0 = newest (default), 1 = one before, ... Fail stated past the end.
-        let index = max(ToolRouter.coerceInt(args, "index") ?? 0, 0)
         guard index < cands.count,
               let pick = cands.dropLast(index + 1).last,
-              let pickURL = pick.fields["url"] else {
+              pick.fields["url"] != nil else {
             throw ToolRouter.bail(ToolRouter.recovery(what: "index \(index) out of range (\(cands.count) matching requests)",
                 next: "lower index below \(cands.count) or drop the url/host filter, then retry"))
         }
-        let e = pick
-        let url = pickURL
+        return pick
+    }
+    // MARK: - Export
+
+    /// Replay-grade curl export rendered from a recorded network event (zero capture
+    /// changes): method + url + req.* headers + decoded body when textual. Picks the
+    /// newest URLSession request matching url/host/since; binary bodies are noted,
+    /// never dumped (unless base64Body:true). Prove-it: paste the command in Terminal, compare statuses.
+    ///
+    /// - Parameter args: `bundleID` (required); `since` (cursor epoch ms, default 0);
+    ///   `url`/`host` (optional case-insensitive substring filters); `index`
+    ///   (0 = newest); `base64Body` (emit binary bodies base64-capped instead
+    ///   of omitting).
+    /// - Returns: JSON with `bundleID`, `url`, the `curl` command, and a `note`
+    ///   when the body was truncated or omitted.
+    /// - Throws: `ToolRouter.bail` when no recorded request matches.
+    // MARK: - Export
+
+    static func exportCurl(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
+        let urlFilter = (args["url"] as? String)?.lowercased()
+        let hostFilter = (args["host"] as? String)?.lowercased()
+        // index: 0 = newest (default), 1 = one before, ... Fail stated past the end.
+        let index = max(ToolRouter.coerceInt(args, "index") ?? 0, 0)
+        let e = try pickNetworkRequest(bundleID: bid, urlFilter: urlFilter, hostFilter: hostFilter,
+                                       since: since, index: index)
+        guard let url = e.fields["url"] else {
+            throw ToolRouter.bail("picked request has no url - take a fresh export_curl")
+        }
         func sh(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         var parts = ["curl", "-X", e.fields["method"] ?? "GET", sh(url)]
         for (k, v) in e.fields.filter({ $0.key.hasPrefix("req.") }).sorted(by: { $0.key < $1.key }) {
@@ -323,13 +345,118 @@ enum EventTools {
             if let text = String(data: body, encoding: .utf8) {
                 parts += ["--data-raw", sh(String(text.prefix(16384)))]
                 if text.count > 16384 { note = "body truncated to 16384 chars" }
+            } else if (args["base64Body"] as? Bool) == true {
+                let b64 = body.base64EncodedString()
+                parts += ["--data-binary", sh(String(b64.prefix(21845)))]
+                note = b64.count > 21845 ? "binary body base64-truncated (~16 KiB)" : "binary body as base64"
             } else {
-                note = "binary body (\(body.count) bytes) omitted - add --data-binary yourself"
+                note = "binary body (\(body.count) bytes) omitted - add --data-binary yourself (or base64Body:true)"
             }
         }
         var payload: [String: Any] = ["bundleID": bid, "url": url, "curl": parts.joined(separator: " ")]
         if index > 0 { payload["index"] = index }
         if let note { payload["note"] = note }
         return try ToolRouter.json(payload)
+    }
+
+    /// Re-issues a recorded request from host networking (Foundation
+    /// URLSession) with optional header/body/method overrides, returning
+    /// status/headers/body + diff vs the recorded response. Proves the
+    /// SERVER hypothesis ("does the server accept this modified param?");
+    /// the app-reaction half stays in-process (modifyArgs rules). Host
+    /// replay runs OUTSIDE app identity (cookies/keychain client certs do
+    /// not transfer unless captured headers carry them) — documented, not
+    /// solved. No credential harvesting: overrides are caller-supplied.
+    ///
+    /// - Parameter args: `bundleID` (required); `index`/`url`/`host`/`since`
+    ///   picker (same as export_curl); `headers` (override/extend dict);
+    ///   `body` (replacement string body); `method` (override verb).
+    /// - Returns: JSON with `status`, `headers`, `body` (prefix 16384, same
+    ///   text/binary rule), `diffVsRecorded` (status/body match booleans).
+    /// - Throws: `ToolRouter.bail` on no match, bad URL, or transport error.
+    static func resendRequest(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        let since = ToolRouter.coerceDouble(args, "since") ?? 0
+        let urlFilter = (args["url"] as? String)?.lowercased()
+        let hostFilter = (args["host"] as? String)?.lowercased()
+        let index = max(ToolRouter.coerceInt(args, "index") ?? 0, 0)
+        let e = try pickNetworkRequest(bundleID: bid, urlFilter: urlFilter, hostFilter: hostFilter,
+                                       since: since, index: index)
+        guard let urlStr = e.fields["url"], let url = URL(string: urlStr) else {
+            throw ToolRouter.bail("picked request has no usable url - take a fresh export_curl")
+        }
+        var req = URLRequest(url: url, timeoutInterval: 30)
+        req.httpMethod = ((args["method"] as? String)?.isEmpty == false)
+            ? (args["method"] as? String) : (e.fields["method"]?.isEmpty == false ? e.fields["method"] : "GET")
+        for (k, v) in e.fields.filter({ $0.key.hasPrefix("req.") }).sorted(by: { $0.key < $1.key }) {
+            let name = String(k.dropFirst(4))
+            if name.lowercased() == "content-length" { continue }
+            req.setValue(v, forHTTPHeaderField: name)
+        }
+        if let overrides = args["headers"] as? [String: String] {
+            for (k, v) in overrides { req.setValue(v, forHTTPHeaderField: k) }
+        }
+        if let body = args["body"] as? String {
+            req.httpBody = body.data(using: .utf8)
+        } else if let recorded = e.requestBody, !recorded.isEmpty {
+            req.httpBody = recorded
+        }
+        let box = ResendBox()
+        let task = URLSession.shared.dataTask(with: req) { data, response, error in
+            box.finish(data: data, response: response, error: error)
+        }
+        task.resume()
+        guard box.wait(timeout: .now() + 30) else {
+            task.cancel()
+            throw ToolRouter.bail("resend timed out after 30s for \(urlStr)")
+        }
+        let (data, response, error) = box.snapshot()
+        if let error {
+            throw ToolRouter.bail("resend transport failed: \(error.localizedDescription)")
+        }
+        let http = response as? HTTPURLResponse
+        let status = http?.statusCode ?? -1
+        var headers: [String: String] = [:]
+        (http?.allHeaderFields as? [String: String])?.forEach { headers[$0.key] = "\($0.value)" }
+        var bodyOut: Any = NSNull()
+        var bodyNote: String? = nil
+        if let data, !data.isEmpty {
+            if let text = String(data: data, encoding: .utf8) {
+                bodyOut = String(text.prefix(16384))
+                if text.count > 16384 { bodyNote = "body truncated to 16384 chars" }
+            } else {
+                bodyNote = "binary body (\(data.count) bytes) omitted"
+            }
+        }
+        let recordedStatus = Int(e.fields["status"] ?? "")
+        return try ToolRouter.json(["bundleID": bid, "url": urlStr,
+                             "status": status, "headers": headers, "body": bodyOut,
+                             "diffVsRecorded": ["statusMatch": recordedStatus.map { $0 == status } ?? NSNull(),
+                                                "recordedStatus": e.fields["status"] ?? NSNull()],
+                             "note": bodyNote ?? "outside app identity: cookies/client certs do not transfer"])
+    }
+
+    /// Synchronous result box for the resend data task (@Sendable boundary).
+    private final class ResendBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var done = false
+        private var data: Data?
+        private var response: URLResponse?
+        private var error: Error?
+        private let semaphore = DispatchSemaphore(value: 0)
+        func finish(data: Data?, response: URLResponse?, error: Error?) {
+            lock.withLock {
+                guard !done else { return }
+                done = true
+                self.data = data; self.response = response; self.error = error
+            }
+            semaphore.signal()
+        }
+        func wait(timeout: DispatchTime) -> Bool {
+            semaphore.wait(timeout: timeout) == .success
+        }
+        func snapshot() -> (Data?, URLResponse?, Error?) {
+            lock.withLock { (data, response, error) }
+        }
     }
 }

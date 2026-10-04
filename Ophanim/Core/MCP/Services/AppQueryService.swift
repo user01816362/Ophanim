@@ -638,6 +638,36 @@ enum AppQueryService {
                 "identitySidecar": sidecar.path]
     }
 
+    /// Mangled↔demangled Swift class pairs (line-aligned `strings | grep |
+    /// demangle` zip). Powers Swift-hook synthesis with exact runtime
+    /// (`_TtC`/`_$s`) class names — demangled display alone cannot target
+    /// vtable hooks. Same allowlist discipline as findSymbols.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Parameter keyword: Caller-allowlisted substring (matched both forms).
+    /// - Returns: `pairs` ([{mangled, demangled}]) + `count`.
+    static func swiftClassPairs(_ bundleID: String, _ keyword: String) -> [[String: String]] {
+        guard let exe = appExecutable(bundleID), !keyword.isEmpty else { return [] }
+        let safe = keyword.replacingOccurrences(of: "'", with: "")
+        func lines(_ cmd: String) -> [String] {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/sh"); p.arguments = ["-c", cmd]
+            let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+            guard (try? p.run()) != nil else { return [] }
+            let d = out.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit()
+            return (String(data: d, encoding: .utf8) ?? "").split(separator: "\n").map(String.init)
+        }
+        let q = "'\(safe)'"
+        let mangled = lines("strings -a '\(exe.path)' 2>/dev/null | grep -E '^(_TtC|_[$]s)' | grep -i \(q) | sort -u | head -200")
+        guard !mangled.isEmpty else { return [] }
+        let joined = mangled.joined(separator: "\n")
+        let dem = lines("printf '%s' '\(joined.replacingOccurrences(of: "'", with: ""))' | xcrun swift-demangle 2>/dev/null")
+        var pairs: [[String: String]] = []
+        for (m, d) in zip(mangled, dem) {
+            pairs.append(["mangled": m, "demangled": d])
+        }
+        return pairs
+    }
+
     /// Filesystem URL of an installed hosted app bundle, if present.
     ///
     /// - Parameter bundleID: The app's bundle identifier.

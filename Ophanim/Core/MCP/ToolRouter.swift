@@ -189,6 +189,7 @@ enum ToolRouter {
         "query_events": EventTools.queryEvents,
         "tail_events": EventTools.tailEvents,
         "export_curl": EventTools.exportCurl,
+        "resend_request": EventTools.resendRequest,
         "subscribe_events": EventTools.subscribeEvents,
         "unsubscribe_events": EventTools.unsubscribeEvents,
         "event_mark": EventTools.eventMark,
@@ -207,8 +208,10 @@ enum ToolRouter {
         "string_xrefs": ReconTools.stringXrefs,
         "app_identity": ReconTools.appIdentity,
         "app_hash": ReconTools.appHash,
+        "app_capabilities": ReconTools.appCapabilities,
         "set_objc_hooks": HookTools.setObjcHooks,
         "remove_hook": HookTools.removeHook,
+        "add_hooks": HookTools.addHooks,
         "get_hooks": HookTools.getHooks,
         "set_swift_hooks": HookTools.setSwiftHooks,
         "set_inline_hooks": HookTools.setInlineHooks,
@@ -249,6 +252,7 @@ enum ToolRouter {
         "keychain_items": ContainerTools.keychainItems,
         "container_read": ContainerTools.containerRead,
         "set_pref": ContainerTools.setPref,
+        "delete_pref": ContainerTools.deletePref,
         "clear_logs": ContainerTools.clearLogs,
         "container_info": ContainerTools.containerInfo,
         "list_profiles": ContainerTools.listProfiles,
@@ -276,13 +280,13 @@ enum ToolRouter {
     /// - "na": read-only, nothing to preview.
     static func matrix() -> [String: Any] {
         let explicit: Set<String> = ["set_objc_hooks", "set_swift_hooks", "set_inline_hooks",
-                                     "set_rules", "apply_preset"]
+                                     "set_rules", "apply_preset", "add_hooks"]
         let none: Set<String> = ["launch_app", "install_app", "resync_tweaks",
                                   "refresh_sources", "subscribe_events", "unsubscribe_events",
                                   "set_config", "tap_element", "swipe", "set_text", "tap_and_read",
                                   "web_act", "bookmark_add", "bookmark_note",
                                   "event_mark", "events_since_mark", "tap_and_observe",
-                                  "app_export_file", "app_export_bundle"]
+                                  "app_export_file", "app_export_bundle", "resend_request"]
         var tools: [[String: Any]] = []
         // Union of the catalog and the handler table: inspect-family tools
         // route via runInspectTool (not handlers) and were silently absent.

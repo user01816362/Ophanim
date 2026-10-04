@@ -15,6 +15,101 @@ import Foundation
 /// the default would silently turn their writes into previews). Pass
 /// dryRun:true to preview counts/validation without persisting.
 enum HookTools {
+    /// Crash-safe hook leases: `{bid::kind: {kind, expires, priorJSON}}`
+    /// persisted beside the settings plists (never in OPConfig — synthesized
+    /// decode fails on missing keys, so shared structs stay untouched).
+    /// Every hook mutation sweeps expired leases first (restoring priors);
+    /// an in-process timer reverts promptly while the server lives.
+    private struct HookLeaseRecord: Codable {
+        var kind: String
+        var expires: Double
+        var priorJSON: String
+    }
+
+    private static var leaseFile: URL {
+        AppQueryService.settingsDir.appendingPathComponent("hook-leases.json")
+    }
+
+    private static func loadLeases() -> [String: HookLeaseRecord] {
+        guard let data = try? Data(contentsOf: leaseFile),
+              let obj = try? JSONDecoder().decode([String: HookLeaseRecord].self, from: data) else { return [:] }
+        return obj
+    }
+
+    private static func saveLeases(_ leases: [String: HookLeaseRecord]) {
+        try? FileManager.default.createDirectory(at: AppQueryService.settingsDir,
+                                                 withIntermediateDirectories: true)
+        if let data = try? JSONEncoder().encode(leases) {
+            try? data.write(to: leaseFile, options: .atomic)
+        }
+    }
+
+    /// Reverts expired leases for an app before any hook mutation (crash-safe:
+    /// priors live in the lease file, not memory).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Returns: Note strings for reverted/orphaned leases.
+    @discardableResult
+    private static func sweepLeases(_ bid: String) -> [String] {
+        var leases = loadLeases()
+        var notes: [String] = []
+        let now = Date().timeIntervalSince1970
+        for key in leases.keys.sorted() where key.hasPrefix("\(bid)::") {
+            guard let lease = leases[key], lease.expires <= now else { continue }
+            let kind = lease.kind
+            guard let jsonData = lease.priorJSON.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: jsonData) else {
+                notes.append("lease for \(kind) expired but the prior array is undecodable - left as-is")
+                leases.removeValue(forKey: key)
+                continue
+            }
+            do {
+                switch kind {
+                case "objc":
+                    let prior: [OPObjCHook] = try ToolRouter.decode(obj, label: "prior")
+                    try SettingsStore.updateSettings(bid) { $0.ophanim.objcHooks = prior }
+                case "swift":
+                    let prior: [OPSwiftHook] = try ToolRouter.decode(obj, label: "prior")
+                    try SettingsStore.updateSettings(bid) { $0.ophanim.swiftHooks = prior }
+                case "inline":
+                    let prior: [OPInlineHook] = try ToolRouter.decode(obj, label: "prior")
+                    try SettingsStore.updateSettings(bid) { $0.ophanim.inlineHooks = prior }
+                default: break
+                }
+                notes.append("lease for \(kind) expired - reverted to pre-lease hooks")
+            } catch {
+                notes.append("lease for \(kind) expired but revert failed: \(error.localizedDescription)")
+            }
+            leases.removeValue(forKey: key)
+        }
+        saveLeases(leases)
+        return notes
+    }
+
+    /// Arms a time-boxed lease around the just-written hooks (fearless
+    /// iteration on live apps): snapshots the prior array, stamps expiry,
+    /// and schedules an in-process revert (the file sweep covers crashes).
+    ///
+    /// - Parameter bid: The app's bundle identifier.
+    /// - Parameter kind: `objc`, `swift`, or `inline`.
+    /// - Parameter leaseSeconds: Lease length (>0 to arm).
+    /// - Parameter priorJSON: The pre-write array as JSON text.
+    private static func armLease(bid: String, kind: String, leaseSeconds: Double, priorJSON: String) {
+        var leases = loadLeases()
+        leases["\(bid)::\(kind)"] = HookLeaseRecord(kind: kind,
+            expires: Date().timeIntervalSince1970 + leaseSeconds,
+            priorJSON: priorJSON)
+        saveLeases(leases)
+        Task.detached {
+            try? await Task.sleep(nanoseconds: UInt64(max(leaseSeconds, 0.5) * 1_000_000_000))
+            _ = sweepLeases(bid)
+        }
+    }
+
+    /// Lease arg shared by the three writers + add_hooks (seconds, >0 arms).
+    private static func leaseArg(_ args: [String: Any]) -> Double? {
+        ToolRouter.coerceDouble(args, "leaseSeconds").flatMap { $0 > 0 ? $0 : nil }
+    }
     /// Structural preflight shared by the three writers: within-batch
     /// duplicates, cross-tier overlap against CURRENT settings, and malformed
     /// shapes. Pure (no recon, no guest) so it runs identically in dryRun
@@ -67,14 +162,18 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPObjCHook] = try ToolRouter.decode(hooksArg, label: "hooks")
-        let notes = preflight(bid: bid, kind: "objc",
+        var notes = sweepLeases(bid)
+        notes += preflight(bid: bid, kind: "objc",
                               keys: hooks.map { ("objc:\($0.className).\($0.selector)", "\($0.className).\($0.selector)") })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
                                  "wouldSet": hooks.count, "kind": "objc",
                                  "preflight": notes])
         }
+        let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.objcHooks ?? []))
+            .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
         try SettingsStore.updateSettings(bid) { $0.ophanim.objcHooks = hooks }
+        if let lease = leaseArg(args) { armLease(bid: bid, kind: "objc", leaseSeconds: lease, priorJSON: priorJSON) }
         var msg = "Set \(hooks.count) ObjC boundary hook(s) for \(bid)."
         msg += notes.map { " NOTE: \($0)." }.joined()
         return msg + " Verify: tail_events search installSummary after ~2 s."
@@ -95,14 +194,18 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPSwiftHook] = try ToolRouter.decode(hooksArg, label: "hooks")
-        let notes = preflight(bid: bid, kind: "swift",
+        var notes = sweepLeases(bid)
+        notes += preflight(bid: bid, kind: "swift",
                               keys: hooks.map { ("swift:\($0.className).\($0.method)", "\($0.className).\($0.method)") })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
                                  "wouldSet": hooks.count, "kind": "swift",
                                  "preflight": notes])
         }
+        let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.swiftHooks ?? []))
+            .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
         try SettingsStore.updateSettings(bid) { $0.ophanim.swiftHooks = hooks }
+        if let lease = leaseArg(args) { armLease(bid: bid, kind: "swift", leaseSeconds: lease, priorJSON: priorJSON) }
         var msg = "Set \(hooks.count) native-Swift vtable hook(s) for \(bid)."
         msg += notes.map { " NOTE: \($0)." }.joined()
         return msg + " Verify: tail_events search installSummary after ~2 s."
@@ -124,7 +227,8 @@ enum HookTools {
         let bid = try ToolRouter.requireBundleID(args)
         guard let hooksArg = args["hooks"] else { throw ToolRouter.bail("hooks array is required") }
         let hooks: [OPInlineHook] = try ToolRouter.decode(hooksArg, label: "hooks")
-        let notes = preflight(bid: bid, kind: "inline",
+        var notes = sweepLeases(bid)
+        notes += preflight(bid: bid, kind: "inline",
                               keys: hooks.map { ("inline:\($0.symbol ?? $0.address ?? $0.offset ?? $0.signature ?? $0.api)", $0.api) })
         if args["dryRun"] as? Bool == true {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid,
@@ -132,13 +236,126 @@ enum HookTools {
                                  "gateOn": SettingsStore.appSettings(bid)?.ophanim.enableInlineHooks ?? false,
                                  "preflight": notes])
         }
+        let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.inlineHooks ?? []))
+            .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
         try SettingsStore.updateSettings(bid) { $0.ophanim.inlineHooks = hooks }
+        if let lease = leaseArg(args) { armLease(bid: bid, kind: "inline", leaseSeconds: lease, priorJSON: priorJSON) }
         let gate = (SettingsStore.appSettings(bid)?.ophanim.enableInlineHooks ?? false)
         var msg = "Set \(hooks.count) inline hook(s) for \(bid)."
         msg += notes.map { " NOTE: \($0)." }.joined()
         msg += " Verify: tail_events search installSummary after ~2 s."
         return msg
             + (gate ? "" : " NOTE: inline hooks are OFF - call set_config enableInlineHooks=true to arm them.")
+    }
+
+    /// Merges hook entries into one tier (append, not replace): ends the
+    /// wipe-by-resend hazard of the full-array writers. Same preflight +
+    /// dryRun shape + optional lease as the writers.
+    ///
+    /// - Parameter args: `bundleID` (required); `kind` (`objc`/`swift`/
+    ///   `inline`, required); `entries` (hook array, required);
+    ///   `leaseSeconds` (optional trial lease); `dryRun: true` previews.
+    /// - Returns: Dry-run JSON with `wouldAdd`, or confirmation with
+    ///   `added`/`skipped` (+ lease note when armed).
+    /// - Throws: `ToolRouter.bail` on bad kind or undecodable entries.
+    static func addHooks(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let kind = args["kind"] as? String, ["objc", "swift", "inline"].contains(kind) else {
+            throw ToolRouter.bail("kind is required: objc | swift | inline")
+        }
+        guard args["entries"] != nil else { throw ToolRouter.bail("entries array is required") }
+        var notes = sweepLeases(bid)
+        switch kind {
+        case "objc":
+            let entries: [OPObjCHook] = try ToolRouter.decode(args["entries"]!, label: "entries")
+            notes += preflight(bid: bid, kind: kind,
+                               keys: entries.map { ("objc:\($0.className).\($0.selector)", "\($0.className).\($0.selector)") })
+            var have = Set((SettingsStore.appSettings(bid)?.ophanim.objcHooks ?? []).map { "\($0.className).\($0.selector).\($0.classMethod)" })
+            let fresh = entries.filter { have.insert("\($0.className).\($0.selector).\($0.classMethod)").inserted }
+            if args["dryRun"] as? Bool == true {
+                return try ToolRouter.json(["dryRun": true, "bundleID": bid, "kind": kind,
+                                     "wouldAdd": fresh.count, "preflight": notes])
+            }
+            let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.objcHooks ?? []))
+                .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
+            try SettingsStore.updateSettings(bid) { s in
+                var cur = s.ophanim.objcHooks
+                var keys = Set(cur.map { "\($0.className).\($0.selector).\($0.classMethod)" })
+                for e in entries {
+                    let k = "\(e.className).\(e.selector).\(e.classMethod)"
+                    if let i = cur.firstIndex(where: { "\($0.className).\($0.selector).\($0.classMethod)" == k }) {
+                        cur[i] = e
+                    } else if keys.insert(k).inserted {
+                        cur.append(e)
+                    }
+                }
+                s.ophanim.objcHooks = cur
+            }
+            if let lease = leaseArg(args) { armLease(bid: bid, kind: kind, leaseSeconds: lease, priorJSON: priorJSON) }
+            var msg = "Added \(fresh.count) ObjC hook(s) for \(bid) (merged, nothing removed)."
+            msg += notes.map { " NOTE: \($0)." }.joined()
+            return msg + " Verify: tail_events search installSummary after ~2 s."
+        case "swift":
+            let entries: [OPSwiftHook] = try ToolRouter.decode(args["entries"]!, label: "entries")
+            notes += preflight(bid: bid, kind: kind,
+                               keys: entries.map { ("swift:\($0.className).\($0.method)", "\($0.className).\($0.method)") })
+            let have = Set((SettingsStore.appSettings(bid)?.ophanim.swiftHooks ?? []).map { "\($0.className).\($0.method)" })
+            let fresh = entries.filter { !have.contains("\($0.className).\($0.method)") }
+            if args["dryRun"] as? Bool == true {
+                return try ToolRouter.json(["dryRun": true, "bundleID": bid, "kind": kind,
+                                     "wouldAdd": fresh.count, "preflight": notes])
+            }
+            let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.swiftHooks ?? []))
+                .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
+            try SettingsStore.updateSettings(bid) { s in
+                var cur = s.ophanim.swiftHooks
+                var keys = Set(cur.map { "\($0.className).\($0.method)" })
+                for e in entries {
+                    let k = "\(e.className).\(e.method)"
+                    if let i = cur.firstIndex(where: { "\($0.className).\($0.method)" == k }) {
+                        cur[i] = e
+                    } else if keys.insert(k).inserted {
+                        cur.append(e)
+                    }
+                }
+                s.ophanim.swiftHooks = cur
+            }
+            if let lease = leaseArg(args) { armLease(bid: bid, kind: kind, leaseSeconds: lease, priorJSON: priorJSON) }
+            var msg = "Added \(fresh.count) Swift hook(s) for \(bid) (merged, nothing removed)."
+            msg += notes.map { " NOTE: \($0)." }.joined()
+            return msg + " Verify: tail_events search installSummary after ~2 s."
+        default:
+            let entries: [OPInlineHook] = try ToolRouter.decode(args["entries"]!, label: "entries")
+            let keyOf: (OPInlineHook) -> String = {
+                "inline:\($0.symbol ?? $0.address ?? $0.offset ?? $0.signature ?? $0.api)"
+            }
+            notes += preflight(bid: bid, kind: kind, keys: entries.map { (keyOf($0), $0.api) })
+            let have = Set((SettingsStore.appSettings(bid)?.ophanim.inlineHooks ?? []).map(keyOf))
+            let fresh = entries.filter { !have.contains(keyOf($0)) }
+            if args["dryRun"] as? Bool == true {
+                return try ToolRouter.json(["dryRun": true, "bundleID": bid, "kind": kind,
+                                     "wouldAdd": fresh.count, "preflight": notes])
+            }
+            let priorJSON = ((try? JSONEncoder().encode(SettingsStore.appSettings(bid)?.ophanim.inlineHooks ?? []))
+                .flatMap { String(data: $0, encoding: .utf8) }) ?? "[]"
+            try SettingsStore.updateSettings(bid) { s in
+                var cur = s.ophanim.inlineHooks
+                var keys = Set(cur.map(keyOf))
+                for e in entries {
+                    let k = keyOf(e)
+                    if let i = cur.firstIndex(where: { keyOf($0) == k }) {
+                        cur[i] = e
+                    } else if keys.insert(k).inserted {
+                        cur.append(e)
+                    }
+                }
+                s.ophanim.inlineHooks = cur
+            }
+            if let lease = leaseArg(args) { armLease(bid: bid, kind: kind, leaseSeconds: lease, priorJSON: priorJSON) }
+            var msg = "Added \(fresh.count) inline hook(s) for \(bid) (merged, nothing removed)."
+            msg += notes.map { " NOTE: \($0)." }.joined()
+            return msg + " Verify: tail_events search installSummary after ~2 s."
+        }
     }
 
     /// Reads back just the three hook arrays plus the inline gate.

@@ -40,7 +40,7 @@ final class MCPServer {
         "list_apps", "tool_matrix", "launch_status", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
         "find_symbols", "list_libraries", "scan_signature", "diff_events", "hook_coverage",
         "app_plist", "all_symbols", "list_protocols", "string_xrefs",
-        "app_identity", "app_hash",
+        "app_identity", "app_hash", "app_capabilities",
         "get_config", "get_hooks", "validate_rule_script",
         "list_jailbreak_detectors", "list_presets",
         "list_sources", "search_source_apps", "refresh_sources",
@@ -49,7 +49,7 @@ final class MCPServer {
         "list_tweaks", "inspect_tweak", "list_keymaps", "get_keymap",
         "list_classes", "uitree_read", "screenshot",
         "inspect_pick", "inspect_pasteboard", "inspect_focus", "find_element", "web_snapshot",
-        "await_ui",
+        "await_ui", "interruption_check",
         "inspect_classes", "inspect_element", "inspect_class_detail",
         "inspect_snapshot", "inspect_timeline", "inspect_diff", "bookmark_list"
     ]
@@ -68,7 +68,7 @@ final class MCPServer {
         "tweak_folder", "resync_tweaks",
         "clear_logs", "create_profile", "remove_profile", "switch_profile",
         "clear_container", "backup_container", "restore_container",
-        "set_pref",
+        "set_pref", "delete_pref",
         "inspect_clear_snapshots",
         "bookmark_add", "bookmark_note", "bookmark_move", "bookmark_remove",
         "tap_element", "swipe", "set_text", "tap_and_read", "web_act", "tap_and_observe",
@@ -437,7 +437,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "rules": ["type": "array", "items": ["type": "object"], "description": "Full rules array (replaces existing). Validate script rules with validate_rule_script first."],
-                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."],
+                    "leaseSeconds": ["type": "number", "description": "Trial lease: auto-revert to pre-write hooks after N seconds."]
                 ],
                 "required": ["bundleID", "rules"]
             ]
@@ -531,12 +532,14 @@ final class MCPServer {
         ],
         [
             "name": "suggest_hooks",
-            "description": "Draft ObjC boundary hooks from a keyword using the LIVE runtime inventory (frida-trace shape, host-only). Pairings come from inspect_class_detail (void methods, 0-3 args only); non-void/arity mismatches are counted skipped. dryRun previews (default true — unlike hook writers, which default-write); pass false to merge new hooks into the app's set.",
+            "description": "Draft ObjC boundary hooks from a keyword using the LIVE runtime inventory (frida-trace shape, host-only). Pairings come from inspect_class_detail (void methods, 0-3 args only); non-void/arity mismatches are counted skipped. dryRun previews (default true — unlike hook writers, which default-write); pass false to merge new hooks into the app's set. kind=swift drafts vtable candidates from mangled class pairs + method substring (labeled likely); kind=inline turns a hex pattern into module+offset anchors via scan hits.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
-                    "keyword": ["type": "string", "description": "Substring matched against live class + method names."],
+                    "keyword": ["type": "string", "description": "Substring matched against live class + method names (kind=inline: hex pattern e.g. '1F 20 ?? D5')."],
+                    "kind": ["type": "string", "description": "objc (default) | swift (needs method) | inline (keyword is a hex pattern)."],
+                    "method": ["type": "string", "description": "Required for kind=swift: method substring."],
                     "category": ["type": "string", "description": "Capture category for drafts (default process)."],
                     "maxClasses": ["type": "integer", "description": "Live classes inventoried (default 5, cap 10)."],
                     "maxHooks": ["type": "integer", "description": "Draft cap (default 10, cap 20)."],
@@ -559,7 +562,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
-                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."],
+                    "leaseSeconds": ["type": "number", "description": "Trial lease: auto-revert to pre-write hooks after N seconds."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -579,6 +583,21 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "add_hooks",
+            "description": "Merge hook entries into one tier (append, not replace): ends the wipe-by-resend hazard. Same preflight + dryRun shape as the writers; optional leaseSeconds trial lease (auto-reverts).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "kind": ["type": "string", "description": "objc, swift, or inline."],
+                    "entries": ["type": "array", "items": ["type": "object"], "description": "Hook entries (same shapes as set_*_hooks)."],
+                    "leaseSeconds": ["type": "number", "description": "Trial lease: auto-revert to pre-merge hooks after N seconds."],
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
+                ],
+                "required": ["bundleID", "kind", "entries"]
+            ]
+        ],
+        [
             "name": "set_swift_hooks",
             "description": "Install native-Swift vtable hooks: patch an overridable Swift "
                 + "method's vtable slot to log each call and pass through. Reaches non-@objc Swift that "
@@ -595,7 +614,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
-                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."],
+                    "leaseSeconds": ["type": "number", "description": "Trial lease: auto-revert to pre-write hooks after N seconds."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -622,7 +642,8 @@ final class MCPServer {
                 "properties": [
                     "bundleID": ["type": "string", "description": "The app's bundle identifier."],
                     "hooks": ["type": "array", "items": ["type": "object"], "description": "Full hooks array (replaces existing; dropped entries are reverted live on next config poll)."],
-                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."]
+                    "dryRun": ["type": "boolean", "description": "Preview only: pass true to validate + report counts without writing (omitted writes)."],
+                    "leaseSeconds": ["type": "number", "description": "Trial lease: auto-revert to pre-write hooks after N seconds."]
                 ],
                 "required": ["bundleID", "hooks"]
             ]
@@ -1106,6 +1127,19 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "delete_pref",
+            "description": "Remove one top-level preferences key (onboarding-reset recipes). Same confinement as set_pref; cfprefsd staleness applies (relaunch to observe).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "key": ["type": "string"],
+                    "dryRun": ["type": "boolean", "description": "Preview only (default true). Pass false to delete."]
+                ],
+                "required": ["bundleID", "key"]
+            ]
+        ],
+        [
             "name": "clear_logs",
             "description": "Delete capture logs, byte-counted.",
             "inputSchema": [
@@ -1353,6 +1387,18 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "app_capabilities",
+            "description": "Capability projection + joins: keychain-group sharing, App Groups, ATS posture, background modes, version skew, optional app-A-vs-app-B entitlement diff. Pure dict logic over shipped projections.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "compareWith": ["type": "string", "description": "Optional other bundleID for entitlement diff."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
             "name": "set_injection_strategy",
             "description": "Persist embedded/sibling strategy and settle load commands.",
             "inputSchema": [
@@ -1554,6 +1600,18 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "interruption_check",
+            "description": "Detect alert/sheet interruptions: alert-sheet classes in any window (window 0 is key) + app focus state. Detection only, no auto-dismiss. Returns interrupted, window, alertIds, appState.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "mode": ["type": "string"]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
             "name": "inspect_pick",
             "description": "Resolve the frontmost view at normalized x/y to an elementId (hitTest-independent; disabled views resolve).",
             "inputSchema": [
@@ -1630,7 +1688,26 @@ final class MCPServer {
                     "url": ["type": "string", "description": "Substring filter."],
                     "host": ["type": "string", "description": "Substring filter."],
                     "since": ["type": "number", "description": "Cursor (epoch ms)."],
-                    "index": ["type": "integer", "description": "0 = newest (default), 1 = one before, ..."]
+                    "index": ["type": "integer", "description": "0 = newest (default), 1 = one before, ..."],
+                    "base64Body": ["type": "boolean", "description": "Emit binary bodies base64-capped instead of omitting."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "resend_request",
+            "description": "Re-issue a recorded request from host networking with header/body/method overrides; returns status/headers/body + diff vs recorded. Proves the SERVER hypothesis. Runs OUTSIDE app identity (cookies/client certs do not transfer).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "url": ["type": "string", "description": "Substring filter."],
+                    "host": ["type": "string", "description": "Substring filter."],
+                    "since": ["type": "number", "description": "Cursor (epoch ms)."],
+                    "index": ["type": "integer", "description": "0 = newest (default)."],
+                    "headers": ["type": "object", "description": "Header overrides."],
+                    "body": ["type": "string", "description": "Replacement string body."],
+                    "method": ["type": "string", "description": "Verb override."]
                 ],
                 "required": ["bundleID"]
             ]

@@ -157,6 +157,41 @@ enum ContainerTools {
                              "new": ContainerService.jsonSafe(value as Any)])
     }
 
+    /// Removes one top-level preferences key (scalar flags like
+    /// `loggedIn`/`onboarded` for onboarding-reset recipes). Same path
+    /// confinement as setPref; scalar top-level keys only. Destructive:
+    /// dryRun previews by default. Note cfprefsd staleness: write-while-
+    /// running may not be seen until relaunch (set → terminate → launch).
+    ///
+    /// - Parameter args: `bundleID` (required); `key` (required).
+    /// - Returns: Dry-run JSON with `old`, or confirmation with removed `old`.
+    /// - Throws: `ToolRouter.bail` on missing key/plist or absent entry.
+    static func deletePref(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let key = args["key"] as? String, !key.isEmpty else {
+            throw ToolRouter.bail("key is required")
+        }
+        let prefs = AppContainer(bundleId: bid).userPrefsUrl
+        guard var dict = PlistReader.plistDict(at: prefs) else {
+            throw ToolRouter.bail("no readable preferences plist for \(bid)")
+        }
+        guard let old = dict[key] else {
+            throw ToolRouter.bail("no such preferences key '\(key)' for \(bid)")
+        }
+        if ToolRouter.isDryRun(args) {
+            return try ToolRouter.json(["dryRun": true, "bundleID": bid, "key": key,
+                                 "old": ContainerService.jsonSafe(old)])
+        }
+        dict.removeValue(forKey: key)
+        do {
+            try PlistReader.writePlistDict(dict, to: prefs)
+        } catch {
+            throw ToolRouter.bail("preferences write failed: \(error.localizedDescription)")
+        }
+        return try ToolRouter.json(["bundleID": bid, "key": key, "removed": true,
+                             "old": ContainerService.jsonSafe(old)])
+    }
+
     // MARK: - SQLite browser (read-only, host-side)
 
     /// Roots a database path is allowed to come from: the app's composed +

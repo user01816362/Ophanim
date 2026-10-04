@@ -128,6 +128,25 @@ enum InspectTools {
         return true
     }
 
+    /// Ax-first ranking for find results: exact identifier hits, then exact
+    /// text hits, then everything else (stable). Grounding quality without
+    /// changing the match set.
+    ///
+    /// - Parameter nodes: Filtered flat nodes.
+    /// - Parameter text: The text query (exact-match boost).
+    /// - Returns: Stably reordered nodes.
+    static func rankMatches(_ nodes: [[String: Any]], text: String?) -> [[String: Any]] {
+        nodes.sorted { a, b in
+            func score(_ d: [String: Any]) -> Int {
+                var s = 0
+                if let ident = d["identifier"] as? String, !ident.isEmpty { s += 2 }
+                if let q = text, !q.isEmpty, (d["text"] as? String) == q { s += 1 }
+                return s
+            }
+            return score(a) > score(b)
+        }
+    }
+
     /// Tree-read arguments shared by uitree_read and inspect_snapshot (mode, substring
     /// filter, subtree root, agent budget caps). Parsed once here so the two readers
     /// cannot drift.
@@ -263,12 +282,12 @@ enum InspectTools {
             guard let findTree = findRsp.tree else {
                 throw ToolRouter.bail("find_element read no tree for \(bid)")
             }
-            let matches = Self.flatNodes(findTree).filter {
+            let matches = Self.rankMatches(Self.flatNodes(findTree).filter {
                 Self.nodeMatches($0, text: args["text"] as? String,
                                  label: args["label"] as? String,
                                  className: args["class"] as? String,
                                  identifier: args["identifier"] as? String)
-            }.prefix(limit)
+            }, text: args["text"] as? String).prefix(limit)
             return MCPServer.toolResult(id, ["bundleID": bid, "matches": Array(matches),
                                       "count": matches.count, "treeHash": Self.hashTree(findTree)])
 
@@ -325,9 +344,10 @@ enum InspectTools {
                     lastHash = Self.hashTree(tree)
                     let nodes = Self.flatNodes(tree)
                     lastCount = nodes.count
-                    if let hit = nodes.first(where: {
+                    let ranked = Self.rankMatches(nodes.filter {
                         Self.nodeMatches($0, text: qText, label: qLabel, className: qClass, identifier: qId)
-                    }) {
+                    }, text: qText)
+                    if let hit = ranked.first {
                         return MCPServer.toolResult(id, ["bundleID": bid, "matched": true,
                                                  "node": hit, "treeHash": lastHash, "nodeCount": lastCount,
                                                  "waitedMs": Int(Date().timeIntervalSince(started) * 1000)])
@@ -391,6 +411,44 @@ enum InspectTools {
                 obPayload["treeHash"] = Self.hashTree(tree)
             }
             return MCPServer.toolResult(id, obPayload)
+
+        case "interruption_check":
+            // Phase-1 interruption detector (host-only heuristic, no
+            // auto-dismiss): alert-sheet classes in any window + app focus
+            // state. Window 0 is the key window (sortedWindows order); alerts
+            // anywhere else are interruptions by construction. SFSafariView /
+            // ASWebAuthentication surfaces are also reported (unreachable
+            // flows — hand back to the user, don't instrument).
+            let alertClasses = ["UIAlertController", "UIAlertAction",
+                                "UIActivityViewController", "_UIActivity",
+                                "SFSafariView", "ASWebAuthentication"]
+            let itMode = try inspectMode(args)
+            let itRsp = try InspectControl.transact(bundleID: bid, op: .uiTree, mode: itMode)
+            guard let forest = itRsp.tree else {
+                throw ToolRouter.bail("interruption_check read no tree for \(bid)")
+            }
+            var alertIds: [String] = []
+            var alertWindow = -1
+            for (wi, window) in forest.children.enumerated() {
+                // Window subtree walk without flattening across windows.
+                var stack = [window]
+                while let n = stack.popLast() {
+                    if alertClasses.contains(where: { n.cls.contains($0) }) {
+                        alertIds.append(n.id)
+                        if alertWindow < 0 { alertWindow = wi }
+                    }
+                    stack.append(contentsOf: n.children)
+                }
+            }
+            var appState: Any = NSNull()
+            if let focus = try? InspectControl.transact(bundleID: bid, op: .focus) {
+                appState = focus.appState ?? NSNull()
+            }
+            return MCPServer.toolResult(id, ["bundleID": bid,
+                                      "interrupted": !alertIds.isEmpty,
+                                      "window": alertWindow,
+                                      "alertIds": alertIds,
+                                      "appState": appState])
 
         case "inspect_pick":
             func norm(_ key: String) throws -> Double {
@@ -1155,6 +1213,7 @@ enum InspectTools {
     static let inspectToolNames: Set<String> = [
         "uitree_read", "screenshot", "tap_element", "swipe", "set_text",
         "find_element", "tap_and_read", "await_ui", "tap_and_observe",
+        "interruption_check",
         "inspect_pick", "inspect_pasteboard", "inspect_focus",
         "web_snapshot", "web_act",
         "inspect_classes", "inspect_element", "inspect_class_detail",
