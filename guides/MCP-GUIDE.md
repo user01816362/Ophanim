@@ -7,15 +7,16 @@ relaunch. Orientation, glossary, and protocol rationale live in
 does not repeat them.
 
 Ground truth: the catalog is `MCPServer.toolDefinitions`
-(`Ophanim/Core/MCP/MCPServer.swift:241`), routed via `ToolRouter.handlers`
-(`Ophanim/Core/MCP/ToolRouter.swift:85-151`, 65 entries) plus the 18
+(`Ophanim/Core/MCP/MCPServer.swift:311`), routed via `ToolRouter.handlers`
+(`Ophanim/Core/MCP/ToolRouter.swift:146-224`, 88 entries) plus the 26
 inspect-routed tools in `InspectTools.inspectToolNames`
-(`Ophanim/Core/MCP/Tools/Inspect/InspectTools.swift:740-748`) — 83 tools
+(`Ophanim/Core/MCP/Tools/Inspect/InspectTools.swift:1012-1022`) — 115 tools
 total. Annotations ride on `tools/list`: `readOnlyTools`
-(`MCPServer.swift:36-48`, 35 tools) and `destructiveTools`
-(`MCPServer.swift:51-66`, 42 tools). `launch_app`, `tap_element`, `swipe`,
-and `set_text` carry **neither** hint — mutating but unannotated; treat them
-as live-effect tools (no dry run exists for the three gestures).
+(`MCPServer.swift:39-52`, 46 tools) and `destructiveTools`
+(`MCPServer.swift:55-72`, 44 tools). `launch_app`, `tap_element`, `swipe`,
+`set_text`, `tap_and_read`, `web_act` and the event-mark tools carry
+**neither** hint — mutating but unannotated; treat them
+as live-effect tools (consult `tool_matrix` for the dryRun family first).
 
 Conventions: **R** read-only · **D** destructive · **I** idempotent.
 `bundleID` is required by every per-app tool
@@ -35,13 +36,18 @@ Conventions: **R** read-only · **D** destructive · **I** idempotent.
    did-you-mean suggestion (`ToolRouter.rejectUnknownKeys`,
    `ToolRouter.swift:46-64`).
 
-## Dry-run contracts (two families — do not mix them up)
+## Dry-run contracts (three families — do not mix them up)
 
 | Family | Rule | Code |
 |---|---|---|
-| Most destructive tools (uninstall, tweaks, containers, sources, keymaps, injection strategy, galgal runtime, clear/reset) | `dryRun` **defaults true**: omitted = preview, pass `dryRun:false` to execute | `ToolRouter.isDryRun`, `ToolRouter.swift:43` |
-| Hook/rule writers: `set_objc_hooks`, `set_swift_hooks`, `set_inline_hooks`, `set_rules`, `apply_preset` | **Omitted = write** (historical contract). Preview only with explicit `dryRun:true` | `HookTools.swift:5-9`, `RuleTools.swift:20-21`, `RuleTools.swift:42-43` |
-| Pure setters / gestures: `set_config`, `tap_element`, `swipe`, `set_text` | **No dry run at all** — the call is the effect | catalog descriptions, `MCPServer.swift:484-553`; gesture handlers `InspectTools.swift:89-180` |
+| Most destructive tools (uninstall, tweaks, containers, sources, keymaps, injection strategy, galgal runtime, clear/reset) | `dryRun` **defaults true**: omitted = preview, pass `dryRun:false` to execute | `ToolRouter.isDryRun`, `ToolRouter.swift:94` |
+| Hook/rule writers: `set_objc_hooks`, `set_swift_hooks`, `set_inline_hooks`, `set_rules`, `apply_preset` | **Omitted = write** (historical contract). Preview only with explicit `dryRun:true` | `HookTools.swift:12-16`, `RuleTools.swift:61,93` |
+| Immediate actors (no preview branch): gestures, `launch_app`, `set_config`, `tap_and_read`, `web_act`, event marks, bundle/file exports | **No dry run at all** — the call is the effect | `tool_matrix` `none` family, `ToolRouter.swift:236-238` |
+
+Machine source: `tool_matrix` reports every catalog tool with
+readOnly/destructive/dryRun (`default`/`explicit`/`none`/`na`).
+Consult it before mutating — prose above is the summary, the matrix is
+the contract (`ToolRouter.matrix`, `ToolRouter.swift:233-253`).
 
 `set_config` has no preview: re-read with `get_config` after writing
 (`ConfigTools.setConfig`, `ConfigTools.swift:11-17` returns the new projection).
@@ -50,11 +56,11 @@ Conventions: **R** read-only · **D** destructive · **I** idempotent.
 
 | Takes effect live on a running app | Needs relaunch / next launch |
 |---|---|
-| Capture categories, rules, sinks, `bypassPinning` (config is watched — `set_config` description, `MCPServer.swift:484-488`) | Newly added hooks (`set_*_hooks` replace the stored arrays; engine reads them at boot — same note, `MCPServer.swift:484-488`) |
-| `set_rules` ("Takes effect live on a running app", `MCPServer.swift:331-348`) | Injection strategy (`set_injection_strategy` rewrites load commands; "next launch applies" pattern, `ConfigTools.swift:24-64`) |
-| Inline-hook gate `enableInlineHooks` ("live code patching", `MCPServer.swift:451-476`) | DYLD libraries ("Takes effect on next launch", `AppTools.swift:182-186`) |
+| Capture categories, rules, sinks, `bypassPinning`, **hooks** (config is watched, ~1 s poll — `set_config` description, `MCPServer.swift:627+`) | Injection strategy (`set_injection_strategy` rewrites load commands) |
+| `set_rules` ("Takes effect live on a running app") | DYLD libraries ("Takes effect on next launch", `AppTools.swift:182-186`) |
+| Inline-hook gate `enableInlineHooks` ("live code patching") | `install_app` output (configure with `set_config`, then `launch_app`) |
 | Turning Agent Mode OFF (stops serving within one poll) | Turning Agent Mode ON (boot latch — guest pump only boots at launch; see `docs/INSPECT.md`) |
-| Dropped hook entries "reverted live on next config poll" (hook catalog text, `MCPServer.swift:418-426`) | `install_app` output (configure with `set_config`, then `launch_app`, `AppTools.swift:77`) |
+| Dropped hook entries "reverted live on next config poll" | |
 
 ## Tool catalog by domain
 
@@ -139,6 +145,18 @@ file op (`TweakTools.swift:46`, `72`, `89`, `113-114`).
 | `backup_container` | D, dryRun-default | `destPath` (required). `ditto` zip; reports `wouldOverwrite` on preview (`ContainerTools.swift:182-201`) |
 | `restore_container` | D, dryRun-default | `archivePath` (required). Refuses while running; replaces the live tree via `ditto` (`ContainerTools.swift:203-225`) |
 
+### Web (WKWebView observe + act)
+
+Plain app-owned `WKWebView`s only — `SFSafariViewController` and
+`ASWebAuthenticationSession` expose no JS surface by Apple design
+(unreachable: detect + hand back). `set_text` refuses web content stated;
+use this pair instead (`docs/INSPECT.md` known limits).
+
+| Tool | R/D | Purpose + key args |
+|---|---|---|
+| `web_snapshot` | R/I | Frozen DOM (ref/fingerprint/tag/id/name/label/text/masked values/frames/cssPaths/url). Secrets always masked; shadow subtrees marked, not entered; main frame only |
+| `web_act` | live effect, consent-gated | Ref-first resolution (fingerprint re-match + uniqueness gate, URL-bound — refuses `navigated`/`ambiguous`/`ref-miss`); cssPath last resort (`via:path`). Fill uses the native setter (React-safe) with type gating; secret fills need per-call `consent:true`; submit stays separate. Values never echoed |
+
 ### Sources (AltStore feeds)
 
 | Tool | R/D | Purpose + key args |
@@ -168,11 +186,23 @@ stack would be wrong, so only synchronous swizzle events carry
 caller-attribution flag (`captureNetworkCallers`, default off: dladdr cost)
 for the hot-path equivalent.
 | `unsubscribe_events` | live effect | `bundleID` optional — one feed or all. Reports `threadParked` (`EventTools.swift:57-63`) |
-| `export_curl` | R/I | Newest recorded request matching `url?`/`host?`/`since?` rendered as replay-grade curl (method + url + `req.*` headers, text body to 4096 chars; binary bodies noted, never dumped) (`EventTools.swift:65-109`) |
+| `export_curl` | R/I | Newest matching request (`index`: 0 = newest) as replay-grade curl (method + url + `req.*` headers, text body to 16384 chars; binary noted, never dumped). Headers may carry secrets — never paste into shared contexts without checking (`EventTools.swift:128-178`) |
+| `event_mark` | live effect (host cursor) | Pin the current newest-event cursor under `name` (default "default") for later `events_since_mark` windows |
+| `events_since_mark` | R/I | Events after a named mark (exact-window causality); same filters as `tail_events` |
+| `diff_events` | R/I | Group events in (`sinceA`, `sinceB`] by api with counts + first/last. The tap-to-traffic read: cursor → act → diff |
+| `hook_coverage` | R/I | Which apis fired since a cursor (counts + first/last + dispositions, most-fired first). Flow map for "did my hook fire" |
 | `analyze_app` | R/I | Behavior/privacy rollup from events + `crash` section: previous run's explanation (`last-crash.json`) or explicit no-artifact statement (`ReconTools.swift:5-8`) |
 | `app_imports` | R/I | Dynamically-imported TLS/crypto/keychain/process symbols — the DYLD_INTERPOSE surface, incl. for statically-linked apps (`ReconTools.swift:10-15`) |
 | `find_symbols` | R/I | `keyword` (required). Keyword allowlist (`A-Za-z0-9_.-:`) — injection-safe by construction (`ReconTools.swift:17-26`) |
-| `list_libraries` | R/I | `otool -L` parse, same as the Recon view (`ReconTools.swift:37-54`) |
+| `all_symbols` | R/I | Paged full dump without keyword guessing (`kind`: symbols/classes/selectors, `page`/`perPage`) — same nm/demangle pipeline |
+| `list_libraries` | R/I | `otool -L` parse with versions, embedded/system split, weak-link marks, one-level transitive closure over embedded frameworks |
+| `list_protocols` | R/I | Raw ObjC protocol + Swift conformance section dumps (delegate-shape hook prediction; typed parsing later) |
+| `string_xrefs` | R/I | Approximate data-pointer scan from matching cstrings (chained-fixup-aware; labeled `approximate`, `via: chained|raw`) — string-to-hook-anchor without disassembly |
+| `app_identity` | R/I | CDHash + whole-file sha256 + LC_UUID + authority + cryptid + verify status. Gate every byte-export on this first |
+| `app_hash` | R/I | Whole-file SHA-256 of a bundle file (default: main executable) |
+| `app_export_file` | live effect | Bounded, hashed, symlink-proof single-file export out of the bundle (never writes into it) |
+| `app_export_bundle` | live effect | Whole-.app `ditto` zip + identity sidecar. Refuses FairPlay mains (`ENCRYPTED_FAIRPLAY`) and broken seals unless `allowBrokenSeal` (labeled `SEAL_BROKEN`) |
+| `app_plist` | R/I | Bundle Info.plist + semantic launch-planning checks (URL schemes → openURL targets, ATS, background modes, usage keys) |
 | `scan_signature` | R/I | `pattern` (required, `"1F 20 ?? D5"` form). Capped at 500 hits (`ReconTools.swift:56-74`) |
 | `list_classes` | R/I | `filter?`, `limit` (default 200, cap 2000). Live-first: runtime classes when Agent Mode runs, else static strings (`ReconTools.swift:28-35`; `InspectTools.swift:752-759`) |
 
@@ -197,10 +227,18 @@ pairs, marks budget-cut or redaction-mismatched pairs `partial`;
 `InspectService.swift:137-155`).
 
 `uitree_read` summaries carry flat `nodes[]` (id/class/role/text/label/
-enabled, buttons + text inputs + labeled nodes, capped 100, zero nesting):
+identifier/enabled, buttons + text inputs + labeled nodes, capped 100, zero nesting):
 the discovery list for `tap_element`/`set_text` by id when the tree text
 block is unavailable — proven live driving a full chat turn (read nodes,
-tap field, `set_text`, tap Send) with no coordinates.
+tap field, `set_text`, tap Send) with no coordinates. `uitree_read`,
+`find_element`, `tap_and_read` summaries also carry `treeHash` (stable for
+same screen+caps) for cheap stuck detection. `find_element` additionally
+matches exact accessibility `identifier` (ranks first). `await_ui`
+bounded-waits (max 30 s) for a text/label/class/identifier match and
+returns it with `treeHash`/`waitedMs` — never hot-loop `uitree_read`.
+`tap_and_observe` fuses tap + post tree + the caused event window
+(`category?`/`search?`/`waitMs?`) — "this tap caused these 3 requests" in
+one call.
 
 Framework coverage for text entry (`set_text` writes `UITextField`/
 `UITextView` directly — no tapping, no keyboard): UIKit and SwiftUI
@@ -296,8 +334,12 @@ ship a dead app; the top-level seal covers their resources
 - First instrumentation: `list_apps` → `get_config` → `set_config` →
   `launch_app` → `tail_events` (cursor loop; or `subscribe_events` +
   `tail_events` on stdio).
-- Hook loop: `app_imports` → `find_symbols` → `set_*_hooks` → relaunch →
-  `query_events` to confirm.
+- Hook loop: `app_imports` → `find_symbols` (or `all_symbols` paged, no
+  guessing) → `string_xrefs` for anchor derivation → `set_*_hooks`
+  (`dryRun:true` shows structural preflight: duplicates/overlap) → live
+  in ~1 s, no relaunch → `tail_events` search `installSummary` (~2 s) →
+  `query_events`/`hook_coverage` to confirm. Revert with `set_*_hooks`
+  minus the entries (P5 reverts on reload).
 - Zero-code trace (frida-trace shape, no engine work): `find_symbols` for the
   keyword → `list_classes` (live) → `inspect_class_detail` on each class hit
   → hand-write `set_objc_hooks` entries (className + selector) → validate
@@ -311,6 +353,13 @@ ship a dead app; the top-level seal covers their resources
   `resync_tweaks` after hand edits.
 - UI investigation: `agentMode` on + relaunch → `uitree_read` →
   `tap`/`swipe` (`snapshot:both`) → `inspect_diff` → `bookmark_add`.
+- Causality loop: `event_mark` → act (`tap_and_read` or `tap_and_observe`
+  for the fused window) → `events_since_mark` (or `diff_events` between
+  two cursors) → `export_curl` for the interesting request →
+  `set_rules` replaceReturn to mock it (mock-from-capture recipe).
+- Identity/export loop: `app_identity` (cryptid/verify gate) →
+  `app_hash` → `app_export_file` (bounded, hashed) or `app_export_bundle`
+  (seal-labeled) for external testing.
 - Container A/B: `list_profiles` → `create`/`switch` (quit the app first) →
   `clear_container` as needed.
 
@@ -327,9 +376,8 @@ ship a dead app; the top-level seal covers their resources
   `container_read` the prefs plist (use the ABSOLUTE path from
   `container_info`; relative paths resolve against the wrong root) →
   `keychain_items` → `sqlite_tables`/`sqlite_rows` on the app's databases.
-- Missing tooling found live: no `terminate_app` — restarting for
-  agentMode/config changes currently needs an external kill; `launch_app`
-  on a running app only activates.
+- Missing tooling found live: resolved since — `terminate_app` exists
+  (restart for agentMode/config changes without an external kill).
 - Replay: `export_curl` → paste in Terminal, compare statuses.
 - Uninstall: `uninstall_app` dryRun → read preview → `dryRun:false`
   (+`purgeData` only deliberately).
@@ -346,4 +394,9 @@ reached` (`InspectTools.swift:379-389`, `357-358`) · `inspect timed out
 after 60s - guest pump silent since <t> - relaunch the app with Agent Mode
 on` (or `no pump heartbeat` when the pump never beat,
 `InspectService.swift:124-131`) · `Quit the app before changing its
-container.` (container ops while running, `OphanimError.swift:42-43`).
+container.` (container ops while running, `OphanimError.swift:42-43`) ·
+`unknown event mark '<name>'` (pass `event_mark` first) · `web_act ref <r>
+is unknown or stale` (fresh `web_snapshot`, refs are single-generation) ·
+`secret-needs-consent` (retry the fill with `consent:true`) ·
+`inspectDisableRedaction:true bundled with …` (send it alone as an
+explicit consent call).
