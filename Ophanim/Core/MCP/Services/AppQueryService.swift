@@ -192,9 +192,10 @@ enum AppQueryService {
     /// Approximate string cross-refs (table + pointer-scan tier, NOT
     /// instruction xrefs): `strings -t d` gives file offsets; an 8-byte
     /// little-endian scan of __DATA finds pointer slots holding those
-    /// offsets. Approximate (coincidental integer matches possible) but
-    /// load-bearing for triage: string → candidate data landlords →
-    /// inline-hook anchors. Labeled approximate in the result.
+    /// offsets, corrected by the __TEXT slide (file pointers are linked
+    /// vmaddrs: fileOffset = value - (vmaddr - fileoff) from `otool -l`).
+    /// Approximate (coincidental integer matches possible) but load-bearing
+    /// for triage: string → candidate data landlords → inline-hook anchors.
     ///
     /// - Parameter bundleID: The app's bundle identifier.
     /// - Parameter keyword: Caller-allowlisted substring of the string.
@@ -204,6 +205,34 @@ enum AppQueryService {
         let safe = keyword.replacingOccurrences(of: "'", with: "").lowercased()
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: exe.path)),
               data.count <= 256 * 1024 * 1024 else { return [:] }
+        // Segment slides (vmaddr - fileoff per segment) from otool -l.
+        var slides: [UInt64] = []
+        let lp = Process(); lp.executableURL = URL(fileURLWithPath: "/usr/bin/otool")
+        lp.arguments = ["-l", exe.path]
+        let lout = Pipe(); lp.standardOutput = lout; lp.standardError = Pipe()
+        if (try? lp.run()) != nil {
+            let ltxt = String(data: lout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            lp.waitUntilExit()
+            var segVmaddr: UInt64?, segFileoff: UInt64?
+            func flush() {
+                if let vm = segVmaddr, let fo = segFileoff, vm >= fo { slides.append(vm - fo) }
+                segVmaddr = nil; segFileoff = nil
+            }
+            func num(_ t: String, _ prefix: String) -> UInt64? {
+                var s = t.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
+                    .split(separator: " ").first.map(String.init) ?? ""
+                if s.hasPrefix("0x") { s = String(s.dropFirst(2)); return UInt64(s, radix: 16) }
+                return UInt64(s)
+            }
+            for line in ltxt.split(separator: "\n") {
+                let t = line.trimmingCharacters(in: .whitespaces)
+                if t.hasPrefix("segname ") { flush(); continue }
+                if t.hasPrefix("vmaddr ") { segVmaddr = num(t, "vmaddr ") }
+                else if t.hasPrefix("fileoff ") { segFileoff = num(t, "fileoff ") }
+            }
+            flush()
+        }
+        if slides.isEmpty { slides = [0x100000000] }  // standard PIE base fallback, still labeled approximate
         let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
         p.arguments = ["-a", "-t", "d", exe.path]
         let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
@@ -213,9 +242,10 @@ enum AppQueryService {
         // (offset, string, end): only tracked strings participate.
         var ranges: [(start: UInt64, end: UInt64, text: String)] = []
         for line in txt.split(separator: "\n") {
-            guard let sp = line.firstIndex(of: " ") else { continue }
-            guard let off = UInt64(line[..<sp]) else { continue }
-            let s = String(line[line.index(after: sp)...])
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard let sp = t.firstIndex(of: " ") else { continue }
+            guard let off = UInt64(t[..<sp]) else { continue }
+            let s = String(t[t.index(after: sp)...])
             guard s.lowercased().contains(safe) else { continue }
             ranges.append((off, off + UInt64(s.utf8.count), s))
             if ranges.count >= 2000 { break }
@@ -228,17 +258,21 @@ enum AppQueryService {
             var i = 0
             while i < n && refs.count < 200 {
                 let v = raw.loadUnaligned(fromByteOffset: i * 8, as: UInt64.self).littleEndian
-                // Binary search: greatest start <= v, then range check.
-                var lo = 0, hi = starts.count - 1, cand = -1
-                while lo <= hi {
-                    let mid = (lo + hi) / 2
-                    if starts[mid] <= v { cand = mid; lo = mid + 1 } else { hi = mid - 1 }
-                }
-                if cand >= 0 {
-                    let st = starts[cand]
-                    if let r = ranges.first(where: { $0.start == st }), v < r.end {
-                        refs.append(["string": String(r.text.prefix(120)),
-                                     "stringOffset": st, "refOffset": UInt64(i * 8)])
+                for slide in slides {
+                    guard v >= slide else { continue }
+                    let f = v - slide
+                    var lo = 0, hi = starts.count - 1, cand = -1
+                    while lo <= hi {
+                        let mid = (lo + hi) / 2
+                        if starts[mid] <= f { cand = mid; lo = mid + 1 } else { hi = mid - 1 }
+                    }
+                    if cand >= 0 {
+                        let st = starts[cand]
+                        if let r = ranges.first(where: { $0.start == st }), f < r.end {
+                            refs.append(["string": String(r.text.prefix(120)),
+                                         "stringOffset": st, "refOffset": UInt64(i * 8)])
+                            break
+                        }
                     }
                 }
                 i += 1
