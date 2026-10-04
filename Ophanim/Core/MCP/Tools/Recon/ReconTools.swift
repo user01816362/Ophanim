@@ -117,20 +117,9 @@ enum ReconTools {
             }
             return Lib(path: path, compat: compat, current: current)
         }
-        // Weak links: otool -l blocks (cmd LC_LOAD_WEAK_DYLIB → following name line).
-        var weak: Set<String> = []
-        if let lud = try? Shell.run(print: false, "/usr/bin/otool", "-l", exe.path) {
-            var inWeak = false
-            for line in lud.split(separator: "\n") {
-                let t = line.trimmingCharacters(in: .whitespaces)
-                if t.hasPrefix("cmd LC_LOAD_WEAK_DYLIB") { inWeak = true }
-                else if t.hasPrefix("cmd ") { inWeak = false }
-                else if inWeak && t.hasPrefix("name ") {
-                    weak.insert(String(t.dropFirst(5).split(separator: " ").first ?? ""))
-                    inWeak = false
-                }
-            }
-        }
+        // Weak links via the shared otool -l parse (single shell-out).
+        let weak: Set<String> = Set(AppQueryService.loadCommands(exe: exe)
+            .filter { $0.cmd == "LC_LOAD_WEAK_DYLIB" }.map { $0.name })
         func isEmbedded(_ p: String) -> Bool {
             p.hasPrefix("@rpath") || p.hasPrefix("@executable_path") || p.contains(".framework/")
         }
@@ -184,6 +173,52 @@ enum ReconTools {
         let (hits, note) = ReconView.scan(url: exe, pattern: bytes)
         return try ToolRouter.json(["bundleID": bid, "pattern": pattern,
                              "hits": hits, "count": hits.count, "note": note ?? ""])
+    }
+
+    /// Identity projection for an installed app: CDHash (Apple's identity
+    /// primitive) + whole-file sha256 (change detection) + LC_UUID (build
+    /// provenance) + signing authority + cryptid (FairPlay gate) + verify
+    /// status. Read-only; every byte-export verb gates on this first.
+    ///
+    /// - Parameter args: `bundleID` (required).
+    /// - Returns: JSON identity projection (empty-object bail when not installed).
+    /// - Throws: `ToolRouter.bail` when the app is not installed.
+    static func appIdentity(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        var payload = AppQueryService.appIdentity(bid)
+        guard !payload.isEmpty else { throw ToolRouter.bail("no bundle for \(bid)") }
+        payload["bundleID"] = bid
+        return try ToolRouter.json(payload)
+    }
+
+    /// Whole-file SHA-256 of a bundle file (integrity, cache keys, dedup).
+    ///
+    /// - Parameter args: `bundleID` (required); `path` (bundle-relative file,
+    ///   default = main executable).
+    /// - Returns: JSON with `path`, `bytes`, and `sha256`.
+    /// - Throws: `ToolRouter.bail` on escape, missing file, or hash failure.
+    static func appHash(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let app = AppQueryService.appURL(bid) else { throw ToolRouter.bail("no bundle for \(bid)") }
+        let rel = (args["path"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        let target: URL
+        if let rel {
+            guard !rel.hasPrefix("/"), !rel.split(separator: "/").contains("..") else {
+                throw ToolRouter.bail("path must be bundle-relative without .. segments")
+            }
+            target = app.appendingPathComponent(rel)
+        } else {
+            guard let exe = AppQueryService.appExecutable(bid) else { throw ToolRouter.bail("no executable for \(bid)") }
+            target = exe
+        }
+        guard target.resolvingSymlinksInPath().path.hasPrefix(app.resolvingSymlinksInPath().path) else {
+            throw ToolRouter.bail("path escapes the bundle (symlink) - refused")
+        }
+        guard let hash = AppQueryService.sha256File(target.path) else {
+            throw ToolRouter.bail("could not hash \(target.path)")
+        }
+        let size = (try? FileManager.default.attributesOfItem(atPath: target.path)[.size] as? Int) ?? 0
+        return try ToolRouter.json(["bundleID": bid, "path": target.path, "bytes": size, "sha256": hash])
     }
 
     /// Bundle Info.plist projection + semantic launch-planning checks

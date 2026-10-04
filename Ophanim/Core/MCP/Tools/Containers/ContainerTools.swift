@@ -577,4 +577,48 @@ enum ContainerTools {
         try Shell.run(print: false, "/usr/bin/ditto", "-x", "-k", archiveURL.path, live.path)
         return try ToolRouter.json(["bundleID": bid, "archive": archiveURL.path, "destination": live.path])
     }
+
+    /// Exports one bundle-relative file outside the bundle (bounded, hashed,
+    /// symlink-escape-proof). Never writes into the bundle. Explicit verb,
+    /// no preview branch.
+    ///
+    /// - Parameter args: `bundleID` (required); `src` (bundle-relative path);
+    ///   `dest` (destination file path, required); `maxBytes` (default
+    ///   52428800); `overwrite` (default false).
+    /// - Returns: JSON with `src`, `dest`, `size`, before/after sha256.
+    /// - Throws: `ToolRouter.bail` on escape, caps, refusal, or I/O failure.
+    static func appExportFile(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let src = args["src"] as? String, !src.isEmpty else { throw ToolRouter.bail("src is required (bundle-relative path)") }
+        guard let dest = args["dest"] as? String, !dest.isEmpty else { throw ToolRouter.bail("dest is required (outside file path)") }
+        guard let app = AppQueryService.appURL(bid) else { throw ToolRouter.bail("no bundle for \(bid)") }
+        let maxBytes = ToolRouter.coerceInt(args, "maxBytes") ?? 50 * 1024 * 1024
+        var payload = try AppQueryService.exportFile(app: app, src: src,
+                                                     dest: ToolRouter.expandedURL(dest),
+                                                     maxBytes: maxBytes,
+                                                     overwrite: (args["overwrite"] as? Bool) ?? false)
+        payload["bundleID"] = bid
+        return try ToolRouter.json(payload)
+    }
+
+    /// Zips a whole .app for external testing (seal-preserving ditto;
+    /// identity sidecar beside the zip). Refuses FairPlay-encrypted mains
+    /// and broken seals (override labeled). Explicit verb, no preview branch.
+    ///
+    /// - Parameter args: `bundleID` (required); `dest` (destination zip path,
+    ///   required); `allowBrokenSeal` (default false).
+    /// - Returns: JSON with `zip`, `sha256_zip`, `bytes`, `sealValid`,
+    ///   `sealLabel`, `identitySidecar`.
+    /// - Throws: `ToolRouter.bail` on encryption, seal, or ditto failure.
+    static func appExportBundle(_ args: [String: Any]) throws -> String {
+        let bid = try ToolRouter.requireBundleID(args)
+        guard let dest = args["dest"] as? String, !dest.isEmpty else { throw ToolRouter.bail("dest is required (zip path)") }
+        guard let app = AppQueryService.appURL(bid) else { throw ToolRouter.bail("no bundle for \(bid)") }
+        let identity = AppQueryService.appIdentity(bid)
+        var payload = try AppQueryService.exportBundle(app: app, dest: ToolRouter.expandedURL(dest),
+                                                        allowBrokenSeal: (args["allowBrokenSeal"] as? Bool) ?? false,
+                                                        identity: identity)
+        payload["bundleID"] = bid
+        return try ToolRouter.json(payload)
+    }
 }

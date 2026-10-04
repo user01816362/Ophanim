@@ -40,6 +40,7 @@ final class MCPServer {
         "list_apps", "tool_matrix", "launch_status", "query_events", "tail_events", "export_curl", "analyze_app", "app_imports",
         "find_symbols", "list_libraries", "scan_signature", "diff_events", "hook_coverage",
         "app_plist", "all_symbols", "list_protocols", "string_xrefs",
+        "app_identity", "app_hash",
         "get_config", "get_hooks", "validate_rule_script",
         "list_jailbreak_detectors", "list_presets",
         "list_sources", "search_source_apps", "refresh_sources",
@@ -1217,6 +1218,34 @@ final class MCPServer {
             ]
         ],
         [
+            "name": "app_export_file",
+            "description": "Export one bundle-relative file outside the bundle (bounded, sha256-verified, symlink-escape-proof). Never writes into the bundle. Example: app_export_file {bundleID, src: 'Frameworks/Foo.framework/Foo', dest: '/tmp/Foo'}.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "src": ["type": "string", "description": "Bundle-relative path (no absolute, no ..)."],
+                    "dest": ["type": "string", "description": "Outside destination file path."],
+                    "maxBytes": ["type": "integer", "description": "Size cap (default 52428800)."],
+                    "overwrite": ["type": "boolean", "description": "Replace an existing dest file (default false)."]
+                ],
+                "required": ["bundleID", "src", "dest"]
+            ]
+        ],
+        [
+            "name": "app_export_bundle",
+            "description": "Zip a whole .app for external testing (seal-preserving ditto, identity sidecar beside the zip). Refuses FairPlay-encrypted mains (ENCRYPTED_FAIRPLAY) and broken seals unless allowBrokenSeal (labeled SEAL_BROKEN).",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string"],
+                    "dest": ["type": "string", "description": "Destination zip path."],
+                    "allowBrokenSeal": ["type": "boolean", "description": "Export despite verify failure, labeled (default false)."]
+                ],
+                "required": ["bundleID", "dest"]
+            ]
+        ],
+        [
             "name": "list_classes",
             "description": "Class/selector inventory (live runtime classes when Agent Mode runs, else static strings).",
             "inputSchema": [
@@ -1298,6 +1327,29 @@ final class MCPServer {
                     "keyword": ["type": "string", "description": "Substring of the string (same allowlist as find_symbols)."]
                 ],
                 "required": ["bundleID", "keyword"]
+            ]
+        ],
+        [
+            "name": "app_identity",
+            "description": "Identity projection: CDHash (Apple's identity primitive) + whole-file sha256 + LC_UUID + signing authority + cryptid (FairPlay gate) + verify status. Read-only; every byte-export gates on this first. Example: app_identity {bundleID}.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."]
+                ],
+                "required": ["bundleID"]
+            ]
+        ],
+        [
+            "name": "app_hash",
+            "description": "Whole-file SHA-256 of a bundle file (integrity, cache keys, dedup). Defaults to the main executable.",
+            "inputSchema": [
+                "type": "object",
+                "properties": [
+                    "bundleID": ["type": "string", "description": "The app's bundle identifier."],
+                    "path": ["type": "string", "description": "Bundle-relative file (default: main executable)."]
+                ],
+                "required": ["bundleID"]
             ]
         ],
         [

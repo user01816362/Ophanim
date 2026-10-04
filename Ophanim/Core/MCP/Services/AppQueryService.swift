@@ -205,34 +205,9 @@ enum AppQueryService {
         let safe = keyword.replacingOccurrences(of: "'", with: "").lowercased()
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: exe.path)),
               data.count <= 256 * 1024 * 1024 else { return [:] }
-        // Segment slides (vmaddr - fileoff per segment) from otool -l.
-        var slides: [UInt64] = []
-        let lp = Process(); lp.executableURL = URL(fileURLWithPath: "/usr/bin/otool")
-        lp.arguments = ["-l", exe.path]
-        let lout = Pipe(); lp.standardOutput = lout; lp.standardError = Pipe()
-        if (try? lp.run()) != nil {
-            let ltxt = String(data: lout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-            lp.waitUntilExit()
-            var segVmaddr: UInt64?, segFileoff: UInt64?
-            func flush() {
-                if let vm = segVmaddr, let fo = segFileoff, vm >= fo { slides.append(vm - fo) }
-                segVmaddr = nil; segFileoff = nil
-            }
-            func num(_ t: String, _ prefix: String) -> UInt64? {
-                var s = t.dropFirst(prefix.count).trimmingCharacters(in: .whitespaces)
-                    .split(separator: " ").first.map(String.init) ?? ""
-                if s.hasPrefix("0x") { s = String(s.dropFirst(2)); return UInt64(s, radix: 16) }
-                return UInt64(s)
-            }
-            for line in ltxt.split(separator: "\n") {
-                let t = line.trimmingCharacters(in: .whitespaces)
-                if t.hasPrefix("segname ") { flush(); continue }
-                if t.hasPrefix("vmaddr ") { segVmaddr = num(t, "vmaddr ") }
-                else if t.hasPrefix("fileoff ") { segFileoff = num(t, "fileoff ") }
-            }
-            flush()
-        }
-        if slides.isEmpty { slides = [0x100000000] }  // standard PIE base fallback, still labeled approximate
+        // Segment slides via the shared otool -l parse (file holds linked
+        // vmaddrs, not offsets; standard PIE base fallback, still approximate).
+        let slides = AppQueryService.segmentSlides(exe: exe)
         let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
         p.arguments = ["-a", "-t", "d", exe.path]
         let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
@@ -302,6 +277,251 @@ enum AppQueryService {
             if lines.count > 1 { sections["\(seg),\(sect)"] = Array(lines.prefix(150)) }
         }
         return ["sections": sections]
+    }
+
+    /// One parsed `otool -l` load-command block: command + the fields agents
+    /// query (dylib name, segment geometry, uuid, cryptid). Single owner so
+    /// weak-link, slide, uuid, and cryptid reads never drift into separate
+    /// parsers (DRY: ReconTools + stringXrefs + identity all use this).
+    struct OtoolLoadCommand {
+        var cmd: String = ""
+        var name: String = ""
+        var segname: String = ""
+        var vmaddr: UInt64?
+        var fileoff: UInt64?
+        var uuid: String = ""
+        var cryptid: String = ""
+    }
+
+    /// Parses `otool -l` into load-command blocks (one shell-out, shared).
+    ///
+    /// - Parameter exe: The Mach-O file.
+    /// - Returns: The blocks in file order ([] when otool fails).
+    static func loadCommands(exe: URL) -> [OtoolLoadCommand] {
+        guard let lud = try? Shell.run(print: false, "/usr/bin/otool", "-l", exe.path) else { return [] }
+        func num(_ t: String) -> UInt64? {
+            var s = t.split(separator: " ").last.map(String.init) ?? ""
+            if s.hasPrefix("0x") { s = String(s.dropFirst(2)); return UInt64(s, radix: 16) }
+            return UInt64(s)
+        }
+        var out: [OtoolLoadCommand] = []
+        var cur = OtoolLoadCommand()
+        var open = false
+        for line in lud.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.hasPrefix("Load command ") {
+                if open { out.append(cur) }
+                cur = OtoolLoadCommand(); open = true
+            }
+            else if t.hasPrefix("cmd ") { cur.cmd = String(t.dropFirst(4)) }
+            else if t.hasPrefix("name ") { cur.name = String(t.dropFirst(5).split(separator: " ").first ?? "") }
+            else if t.hasPrefix("segname ") { cur.segname = String(t.dropFirst(8)) }
+            else if t.hasPrefix("vmaddr ") { cur.vmaddr = num(t) }
+            else if t.hasPrefix("fileoff ") { cur.fileoff = num(t) }
+            else if t.hasPrefix("uuid ") { cur.uuid = String(t.dropFirst(5)) }
+            else if t.hasPrefix("cryptid ") { cur.cryptid = String(t.dropFirst(8)) }
+        }
+        if open { out.append(cur) }
+        return out
+    }
+
+    /// Segment slides (vmaddr − fileoff) for file-pointer → file-offset
+    /// correction (file holds linked vmaddrs, not offsets).
+    ///
+    /// - Parameter exe: The Mach-O file.
+    /// - Returns: The slides (standard PIE base fallback, still approximate).
+    static func segmentSlides(exe: URL) -> [UInt64] {
+        let slides = loadCommands(exe: exe).compactMap { c -> UInt64? in
+            guard let vm = c.vmaddr, let fo = c.fileoff, vm >= fo else { return nil }
+            return vm - fo
+        }
+        return slides.isEmpty ? [0x100000000] : slides
+    }
+
+    /// Whole-file SHA-256 via pinned `/usr/bin/openssl` (5× faster than
+    /// shasum at 100 MB, host-verified), falling back to `/usr/bin/shasum`.
+    /// Bare `openssl` is never used (Homebrew shadowing).
+    ///
+    /// - Parameter path: The file to hash.
+    /// - Returns: Lowercase hex digest, or nil when neither tool runs.
+    static func sha256File(_ path: String) -> String? {
+        func digest(_ exe: String, _ args: [String]) -> String? {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: exe); p.arguments = args
+            let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+            guard (try? p.run()) != nil else { return nil }
+            let txt = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { return nil }
+            // openssl: "SHA2-256(path)= <hash>"; shasum: "<hash>  path".
+            let candidates = txt.split(separator: " ").map(String.init)
+                + (txt.split(separator: "=").last.map { [$0.trimmingCharacters(in: .whitespacesAndNewlines)] } ?? [])
+            for tok in candidates where tok.count == 64
+                    && tok.range(of: "[^0-9a-fA-F]", options: .regularExpression) == nil {
+                return tok.lowercased()
+            }
+            return nil
+        }
+        return digest("/usr/bin/openssl", ["dgst", "-sha256", path])
+            ?? digest("/usr/bin/shasum", ["-a", "256", path])
+    }
+
+    /// Identity projection for an installed app: CDHash (Apple's identity
+    /// primitive) + whole-file sha256 (change detection) + LC_UUID (build
+    /// provenance) + signing authority + cryptid (FairPlay gate) + verify
+    /// status. Read-only; every byte-export verb gates on this first.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    /// - Returns: The projection dict (empty when the app is not installed).
+    static func appIdentity(_ bundleID: String) -> [String: Any] {
+        guard let app = appURL(bundleID), let exe = appExecutable(bundleID) else { return [:] }
+        func sh(_ exePath: String, _ args: [String]) -> (out: String, ok: Bool) {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: exePath); p.arguments = args
+            let out = Pipe(); p.standardOutput = out; p.standardError = Pipe()
+            guard (try? p.run()) != nil else { return ("", false) }
+            let txt = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            p.waitUntilExit()
+            return (txt, p.terminationStatus == 0)
+        }
+        // codesign writes display info to STDERR — merge by capturing both via shell redirect.
+        let disp = sh("/bin/sh", ["-c", "codesign -d -vvv '\(app.path)' 2>&1"])
+        func kv(_ key: String) -> String? {
+            disp.out.split(separator: "\n").compactMap { line -> String? in
+                let t = line.trimmingCharacters(in: .whitespaces)
+                guard t.hasPrefix(key + "=") else { return nil }
+                return String(t.dropFirst(key.count + 1))
+            }.first
+        }
+        let auths = disp.out.split(separator: "\n").compactMap { line -> String? in
+            let t = line.trimmingCharacters(in: .whitespaces)
+            guard t.hasPrefix("Authority=") else { return nil }
+            return String(t.dropFirst("Authority=".count))
+        }
+        let cmds = loadCommands(exe: exe)
+        let uuids = cmds.filter { $0.cmd == "LC_UUID" }.map { $0.uuid }.filter { !$0.isEmpty }
+        let cryptid = cmds.first { $0.cmd == "LC_ENCRYPTION_INFO_64" || $0.cmd == "LC_ENCRYPTION_INFO" }
+            .flatMap { Int($0.cryptid) } ?? 0
+        let verify = sh("/bin/sh", ["-c", "codesign --verify --deep --strict '\(app.path)' 2>&1"])
+        let entPlist = sh("/bin/sh", ["-c", "codesign -d --entitlements :- '\(app.path)' 2>/dev/null"])
+        var entitlements: Any = NSNull()
+        if !entPlist.out.isEmpty,
+           let data = entPlist.out.data(using: .utf8),
+           let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
+            entitlements = ContainerService.jsonSafe(obj)
+        }
+        return [
+            "identifier": kv("Identifier") ?? NSNull(),
+            "teamIdentifier": kv("TeamIdentifier") ?? NSNull(),
+            "cdhash": kv("CDHash") ?? NSNull(),
+            "authority": auths,
+            "entitlements": entitlements,
+            "lc_uuid": uuids,
+            "cryptid": cryptid,
+            "encrypted": cryptid != 0,
+            "verifyOk": verify.ok,
+            "verifyOutput": String(verify.out.prefix(500)),
+            "sha256_file": sha256File(exe.path) ?? NSNull(),
+        ]
+    }
+
+    /// Exports one bundle-relative file outside the bundle (bounded, hashed,
+    /// symlink-escape-proof). Never writes INTO the bundle.
+    ///
+    /// - Parameter app: The installed .app URL.
+    /// - Parameter src: Bundle-relative source path (no absolute, no `..` escape).
+    /// - Parameter dest: Destination file URL (parent created; refuses existing
+    ///   unless `overwrite`).
+    /// - Parameter maxBytes: Size cap (default 50 MB).
+    /// - Parameter overwrite: Replace an existing dest file.
+    /// - Returns: `{src, dest, size, sha256_before, sha256_after}`.
+    /// - Throws: `ToolRouter.bail` on escape, caps, or I/O failure.
+    static func exportFile(app: URL, src: String, dest: URL,
+                           maxBytes: Int = 50 * 1024 * 1024,
+                           overwrite: Bool = false) throws -> [String: Any] {
+        guard !src.isEmpty, !src.hasPrefix("/"), !src.split(separator: "/").contains("..") else {
+            throw ToolRouter.bail("src must be bundle-relative without .. segments")
+        }
+        let srcURL = app.appendingPathComponent(src)
+        // Realpath confinement: the symlink-resolved source must stay inside
+        // the resolved bundle (kills symlink escape); the copy itself
+        // preserves links as links.
+        let bundleRoot = app.resolvingSymlinksInPath().path
+        guard srcURL.resolvingSymlinksInPath().path.hasPrefix(bundleRoot) else {
+            throw ToolRouter.bail("src escapes the bundle (symlink) - refused")
+        }
+        guard FileManager.default.fileExists(atPath: srcURL.path) else {
+            throw ToolRouter.bail("no such bundle file: \(src)")
+        }
+        let attrs = try FileManager.default.attributesOfItem(atPath: srcURL.path)
+        let size = (attrs[.size] as? Int) ?? 0
+        guard size <= maxBytes else {
+            throw ToolRouter.bail("file is \(size) bytes (cap \(maxBytes)) - raise maxBytes explicitly")
+        }
+        guard !FileManager.default.fileExists(atPath: dest.path) || overwrite else {
+            throw ToolRouter.bail("dest exists: \(dest.path) - pass overwrite:true or pick another path")
+        }
+        try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: dest.path) {
+            try FileManager.default.removeItem(at: dest)
+        }
+        try FileManager.default.copyItem(at: srcURL, to: dest)
+        let before = sha256File(srcURL.path) ?? ""
+        let after = sha256File(dest.path) ?? ""
+        guard !before.isEmpty, before == after else {
+            throw ToolRouter.bail("hash mismatch after copy (src intact, dest suspect) - dest left for inspection")
+        }
+        return ["src": src, "dest": dest.path, "size": size,
+                "sha256_before": before, "sha256_after": after]
+    }
+
+    /// Zips a whole .app via `ditto -c -k --keepParent` (seal-preserving;
+    /// never `--arch`) after the identity gate, with an identity sidecar next
+    /// to (never inside) the zip.
+    ///
+    /// - Parameter app: The installed .app URL.
+    /// - Parameter dest: Destination zip URL.
+    /// - Parameter allowBrokenSeal: Export despite verify failure (labeled).
+    /// - Parameter identity: Precomputed `appIdentity` (avoids recompute).
+    /// - Returns: `{zip, sha256_zip, bytes, sealValid, identity}`.
+    /// - Throws: `ToolRouter.bail` on FairPlay encryption, broken seal
+    ///   (without override), or ditto failure.
+    static func exportBundle(app: URL, dest: URL, allowBrokenSeal: Bool,
+                             identity: [String: Any]) throws -> [String: Any] {
+        if (identity["encrypted"] as? Bool) == true {
+            throw ToolRouter.bail("ENCRYPTED_FAIRPLAY: main binary is FairPlay-encrypted (cryptid!=0) - "
+                + "extracted bytes are ciphertext, useless for analysis. Metadata-only projection available.")
+        }
+        let sealOk = (identity["verifyOk"] as? Bool) ?? false
+        guard sealOk || allowBrokenSeal else {
+            throw ToolRouter.bail("SEAL_BROKEN: source fails codesign --verify --deep --strict - "
+                + "pass allowBrokenSeal:true to export labeled output")
+        }
+        try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: dest.path) {
+            try FileManager.default.removeItem(at: dest)
+        }
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+        p.arguments = ["-c", "-k", "--keepParent", app.path, dest.path]
+        p.standardOutput = Pipe(); p.standardError = Pipe()
+        guard (try? p.run()) != nil else { throw ToolRouter.bail("ditto failed to start") }
+        p.waitUntilExit()
+        guard p.terminationStatus == 0,
+              FileManager.default.fileExists(atPath: dest.path) else {
+            throw ToolRouter.bail("ditto archive creation failed (exit \(p.terminationStatus))")
+        }
+        let bytes = (try? FileManager.default.attributesOfItem(atPath: dest.path)[.size] as? Int) ?? 0
+        let sidecar = dest.deletingPathExtension().appendingPathExtension("identity.json")
+        let sidecarObj = identity.merging(["bundleID": app.deletingPathExtension().lastPathComponent,
+                                            "exportedAt": ISO8601DateFormatter().string(from: Date())]) { _, new in new }
+        if let data = try? JSONSerialization.data(withJSONObject: ContainerService.jsonSafe(sidecarObj),
+                                                  options: [.prettyPrinted, .sortedKeys]) {
+            try? data.write(to: sidecar)
+        }
+        return ["zip": dest.path, "sha256_zip": sha256File(dest.path) ?? NSNull(),
+                "bytes": bytes, "sealValid": sealOk,
+                "sealLabel": sealOk ? "ok" : "SEAL_BROKEN",
+                "identitySidecar": sidecar.path]
     }
 
     /// Filesystem URL of an installed hosted app bundle, if present.

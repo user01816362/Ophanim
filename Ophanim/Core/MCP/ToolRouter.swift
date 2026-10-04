@@ -205,6 +205,8 @@ enum ToolRouter {
         "all_symbols": ReconTools.allSymbols,
         "list_protocols": ReconTools.listProtocols,
         "string_xrefs": ReconTools.stringXrefs,
+        "app_identity": ReconTools.appIdentity,
+        "app_hash": ReconTools.appHash,
         "set_objc_hooks": HookTools.setObjcHooks,
         "remove_hook": HookTools.removeHook,
         "get_hooks": HookTools.getHooks,
@@ -256,6 +258,8 @@ enum ToolRouter {
         "clear_container": ContainerTools.clearContainer,
         "backup_container": ContainerTools.backupContainer,
         "restore_container": ContainerTools.restoreContainer,
+        "app_export_file": ContainerTools.appExportFile,
+        "app_export_bundle": ContainerTools.appExportBundle,
         "list_classes": ReconTools.listClasses,
         "set_injection_strategy": ConfigTools.setInjectionStrategy,
         "get_keymap": ConfigTools.getKeymap,
@@ -277,7 +281,8 @@ enum ToolRouter {
                                   "refresh_sources", "subscribe_events", "unsubscribe_events",
                                   "set_config", "tap_element", "swipe", "set_text", "tap_and_read",
                                   "web_act", "bookmark_add", "bookmark_note",
-                                  "event_mark", "events_since_mark", "tap_and_observe"]
+                                  "event_mark", "events_since_mark", "tap_and_observe",
+                                  "app_export_file", "app_export_bundle"]
         var tools: [[String: Any]] = []
         // Union of the catalog and the handler table: inspect-family tools
         // route via runInspectTool (not handlers) and were silently absent.
