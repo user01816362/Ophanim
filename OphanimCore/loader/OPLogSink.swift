@@ -169,7 +169,9 @@ public final class OPFileSink: OPLogSink {
         let f = DateFormatter()
         f.dateFormat = "yyyyMMdd-HHmmss"
         f.locale = Locale(identifier: "en_US_POSIX")
-        return f.string(from: Date())
+        // Pid-suffixed: two processes in the same second no longer share one
+        // file (matches runId and crash-file stems; lexical order preserved).
+        return f.string(from: Date()) + "-\(ProcessInfo.processInfo.processIdentifier)"
     }()
 
     static func runStamp() -> String { cachedRunStamp }

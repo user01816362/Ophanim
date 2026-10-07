@@ -348,8 +348,14 @@ struct EventDetailView: View {
                     }
                 }
 
-                bodyBlock("Request body", event.requestBody)
-                bodyBlock("Response body", event.responseBody)
+                // Feed the render chain: content types were captured in fields
+                // but never forwarded, leaving every dispatch branch except
+                // sniffing unreachable. Request/response content types come
+                // from their respective header namespaces.
+                bodyBlock("Request body", event.requestBody,
+                          contentType: event.fields["req.Content-Type"])
+                bodyBlock("Response body", event.responseBody,
+                          contentType: event.fields["resp.Content-Type"])
 
                 if let bt = event.backtrace, !bt.isEmpty {
                     section("Backtrace")

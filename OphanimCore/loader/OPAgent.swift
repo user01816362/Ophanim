@@ -73,6 +73,9 @@ public final class OPAgent: @unchecked Sendable {
         op_set_bypass_pinning(config.enabled && config.bypassPinning)
         guard config.enabled else { sinks = nil; interceptor = nil; return }
         let dir = OPAgent.resolveLogDirectory(config)
+        // Durability point: flush the outgoing sink set before the rebuild
+        // replaces it, so config reloads never strand buffered events.
+        sinks?.flush()
         sinks = OPSinkMultiplexer.make(config: config, logDirectory: dir)
         interceptor = OPInterceptor(rules: config.rules)
         observe(OPEvent(category: .process, layer: .interpose, api: "ophanim.\(boot ? "start" : "reload")",
@@ -141,6 +144,16 @@ public final class OPAgent: @unchecked Sendable {
         if let u = ctx.url { fields["url"] = u }
         if let p = ctx.path { fields["path"] = p }
         for (k, v) in extraFields { fields[k] = v }
+        // Size honesty: capped bodies are otherwise indistinguishable from
+        // complete ones. True lengths + truncation flags ride in fields.
+        if let req = ctx.requestBody {
+            fields["requestBodyLen"] = String(req.count)
+            if req.count > config.bodyCapBytes { fields["requestTruncated"] = "true" }
+        }
+        if let rsp = ctx.responseBody {
+            fields["responseBodyLen"] = String(rsp.count)
+            if rsp.count > config.bodyCapBytes { fields["responseTruncated"] = "true" }
+        }
         // Backtraces are only meaningful for ObjC-swizzle events: those hooks run synchronously on
         // the app's calling thread, so the call stack here is the real caller. Ring-based events
         // (interpose/socket/tls) are drained on the consumer thread, where the stack would be wrong.

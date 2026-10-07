@@ -123,6 +123,16 @@ static void op_kc_attr(CFDictionaryRef d, char *buf, size_t cap) {
     }
 }
 
+// Shared SecItem call tail: extract service/account into a stack buffer
+// (never secret bytes) and emit one ring record. One shape for all four
+// wrappers so emit drift (a wrapper forgetting the account or the retval)
+// is impossible by construction. Debug mirroring stays per call site
+// (message shapes differ); the ring record is the contract.
+static void gg_SecItemEmit(int kind, OSStatus retval, CFDictionaryRef query) {
+    char acct[OP_STR_CAP]; op_kc_attr(query, acct, sizeof(acct));
+    op_ring_emit(kind, 0, (int32_t)retval, acct[0] ? acct : NULL, NULL, 0);
+}
+
 // Use the implementations from KeychainShim
 static OSStatus gg_SecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
     OSStatus retval;
@@ -131,8 +141,7 @@ static OSStatus gg_SecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result)
     } else {
         retval = SecItemCopyMatching(query, result);
     }
-    char acct[OP_STR_CAP]; op_kc_attr(query, acct, sizeof(acct));
-    op_ring_emit(OP_K_KEYCHAIN_COPY, 0, (int32_t)retval, acct[0] ? acct : NULL, NULL, 0);
+    gg_SecItemEmit(OP_K_KEYCHAIN_COPY, retval, query);
     if (result != NULL) {
         if ([[AppConfig shared] chainGuardDebugging]) {
             [KeychainShim debugLogger:[NSString stringWithFormat:@"SecItemCopyMatching: %@", query]];
@@ -149,8 +158,7 @@ static OSStatus gg_SecItemAdd(CFDictionaryRef attributes, CFTypeRef *result) {
     } else {
         retval = SecItemAdd(attributes, result);
     }
-    char acct[OP_STR_CAP]; op_kc_attr(attributes, acct, sizeof(acct));
-    op_ring_emit(OP_K_KEYCHAIN_ADD, 0, (int32_t)retval, acct[0] ? acct : NULL, NULL, 0);
+    gg_SecItemEmit(OP_K_KEYCHAIN_ADD, retval, attributes);
     if (result != NULL) {
         if ([[AppConfig shared] chainGuardDebugging]) {
             [KeychainShim debugLogger: [NSString stringWithFormat:@"SecItemAdd: %@", attributes]];
@@ -167,8 +175,7 @@ static OSStatus gg_SecItemUpdate(CFDictionaryRef query, CFDictionaryRef attribut
     } else {
         retval = SecItemUpdate(query, attributesToUpdate);
     }
-    char acct[OP_STR_CAP]; op_kc_attr(query, acct, sizeof(acct));
-    op_ring_emit(OP_K_KEYCHAIN_UPDATE, 0, (int32_t)retval, acct[0] ? acct : NULL, NULL, 0);
+    gg_SecItemEmit(OP_K_KEYCHAIN_UPDATE, retval, query);
     if (attributesToUpdate != NULL) {
         if ([[AppConfig shared] chainGuardDebugging]) {
             [KeychainShim debugLogger: [NSString stringWithFormat:@"SecItemUpdate: %@", query]];
@@ -186,8 +193,7 @@ static OSStatus gg_SecItemDelete(CFDictionaryRef query) {
     } else {
         retval = SecItemDelete(query);
     }
-    char acct[OP_STR_CAP]; op_kc_attr(query, acct, sizeof(acct));
-    op_ring_emit(OP_K_KEYCHAIN_DELETE, 0, (int32_t)retval, acct[0] ? acct : NULL, NULL, 0);
+    gg_SecItemEmit(OP_K_KEYCHAIN_DELETE, retval, query);
     if ([[AppConfig shared] chainGuardDebugging]) {
         [KeychainShim debugLogger: [NSString stringWithFormat:@"SecItemDelete: %@", query]];
     }
@@ -362,25 +368,61 @@ DYLD_INTERPOSE(gg_usleep, usleep)
 /// store sync): plain .dylib files directly, .framework bundles via their binary.
 /// Dotfiles and the .disabled convention are skipped, mirroring the host scan, so the
 /// GUI toggle and the loader can never disagree about what runs. Main queue only.
+static BOOL OPLoadOnePlugin(NSString *path) {
+    @try {
+        void *handle = dlopen([path fileSystemRepresentation], RTLD_NOW | RTLD_GLOBAL);
+        const char *err = dlerror();
+        NSLog(@"[Ophanim] tweak %@: %s", [path lastPathComponent], handle ? "loaded" : (err ? err : "unknown"));
+        op_ring_emit(OP_K_PROC_DLOPEN, 0, handle ? 0 : -1, [path fileSystemRepresentation], NULL, 0);
+        return handle != NULL;
+    } @catch (NSException *e) {
+        NSLog(@"[Ophanim] tweak %@ threw: %@", [path lastPathComponent], e);
+        return NO;
+    }
+}
+
+// Recursive, deterministic plugin collection: depth-8, symlink-
+// canonicalized visited set (no cycles), sorted order, `.dylib` plus
+// `.framework` executable-path resolution, dotfiles/`.disabled` skipped,
+// dangling symlinks tolerated. Pass-1 failures retry once (dependency order).
+static void OPCollectPlugins(NSString *dir, NSMutableArray<NSString *> *out,
+                             NSMutableSet<NSString *> *seen, int depth) {
+    if (depth > 8) { return; }
+    NSString *canon = [dir stringByResolvingSymlinksInPath];
+    if (!canon || [seen containsObject:canon]) { return; }
+    [seen addObject:canon];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *names =
+        [[fm contentsOfDirectoryAtPath:dir error:nil] sortedArrayUsingSelector:@selector(compare:)];
+    for (NSString *name in names) {
+        if ([name hasPrefix:@"."] || [name hasSuffix:@".disabled"]) { continue; }
+        NSString *full = [dir stringByAppendingPathComponent:name];
+        BOOL isDir = NO;
+        if (![fm fileExistsAtPath:full isDirectory:&isDir]) { continue; }
+        if (isDir) {
+            if ([name hasSuffix:@".framework"]) {
+                NSString *exe = [full stringByAppendingPathComponent:
+                    [[name stringByDeletingPathExtension] lastPathComponent]];
+                if ([fm fileExistsAtPath:exe]) { [out addObject:exe]; continue; }
+            }
+            OPCollectPlugins(full, out, seen, depth + 1);
+        } else if ([name hasSuffix:@".dylib"]) {
+            [out addObject:full];
+        }
+    }
+}
+
 static void OPLoadUserTweaks(void) {
     NSString *plugins = [[[[NSBundle mainBundle] bundlePath]
         stringByAppendingPathComponent:@"Frameworks"] stringByAppendingPathComponent:@"UserPlugins"];
     NSFileManager *fm = [NSFileManager defaultManager];
     BOOL isDir = NO;
     if (![fm fileExistsAtPath:plugins isDirectory:&isDir] || !isDir) { return; }
-    for (NSString *name in [fm contentsOfDirectoryAtPath:plugins error:nil]) {
-        if ([name hasPrefix:@"."] || [name hasSuffix:@".disabled"]) { continue; }
-        NSString *full = [plugins stringByAppendingPathComponent:name];
-        if ([name hasSuffix:@".framework"]) {
-            full = [full stringByAppendingPathComponent:
-                    [[name stringByDeletingPathExtension] lastPathComponent]];
-        } else if (![name hasSuffix:@".dylib"]) {
-            continue;
-        }
-        void *handle = dlopen([full fileSystemRepresentation], RTLD_NOW);
-        NSLog(@"[Ophanim] tweak %@: %s", name,
-              handle ? "loaded" : dlerror());
-    }
+    NSMutableArray<NSString *> *ordered = [NSMutableArray array];
+    OPCollectPlugins(plugins, ordered, [NSMutableSet set], 0);
+    NSMutableArray<NSString *> *retry = [NSMutableArray array];
+    for (NSString *p in ordered) { if (!OPLoadOnePlugin(p)) { [retry addObject:p]; } }
+    for (NSString *p in retry) { OPLoadOnePlugin(p); }
 }
 
 static void __attribute__((constructor)) initialize(void) {

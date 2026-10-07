@@ -77,17 +77,24 @@ enum OPNetworkHooks {
            let req = task.value(forKey: "currentRequest") as? URLRequest { host = req.url?.host }
         var str: String?
         var data: Data?
+        var messageType = "empty"
         if let msg = msg, msg.responds(to: NSSelectorFromString("string")) {
             str = msg.value(forKey: "string") as? String
         }
-        if let msg = msg, msg.responds(to: NSSelectorFromString("data")) {
-            data = (msg.value(forKey: "data") as? Data) ?? str?.data(using: .utf8)
-        } else {
+        if let msg = msg, msg.responds(to: NSSelectorFromString("data")),
+           let raw = msg.value(forKey: "data") as? Data {
+            // A data payload exists independently of any string form: binary frame.
+            data = raw
+            messageType = "binary"
+        } else if str != nil {
             data = str?.data(using: .utf8)
+            messageType = "text"
         }
         let ctx = OPCallContext(category: .network, layer: .objc,
                                 api: "URLSessionWebSocketTask.\(dir)",
-                                fields: ["transport": "websocket"], host: host)
+                                fields: ["transport": "websocket",
+                                         "messageType": messageType],
+                                host: host)
         if dir == "send" { ctx.requestBody = data } else { ctx.responseBody = data }
         let decision = OPAgent.shared.intercept(ctx)
         OPAgent.shared.observe(OPAgent.shared.event(from: ctx, decision: decision,
@@ -152,6 +159,12 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
             if !callers.symbols.isEmpty {
                 fields["callerSymbols"] = callers.symbols.joined(separator: ",")
             }
+        }
+        // Streamed uploads: req.httpBodyStream is a live, single-read
+        // stream — copying it here would consume bytes the app still needs,
+        // so label (never drain). Stream bodies stay headers-only by design.
+        if req.httpBody == nil, req.httpBodyStream != nil {
+            fields["bodySource"] = "stream-unread"
         }
         let ctx = OPCallContext(category: .network, layer: .urlProtocol, api: "URLSession.request",
                                 fields: fields, host: req.url?.host, url: req.url?.absoluteString,
