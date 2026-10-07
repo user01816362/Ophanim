@@ -159,7 +159,9 @@ public final class OPInterceptor {
             return decision(.blocked, rule)
         case .delay:
             var d = decision(.delayed, rule)
-            d.delay = TimeInterval(a.delayMilliseconds ?? 0) / 1000.0
+            // Hard ceiling: a config typo must never stall the app under test
+            // indefinitely (main-thread sleeps flirt with the watchdog).
+            d.delay = min(TimeInterval(a.delayMilliseconds ?? 0) / 1000.0, 5.0)
             return d
         case .fault:
             var d = decision(.faulted, rule)

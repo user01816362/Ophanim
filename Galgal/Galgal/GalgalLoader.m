@@ -260,14 +260,14 @@ static int gg_open(char const* restrict filename, int oflag, ... ) {
     // though open() is called from inside malloc. It self-gates on the .filesystem category mask.
     op_ring_emit(OP_K_FS_OPEN, 0, oflag, filename, NULL, 0);
 
-    if (oflag == O_CREAT) {
+    if (oflag & O_CREAT) {
         int mod;
         va_list ap;
         va_start(ap, oflag);
         mod = va_arg(ap, int);
         va_end(ap);
 
-        return open(filename, O_CREAT, mod);
+        return open(filename, oflag, mod);
     }
 
     return open(filename, oflag);

@@ -70,9 +70,21 @@ enum OPNetworkHooks {
     private static func emitWS(task: AnyObject, msg: AnyObject?, dir: String) {
         guard OPAgent.shared.isActive(.network) else { return }
         var host: String?
-        if let req = task.value(forKey: "currentRequest") as? URLRequest { host = req.url?.host }
-        let str = msg?.value(forKey: "string") as? String
-        let data = (msg?.value(forKey: "data") as? Data) ?? str?.data(using: .utf8)
+        // KVC without responds(to:) throws NSUnknownKeyException straight
+        // into the app (Swift cannot catch ObjC exceptions) — probe first,
+        // fail open with metadata only.
+        if task.responds(to: NSSelectorFromString("currentRequest")),
+           let req = task.value(forKey: "currentRequest") as? URLRequest { host = req.url?.host }
+        var str: String?
+        var data: Data?
+        if let msg = msg, msg.responds(to: NSSelectorFromString("string")) {
+            str = msg.value(forKey: "string") as? String
+        }
+        if let msg = msg, msg.responds(to: NSSelectorFromString("data")) {
+            data = (msg.value(forKey: "data") as? Data) ?? str?.data(using: .utf8)
+        } else {
+            data = str?.data(using: .utf8)
+        }
         let ctx = OPCallContext(category: .network, layer: .objc,
                                 api: "URLSessionWebSocketTask.\(dir)",
                                 fields: ["transport": "websocket"], host: host)
@@ -108,6 +120,7 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
     private var session: URLSession?
     private var proxyTask: URLSessionDataTask?
     private var responseData = Data()
+    private var overflowBytes = 0
     private var httpResponse: HTTPURLResponse?
     private var ctx: OPCallContext?
     private var decision: OPDecision = .observe
@@ -170,7 +183,12 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
             fallthrough
         default:
             // Pass through: re-issue the request with a marker so we don't re-enter.
-            guard let mutable = (req as NSURLRequest).mutableCopy() as? NSMutableURLRequest else { return }
+            // A request that cannot be copied fails STATED (didFail) — never a
+            // silent hang: the loader would wait forever otherwise.
+            guard let mutable = (req as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
+                client?.urlProtocol(self, didFailWithError: URLError(.cannotParseResponse))
+                return
+            }
             URLProtocol.setProperty(true, forKey: Self.handledKey, in: mutable)
             // Drop the app's explicit Accept-Encoding so URLSession manages compression itself and
             // hands us DECOMPRESSED bytes - otherwise we'd capture (and log) raw gzip/brotli, which
@@ -196,13 +214,22 @@ final class OPURLProtocol: URLProtocol, URLSessionDataDelegate {
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        responseData.append(data)
+        // Bounded accumulator (jetsam guard): stop buffering past the body
+        // cap, keep counting the dropped tail. The cap still applies at
+        // event build; overflow is reported, never silently lost.
+        let cap = OPAgent.shared.bodyCap
+        let room = max(0, cap - responseData.count)
+        if room > 0 { responseData.append(data.prefix(room)) }
+        overflowBytes += max(0, data.count - room)
         client?.urlProtocol(self, didLoad: data)
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let ctx = ctx {
             ctx.responseBody = responseData
+            if overflowBytes > 0 {
+                ctx.fields["truncatedBytes"] = String(overflowBytes)
+            }
             if let r = httpResponse {
                 ctx.fields["status"] = String(r.statusCode)
                 for (k, v) in r.allHeaderFields { ctx.fields["resp.\(k)"] = "\(v)" }
