@@ -55,19 +55,30 @@ class Macho {
     /// - Throws: Strip/rewrite errors or file I/O failures.
     static func convertMacho(_ macho: URL) throws {
         print("Converting MachO at \(macho.path)")
+        let binary = try convertedBytes(macho)
 
+        print("Writing revised MachO...")
+        try FileManager.default.removeItem(at: macho)
+        try binary.write(to: macho)
+    }
+
+    /// Conversion without the write: strip to the arm64 slice, retarget the
+    /// version command at Catalyst, redirect iOS-only @rpath libs. Pure
+    /// (reads the file, returns bytes) so callers can probe convertibility
+    /// or stage converted bytes without touching the source.
+    ///
+    /// - Parameter macho: The file to read.
+    /// - Returns: Converted bytes.
+    /// - Throws: Strip/rewrite errors or file I/O failures.
+    static func convertedBytes(_ macho: URL) throws -> Data {
         var binary = try Data(contentsOf: macho)
-
         print("Stripping MachO...")
         try stripBinary(&binary)
         print("Replacing version command...")
         try replaceVersionCommand(&binary)
         print("Replacing instances of @rpath dylibs...")
         try replaceLibraries(&binary)
-
-        print("Writing revised MachO...")
-        try FileManager.default.removeItem(at: macho)
-        try binary.write(to: macho)
+        return binary
     }
 
     /// Redirects iOS-only @rpath Swift libs (libswiftUIKit) at their Mac Catalyst paths.
@@ -295,15 +306,23 @@ class Macho {
     /// `command` and evaluate `test` against its byte range. Returns false if no such command exists.
     private static func firstLoadCommand(atURL url: URL, command: UInt32,
                                          test: (_ binary: Data, _ offset: Int, _ shouldSwap: Bool) -> Bool) throws -> Bool {
-        var binary = try Data(contentsOf: url)
-        try stripBinary(&binary)
+        try firstLoadCommand(binary: try Data(contentsOf: url), command: command, test: test)
+    }
+
+    /// In-memory twin of the URL variant (no file read): the caller supplies
+    /// bytes, typically freshly converted ones being probed before any write.
+    /// Strip is idempotent (a slim slice passes through untouched).
+    private static func firstLoadCommand(binary: Data, command: UInt32,
+                                         test: (_ binary: Data, _ offset: Int, _ shouldSwap: Bool) -> Bool) throws -> Bool {
+        var slim = binary
+        try stripBinary(&slim)
         var result = false
-        _ = try iterateLoadCommands(binary: binary) { offset, shouldSwap in
-            let loadCommand = binary.extract(load_command.self,
+        _ = try iterateLoadCommands(binary: slim) { offset, shouldSwap in
+            let loadCommand = slim.extract(load_command.self,
                                              offset: offset,
                                              swap: shouldSwap ? { swapLoadCommand($0, $1) } : nil)
             if loadCommand.cmd == command {
-                result = test(binary, offset, shouldSwap)
+                result = test(slim, offset, shouldSwap)
                 return true
             }
             return false
@@ -338,6 +357,23 @@ class Macho {
                                                 swap: shouldSwap ? { swapBuildVersionCommand($0, $1) } : nil)
             return versionCommand.platform == PLATFORM_MACCATALYST
         }
+    }
+
+    /// True when converted bytes (see `convertedBytes`) would carry a
+    /// Catalyst marker. Pure probe: answers "would `addTweak`'s engine-side
+    /// conversion make this loadable" without writing anything.
+    ///
+    /// - Parameter url: The file to probe.
+    /// - Returns: Whether conversion yields a Catalyst slice (false on any
+    ///   failure: unreadable, no arm64 slice, corrupt table).
+    static func convertsCleanly(_ url: URL) -> Bool {
+        guard let bytes = try? convertedBytes(url) else { return false }
+        return (try? firstLoadCommand(binary: bytes, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
+            let versionCommand = binary.extract(build_version_command.self,
+                                                offset: offset,
+                                                swap: shouldSwap ? { swapBuildVersionCommand($0, $1) } : nil)
+            return versionCommand.platform == PLATFORM_MACCATALYST
+        }) ?? false
     }
 
     // MARK: - Inspect
@@ -419,6 +455,16 @@ class Macho {
         if (report["validArchitecture"] as? Bool) == false { blockers.append("not a loadable arm64 slice") }
         report["loadable"] = blockers.isEmpty
         report["reason"] = blockers.isEmpty ? "ok" : blockers.joined(separator: ", ")
+        // Convertibility probe (add_tweak's engine converts the store copy):
+        // an unencrypted, currently-unloadable Mach-O that converts cleanly
+        // is installable despite loadable=false. Skipped when already
+        // loadable (no wasted work on the happy path) and when encrypted
+        // (byte surgery on ciphertext is meaningless).
+        if !blockers.isEmpty && (report["encrypted"] as? Bool) != true {
+            report["needsConversion"] = convertsCleanly(binaryURL)
+        } else {
+            report["needsConversion"] = false
+        }
         return report
     }
 }

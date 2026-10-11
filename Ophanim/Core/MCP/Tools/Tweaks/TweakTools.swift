@@ -56,7 +56,8 @@ enum TweakTools {
     /// - Returns: Dry-run JSON with `source`/`destination`/`wouldReplace`, or
     ///   confirmation with the `added` path.
     /// - Throws: `ToolRouter.bail` when `path` is missing, names no file, the
-    ///   app is not installed, the slice is not loadable, or the name exists
+    ///   app is not installed, the slice is neither loadable nor convertible,
+    ///   or the name exists
     ///   without `replace: true`.
     static func addTweak(_ args: [String: Any]) throws -> String {
         let bid = try ToolRouter.requireBundleID(args)
@@ -67,10 +68,22 @@ enum TweakTools {
         }
         guard let exe = AppQueryService.appExecutable(bid) else { throw ToolRouter.bail("app not installed: \(bid)") }
         // Refuse a slice the engine cannot load, before copying rather than after.
+        // Convertible slices (iOS platform, fat multi-arch) pass through: the
+        // engine converts the STORE COPY via the same convertMacho path the
+        // installer uses for app binaries — the source file is never touched.
+        // Encrypted bytes stay refused (conversion on ciphertext is meaningless).
         let verdict = try Macho.inspect(source)
+        var converted = false
         if verdict["loadable"] as? Bool == false {
-            throw ToolRouter.bail("this file cannot be loaded by the engine: "
-                + "\(verdict["reason"] as? String ?? "unsupported slice")")
+            if verdict["encrypted"] as? Bool == true {
+                throw ToolRouter.bail("this file cannot be loaded by the engine: "
+                    + "\(verdict["reason"] as? String ?? "unsupported slice")")
+            }
+            guard Macho.convertsCleanly(source) else {
+                throw ToolRouter.bail("this file cannot be loaded by the engine: "
+                    + "\(verdict["reason"] as? String ?? "unsupported slice")")
+            }
+            converted = true
         }
         let (store, custom) = TweakStoreService.store(bundleID: bid)
         let destination = store.appendingPathComponent(source.lastPathComponent)
@@ -81,11 +94,12 @@ enum TweakTools {
         if ToolRouter.isDryRun(args) {
             return try ToolRouter.json(["dryRun": true, "bundleID": bid, "source": source.path,
                                  "destination": destination.path, "wouldReplace": exists,
-                                 "loadable": true])
+                                 "loadable": true, "converted": converted])
         }
         try Galgal.addTweakItem(at: source, bundleIdentifier: bid,
                                 appExecutable: exe, customPath: custom)
-        return try ToolRouter.json(["bundleID": bid, "added": destination.path, "replaced": exists])
+        return try ToolRouter.json(["bundleID": bid, "added": destination.path, "replaced": exists,
+                             "converted": converted])
     }
 
     /// Renames a tweak inside the store (and re-syncs the app). Destructive:

@@ -122,7 +122,7 @@ matching rule wins; no match = observe (`OPInterceptor.swift:84-89`). The
 |---|---|---|
 | `list_tweaks` | R/I | `recursive` bool. Store entries (dylib/framework/folder, enabled state) (`TweakTools.swift:7-13`) |
 | `inspect_tweak` | R/I | `path` (required; note: catalog marks `bundleID` required, handler reads `path` — pass both). Loadability + Mach-O facts. **Run BEFORE add** (`TweakTools.swift:15-19`; `MCPServer.swift:765-774`) |
-| `add_tweak` | D, dryRun-default | `path` (required) + `replace` bool. Gate: un-loadable slices refused **before** copying. Name clash without `replace:true` refused (`TweakTools.swift:21-49`) |
+| `add_tweak` | D, dryRun-default | `path` (required) + `replace` bool. Gate: un-loadable slices refused **before** copying — except convertible iOS/fat slices, which pass with `converted:true` (engine converts the store copy). Name clash without `replace:true` refused (`TweakTools.swift:21-49`) |
 | `move_tweak` | D, dryRun-default | `from`/`to` (required). Destination clash refused (`TweakTools.swift:51-74`) |
 | `remove_tweak` | D, dryRun-default | `name` (required) (`TweakTools.swift:76-91`) |
 | `set_tweak_enabled` | D, dryRun-default | `name` + `enabled` bool (required). `.disabled`-suffix convention; accepts the display name with or without the suffix (`TweakTools.swift:93-116`) |

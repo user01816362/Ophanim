@@ -971,7 +971,7 @@ final class MCPServer {
         ],
         [
             "name": "add_tweak",
-            "description": "Copy a tweak into the store after a loadability check.",
+            "description": "Copy a tweak into the store after a loadability check. iOS-platform / fat slices pass through with converted:true — the engine converts the store copy (source never touched); encrypted bytes stay refused.",
             "inputSchema": [
                 "type": "object",
                 "properties": [
