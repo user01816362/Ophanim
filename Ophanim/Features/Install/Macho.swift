@@ -33,7 +33,11 @@ class Macho {
                     swapFatArch(&arch, NXHostByteOrder())
                 }
 
-                if arch.cputype == CPU_TYPE_ARM64 {
+                // Engine executes arm64 only: skip PAC (arm64e) slices even
+                // when listed first — converting their platform marker would
+                // produce a "loadable" slice that faults on this host.
+                if arch.cputype == CPU_TYPE_ARM64
+                    && isLoadableSubtype(family: UInt32(bitPattern: arch.cpusubtype) & 0xFF) {
                     print("Found ARM64 arch in fat binary")
 
                     binary = binary
@@ -344,6 +348,50 @@ class Macho {
         }
     }
 
+    /// PAC-subtype gate shared by the slice check and the fat scan: known
+    /// pointer-authentication families refuse; everything else passes through
+    /// to dyld (clean load refusal, never a fault through our engine).
+    ///
+    /// - Parameter family: Low byte of the CPU subtype.
+    /// - Returns: False for arm64e (2) and its X1 PAC variant (12).
+    static func isLoadableSubtype(family: UInt32) -> Bool {
+        family != UInt32(bitPattern: CPU_SUBTYPE_ARM64E)
+            && family != UInt32(bitPattern: CPU_SUBTYPE_ARM64E_X1)
+    }
+
+    /// True when bytes are a thin arm64 slice this engine can execute:
+    /// MH_MAGIC_64 with cputype ARM64 and a non-PAC subtype. arm64e slices
+    /// (CPU_SUBTYPE_ARM64E and its E variants — pointer authentication) have
+    /// no host support on arm64 Macs: the code faults, so they are unloadable
+    /// even with a Catalyst platform marker. Endian-aware (CIGAM accepted).
+    ///
+    /// - Parameter binary: The (already stripped, if fat) bytes.
+    /// - Returns: Whether dyld on this host could load the slice.
+    static func isArm64Slice(_ binary: Data) -> Bool {
+        guard binary.count >= 8 else { return false }
+        var magic = UInt32(binary[0]) | (UInt32(binary[1]) << 8)
+            | (UInt32(binary[2]) << 16) | (UInt32(binary[3]) << 24)
+        var cputype = UInt32(binary[4]) | (UInt32(binary[5]) << 8)
+            | (UInt32(binary[6]) << 16) | (UInt32(binary[7]) << 24)
+        var subtype: UInt32 = 0
+        if binary.count >= 12 {
+            subtype = UInt32(binary[8]) | (UInt32(binary[9]) << 8)
+                | (UInt32(binary[10]) << 16) | (UInt32(binary[11]) << 24)
+        }
+        if magic == 0xCFFAEDFE {
+            magic = magic.byteSwapped
+            cputype = cputype.byteSwapped
+            subtype = subtype.byteSwapped
+        }
+        guard magic == 0xFEEDFACF,
+              cputype == UInt32(bitPattern: CPU_TYPE_ARM64) else { return false }
+        // Low byte carries the subtype family; known PAC variants refuse.
+        // Unknown future subtypes pass through to dyld, which enforces the
+        // rest with a clean load refusal (never a fault through our engine).
+        let family = subtype & 0xFF
+        return isLoadableSubtype(family: family)
+    }
+
     /// True when a Catalyst platform marker is present (same any-match rule as
     /// launch: converted binaries carry iOS first, Catalyst second).
     ///
@@ -351,7 +399,11 @@ class Macho {
     /// - Returns: Whether the binary has a Catalyst slice.
     /// - Throws: Read/strip/iteration failures.
     static func isMachoValidArch(_ url: URL) throws -> Bool {
-        try firstLoadCommand(atURL: url, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
+        // PAC slices are unloadable regardless of platform marker.
+        var probe = try Data(contentsOf: url)
+        try stripBinary(&probe)
+        guard isArm64Slice(probe) else { return false }
+        return try firstLoadCommand(atURL: url, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
             let versionCommand = binary.extract(build_version_command.self,
                                                 offset: offset,
                                                 swap: shouldSwap ? { swapBuildVersionCommand($0, $1) } : nil)
@@ -367,7 +419,7 @@ class Macho {
     /// - Returns: Whether conversion yields a Catalyst slice (false on any
     ///   failure: unreadable, no arm64 slice, corrupt table).
     static func convertsCleanly(_ url: URL) -> Bool {
-        guard let bytes = try? convertedBytes(url) else { return false }
+        guard let bytes = try? convertedBytes(url), isArm64Slice(bytes) else { return false }
         return (try? firstLoadCommand(binary: bytes, command: UInt32(LC_BUILD_VERSION)) { binary, offset, shouldSwap in
             let versionCommand = binary.extract(build_version_command.self,
                                                 offset: offset,
