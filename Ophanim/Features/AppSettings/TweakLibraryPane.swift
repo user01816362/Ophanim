@@ -10,7 +10,9 @@ import SwiftUI
 import AppKit
 
 /// Per-app tweak library: folder picker, installed-tweak list with enable toggles,
-/// add/remove, and validated new-folder creation. Reloads from disk on appear.
+/// add/remove, and validated new-folder creation. Self-refreshing after every
+/// mutation (no manual refresh needed): each action bumps `reloadToken`, and
+/// reloadItems is the single disk→view funnel.
 struct CustomDylibView: View {
     var app: HostedApp
     @Bindable var settings: AppSettings
@@ -20,6 +22,31 @@ struct CustomDylibView: View {
     @State private var showNewFolderSheet = false
     @State private var newFolderName = ""
     @AppStorage("hasShownCustomPluginWarning") private var hasShownWarning = false
+    /// Bumped by every mutation; the disk reload observes it, so adds /
+    /// creates / toggles / removes repaint immediately without a manual
+    /// refresh and without relying on .onAppear (which does not re-fire
+    /// while the pane is already visible).
+    @State private var reloadToken = UUID()
+
+    /// Row subtitle. Folders state their recursive dylib count (what actually
+    /// loads); other rows keep the plain type label.
+    private func subtitle(for item: TweakItem) -> String {
+        guard item.isFolder else {
+            return item.isFramework ? "Framework Bundle" : "Mach-O Dylib"
+        }
+        if let nested = try? FileManager.default.contentsOfDirectory(
+            at: item.fileUrl,
+            includingPropertiesForKeys: nil
+        ), !nested.isEmpty {
+            let dylibs = nested.filter { $0.pathExtension == "dylib" }.count
+            let frameworks = nested.filter { $0.pathExtension == "framework" }.count
+            let total = dylibs + frameworks
+            return total == 0
+                ? "Folder (empty — nothing loads)"
+                : "Folder — loads \(total) item\(total == 1 ? "" : "s") recursively"
+        }
+        return "Folder (empty — nothing loads)"
+    }
 
     init(app: HostedApp, settings: AppSettings, hasGalgal: Binding<Bool?>) {
         self.app = app
@@ -46,6 +73,7 @@ struct CustomDylibView: View {
 
                     Button("Change Folder…") {
                         vm.chooseCustomFolder()
+                        reloadToken = UUID()
                     }
                     .font(.caption)
                     .disabled(vm.isProcessing)
@@ -53,6 +81,7 @@ struct CustomDylibView: View {
                     if vm.isUsingCustomFolder {
                         Button("Reset") {
                             vm.resetCustomFolder()
+                            reloadToken = UUID()
                         }
                         .font(.caption)
                         .disabled(vm.isProcessing)
@@ -101,6 +130,7 @@ struct CustomDylibView: View {
                 Button {
                     if hasShownWarning {
                         vm.selectAndAddTweak()
+                        reloadToken = UUID()
                     } else {
                         showWarning = true
                     }
@@ -141,7 +171,11 @@ struct CustomDylibView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.displayName)
                                     .font(.system(.body, design: .monospaced))
-                                Text(item.isFolder ? "Folder (Recursively loaded)" : (item.isFramework ? "Framework Bundle" : "Mach-O Dylib"))
+                                // Folder rows load recursively but were listed
+                                // non-recursively, so tweaks inside a folder
+                                // never appeared anywhere. Count them here so
+                                // the row states exactly what will run.
+                                Text(subtitle(for: item))
                                     .font(.system(size: 9))
                                     .foregroundStyle(.secondary)
                             }
@@ -151,7 +185,10 @@ struct CustomDylibView: View {
 
                             Toggle("", isOn: Binding(
                                 get: { item.isEnabled },
-                                set: { vm.toggleEnabled(item: item, enabled: $0) }
+                                set: { new in
+                                    vm.toggleEnabled(item: item, enabled: new)
+                                    reloadToken = UUID()
+                                }
                             ))
                             .labelsHidden()
                             .disabled(vm.isProcessing)
@@ -159,6 +196,7 @@ struct CustomDylibView: View {
 
                             Button {
                                 vm.removeItem(item)
+                                reloadToken = UUID()
                             } label: {
                                 Image(systemName: "trash")
                                     .foregroundStyle(.red.opacity(0.8))
@@ -176,6 +214,7 @@ struct CustomDylibView: View {
             }
         }
         .disabledWhenNoGalgal(hasGalgal)
+        .task(id: reloadToken) { await vm.reloadItems() }
         .onAppear {
             Task { await vm.reloadItems() }
         }
@@ -184,6 +223,7 @@ struct CustomDylibView: View {
             Button("settings.customPlugins.warningConfirm", role: .destructive) {
                 hasShownWarning = true
                 vm.selectAndAddTweak()
+                reloadToken = UUID()
             }
         } message: {
             Text("settings.customPlugins.warningMessage")
@@ -211,6 +251,7 @@ struct CustomDylibView: View {
                             return
                         }
                         vm.createSubfolder(named: name)
+                        reloadToken = UUID()
                         showNewFolderSheet = false
                     }
                     .keyboardShortcut(.defaultAction)
