@@ -42,7 +42,7 @@ on:
         description: Runner image
         type: choice
         options: [macos-26, macos-15, xcode-27]
-        default: macos-26
+        default: xcode-27
       publish:
         description: Tag + release this build on success
         type: boolean
@@ -75,9 +75,9 @@ jobs:
   build:
     name: Build Ophanim.app
     # `inputs` is populated for workflow_dispatch and empty for push/pull_request, so this
-    # resolves to macos-26 on CI and to the operator's choice on a manual run. `env` is NOT
+    # resolves to xcode-27 on CI and to the operator's choice on a manual run. `env` is NOT
     # usable here (jobs.<id>.runs-on can't see the env context), hence the inline fallback.
-    runs-on: ${{ inputs.runner || 'macos-26' }}
+    runs-on: ${{ inputs.runner || 'xcode-27' }}
     timeout-minutes: 45
     permissions:
       contents: read
