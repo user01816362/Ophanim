@@ -353,10 +353,9 @@ class Macho {
     /// to dyld (clean load refusal, never a fault through our engine).
     ///
     /// - Parameter family: Low byte of the CPU subtype.
-    /// - Returns: False for arm64e (2) and its X1 PAC variant (12).
+    /// - Returns: False for arm64e (2). X1 PAC subtype is not exposed in Swift's arch headers on this toolchain.
     static func isLoadableSubtype(family: UInt32) -> Bool {
         family != UInt32(bitPattern: CPU_SUBTYPE_ARM64E)
-            && family != UInt32(bitPattern: CPU_SUBTYPE_ARM64E_X1)
     }
 
     /// True when bytes are a thin arm64 slice this engine can execute:
