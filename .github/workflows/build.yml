@@ -328,8 +328,9 @@ jobs:
   release:
     name: Tag and publish release
     needs: build
-    # The Build button is authoritative: unticking `publish` and hitting Run must NOT publish.
-    # Otherwise: a v* tag push, or any green build landing on main.
+    # After successful build, cut the nightly release when it is configured to do so.
+    # The Build button remains authoritative (unticking publish must NOT publish);
+    # otherwise falls back to auto behavior on main / tag pushes.
     if: >-
       (github.event_name == 'workflow_dispatch' && (inputs.publish == true || inputs.publish == 'true')) ||
       (github.event_name != 'workflow_dispatch' &&
