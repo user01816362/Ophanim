@@ -370,7 +370,7 @@ DYLD_INTERPOSE(gg_usleep, usleep)
 /// GUI toggle and the loader can never disagree about what runs. Main queue only.
 static BOOL OPLoadOnePlugin(NSString *path) {
     @try {
-        void *handle = dlopen([path fileSystemRepresentation], RTLD_NOW | RTLD_GLOBAL);
+        void *handle = dlopen([path fileSystemRepresentation], RTLD_LAZY | RTLD_GLOBAL);
         const char *err = dlerror();
         NSLog(@"[Ophanim] tweak %@: %s", [path lastPathComponent], handle ? "loaded" : (err ? err : "unknown"));
         op_ring_emit(OP_K_PROC_DLOPEN, 0, handle ? 0 : -1, [path fileSystemRepresentation], NULL, 0);
@@ -428,25 +428,15 @@ static void OPLoadUserTweaks(void) {
 static void __attribute__((constructor)) initialize(void) {
     [Ophanim launch];
 
-    // Ophanim instrumentation engine (embedded injection mode). Gated: starts only when the app's
-    // config selects embedded injection - in sibling mode the standalone agent dylib owns the engine
-    // and the embedded core stays dormant here.
+    // LiveContainer-style load in this constructor: do not defer user tweak loading
+    // behind InspectBoot (or app startup completion); RTLD_LAZY allows late symbol resolution
+    // rather than failing at load.
+    OPLoadUserTweaks();
+
     [OPBootstrap startEmbedded];
 
-    // Inspect (Agent Mode): boot on the main queue - the pump's timer must attach to a
-    // spinning runloop, and constructors are not guaranteed main-thread. Starts its command
-    // pump only when the app opted in - otherwise one config read and out. Deliberately the
-    // only addition here: no engine, no hooks, no loader behavior change for apps that never
-    // enable it.
     [[NSOperationQueue mainQueue] addOperationWithBlock:^{
         [InspectBoot maybeStart];
-        // User tweaks (Frameworks/UserPlugins, synced by the host tweak store): dlopen each
-        // .dylib / framework binary on the main queue - constructors are not guaranteed
-        // main-thread and dlopen runs initializers. Skips dotfiles + the .disabled
-        // convention (mirrors the host store scan). RTLD_NOW fails loud in the log for
-        // missing symbols instead of crashing later at first call. No-op when the dir
-        // is absent (no tweaks installed).
-        OPLoadUserTweaks();
     }];
 
     if (ue_status == 0) {
